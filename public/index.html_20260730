@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IP 가디언즈: 특허 패스트트랙 서바이벌</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background-color: #05050d; font-family: 'Pretendard', sans-serif; color: #fff; }
+    #canvas-container { width: 100vw; height: 100vh; display: block; }
+    
+    /* In-Game HUD overlay */
+    #hud {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; pading: 20px;
+    }
+    .hud-header {
+      display: flex; justify-content: space-between; align-items: center; padding: 20px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+    }
+    .title-box h1 { font-size: 22px; color: #00ffcc; text-shadow: 0 0 10px #00ffcc; }
+    .status-box { font-size: 16px; font-weight: bold; background: rgba(10, 15, 30, 0.8); padding: 10px 18px; border-radius: 8px; border: 1px solid #00ffcc; }
+    
+    #layer-info {
+      position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .layer-badge {
+      padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: bold;
+      background: rgba(0,0,0,0.6); border: 1px solid #444; opacity: 0.5; transition: 0.3s;
+    }
+    .layer-badge.active { opacity: 1; transform: scale(1.05); border-color: #fff; box-shadow: 0 0 12px currentColor; }
+    .l-3 { color: #00ffcc; } .l-2 { color: #0088ff; } .l-1 { color: #aa00ff; }
+    
+    /* 관전자 조작 패널 */
+    #spectator-panel {
+      pointer-events: auto; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+      display: none; gap: 15px; background: rgba(10, 15, 30, 0.9); padding: 12px 24px; border-radius: 30px; border: 1px solid #00ffcc;
+    }
+    .spec-btn {
+      background: #111; color: #fff; border: 1px solid #00ffcc; padding: 10px 20px; border-radius: 20px;
+      cursor: pointer; font-weight: bold; transition: 0.2s;
+    }
+    .spec-btn:hover { background: #00ffcc; color: #000; box-shadow: 0 0 15px #00ffcc; }
+
+    /* 오버레이 메시지 */
+    #overlay-msg {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.85); display: flex; flex-direction: column;
+      justify-content: center; align-items: center; pointer-events: auto; z-index: 100;
+    }
+    #overlay-msg h2 { font-size: 40px; color: #00ffcc; margin-bottom: 15px; text-shadow: 0 0 20px #00ffcc; }
+    #overlay-msg p { font-size: 18px; color: #ccc; margin-bottom: 25px; }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="hud">
+    <div class="hud-header">
+      <div class="title-box">
+        <h1>IP 가디언즈: 특허 패스트트랙 서바이벌</h1>
+      </div>
+      <div class="status-box" id="status-text">대기실 접속 중...</div>
+    </div>
+
+    <div id="layer-info">
+      <div class="layer-badge l-3 active" id="badge-3">3층: 우선심사 레이어</div>
+      <div class="layer-badge l-2" id="badge-2">2층: 의견제출통지 레이어</div>
+      <div class="layer-badge l-1" id="badge-1">1층: 아이디어 구상 레이어</div>
+    </div>
+
+    <div id="spectator-panel">
+      <button class="spec-btn" onclick="triggerCheer()">✨ 응원 부스터 투입</button>
+      <button class="spec-btn" onclick="triggerObstacle()">⚠️ 특허침해 경고장 투하</button>
+    </div>
+  </div>
+
+  <div id="overlay-msg">
+    <h2 id="msg-title">매칭 대기 중...</h2>
+    <p id="msg-desc">4명의 플레이어가 참가하면 특허 패스트트랙 서바이벌이 시작됩니다.</p>
+  </div>
+
+  <script>
+    // --- 1. 글로벌 게임 제어 변수 및 렌더링 설정 ---
+    let socket;
+    let scene, camera, renderer;
+    let localPlayerId = null;
+    let isSpectator = false;
+    let gameStarted = false;
+
+    const players = {}; // id -> { mesh, targetPos, targetRotY, velocity, animState, layer, isAlive }
+    const tiles = {};   // "layer_row_col" -> mesh
+
+    const GRID_SIZE = 7;
+    const TILE_RADIUS = 1.2;
+    const LAYER_HEIGHTS = { 3: 12, 2: 6, 1: 0 };
+
+    // 로컬 캐릭터 물리 엔진 제어
+    const localPhysics = {
+      position: new THREE.Vector3(0, 15, 0),
+      velocity: new THREE.Vector3(0, 0, 0),
+      rotationY: 0,
+      isGrounded: false,
+      currentLayer: 3,
+      isAlive: true,
+      moveSpeed: 7.0,
+      jumpForce: 8.5,
+      gravity: -22.0
+    };
+
+    const keys = { Up: false, Down: false, Left: false, Right: false, Space: false };
+
+    // --- 2. Three.js 초기화 ---
+    function initThreeJS() {
+      const container = document.getElementById('canvas-container');
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x05050d, 0.025);
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 20, 22);
+      camera.lookAt(0, 4, 0);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      container.appendChild(renderer.domElement);
+
+      // 조명 연산
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0x00ffcc, 0.8);
+      dirLight.position.set(15, 30, 10);
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+
+      // 3단 발판 그리드 및 용암 바닥 생성
+      buildHexagonGrids();
+      buildLavaFloor();
+
+      window.addEventListener('resize', onWindowResize);
+      setupInputListeners();
+    }
+
+    // --- 3. 3단 발판 및 메쉬 직조 ---
+    function buildHexagonGrids() {
+      const layerColors = {
+        3: 0x00ffcc, // 초록 (우선심사)
+        2: 0x0088ff, // 파랑 (의견제출)
+        1: 0xaa00ff  // 보라 (아이디어)
+      };
+
+      for (let layer = 3; layer >= 1; layer--) {
+        const y = LAYER_HEIGHTS[layer];
+        const color = layerColors[layer];
+
+        for (let r = -GRID_SIZE; r <= GRID_SIZE; r++) {
+          for (let q = -GRID_SIZE; q <= GRID_SIZE; q++) {
+            if (Math.abs(r + q) > GRID_SIZE) continue;
+
+            const x = TILE_RADIUS * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r);
+            const z = TILE_RADIUS * (3/2 * r);
+            const isTrap = Math.random() < 0.08; // 8% 확률로 무단 카피캣 함정 발판 지정
+
+            const tileKey = `${layer}_${r}_${q}`;
+            const tileMesh = createTileMesh(x, y, z, isTrap ? 0x880000 : color, isTrap);
+            tileMesh.userData = { tileKey, layer, row: r, col: q, isTrap, isCollapsed: false, color };
+            
+            scene.add(tileMesh);
+            tiles[tileKey] = tileMesh;
+          }
+        }
+      }
+    }
+
+    function createTileMesh(x, y, z, colorHex, isTrap) {
+      const geometry = new THREE.CylinderGeometry(TILE_RADIUS * 0.95, TILE_RADIUS * 0.95, 0.4, 6);
+      const material = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        roughness: 0.3,
+        metalness: 0.5,
+        wireframe: false
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, y, z);
+      mesh.receiveShadow = true;
+
+      // 테두리 강조선
+      const edges = new THREE.EdgesGeometry(geometry);
+      const lineMat = new THREE.LineBasicMaterial({ color: isTrap ? 0xff0000 : 0xffffff });
+      const wireframe = new THREE.LineSegments(edges, lineMat);
+      mesh.add(wireframe);
+
+      return mesh;
+    }
+
+    function buildLavaFloor() {
+      const geo = new THREE.PlaneGeometry(100, 100);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
+      const lava = new THREE.Mesh(geo, mat);
+      lava.rotation.x = Math.PI / 2;
+      lava.position.y = -3;
+      scene.add(lava);
+    }
+
+    function createPlayerMesh(colorHex) {
+      const group = new THREE.Group();
+
+      // 머리
+      const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
+      const headMat = new THREE.MeshStandardMaterial({ color: 0xffe0bd });
+      const head = new THREE.Mesh(headGeo, headMat);
+      head.position.y = 1.2;
+      group.add(head);
+
+      // 몸통
+      const bodyGeo = new THREE.CylinderGeometry(0.3, 0.2, 0.7, 8);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.2 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 0.65;
+      group.add(body);
+
+      group.castShadow = true;
+      return group;
+    }
+
+    // --- 4. Socket.io 실시간 네트워크 연동 및 Dead Reckoning ---
+    function initSocket() {
+      socket = io();
+
+      socket.on('init_player', (data) => {
+        localPlayerId = data.playerId;
+        isSpectator = data.isSpectator;
+
+        if (isSpectator) {
+          document.getElementById('status-text').innerText = "관전자 모드 접속 중";
+          document.getElementById('spectator-panel').style.display = 'flex';
+        } else {
+          document.getElementById('status-text').innerText = "매칭 완료 (대기 중)";
+          localPhysics.position.copy(data.playerData.position);
+        }
+
+        // 기존 참가자 스폰
+        for (const pId in data.players) {
+          spawnPlayerMesh(pId, data.players[pId]);
+        }
+      });
+
+      socket.on('player_joined', (data) => {
+        document.getElementById('status-text').innerText = `참가자 대기 중 (${data.playerCount}/4)`;
+        for (const pId in data.players) {
+          if (!players[pId]) spawnPlayerMesh(pId, data.players[pId]);
+        }
+      });
+
+      socket.on('start_game', (data) => {
+        gameStarted = true;
+        document.getElementById('overlay-msg').style.display = 'none';
+        document.getElementById('status-text').innerText = "🔴 SURVIVAL MATCH START";
+      });
+
+      // Dead Reckoning 동기화
+      socket.on('player_moved', (data) => {
+        if (data.id !== localPlayerId && players[data.id]) {
+          const p = players[data.id];
+          p.targetPos = new THREE.Vector3(data.position.x, data.position.y, data.position.z);
+          p.targetRotY = data.rotationY;
+          p.animState = data.animState;
+          p.layer = data.layer;
+        }
+      });
+
+      // 발판 붕괴 시각 연출
+      socket.on('tile_warning', (data) => {
+        const tile = tiles[data.tileKey];
+        if (tile) {
+          tile.material.color.setHex(0xffff00); // 경고 노란색 플래시
+        }
+      });
+
+      socket.on('tile_collapsed', (data) => {
+        const tile = tiles[data.tileKey];
+        if (tile) {
+          tile.userData.isCollapsed = true;
+          tile.visible = false;
+        }
+      });
+
+      // 관전자 실시간 이벤트 수신
+      socket.on('spawn_cheer_platform', (data) => {
+        const goldGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.4, 6);
+        const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8 });
+        const goldMesh = new THREE.Mesh(goldGeo, goldMat);
+        goldMesh.position.set(data.position.x, data.position.y - 0.2, data.position.z);
+        scene.add(goldMesh);
+
+        setTimeout(() => { scene.remove(goldMesh); }, 3000);
+      });
+
+      socket.on('spawn_obstacle', (data) => {
+        const obsGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+        const obsMat = new THREE.MeshStandardMaterial({ color: 0xff0055 });
+        const obsMesh = new THREE.Mesh(obsGeo, obsMat);
+        obsMesh.position.set(data.position.x, data.position.y, data.position.z);
+        scene.add(obsMesh);
+
+        // 정교한 추락 물리 연산
+        let dropVel = 0;
+        const interval = setInterval(() => {
+          dropVel += -0.5;
+          obsMesh.position.y += dropVel * 0.016;
+          if (obsMesh.position.y <= -2) {
+            scene.remove(obsMesh);
+            clearInterval(interval);
+          }
+        }, 16);
+      });
+
+      socket.on('player_died', (data) => {
+        if (players[data.id]) {
+          scene.remove(players[data.id].mesh);
+          players[data.id].isAlive = false;
+        }
+      });
+
+      socket.on('game_over', (data) => {
+        gameStarted = false;
+        const overlay = document.getElementById('overlay-msg');
+        overlay.style.display = 'flex';
+        document.getElementById('msg-title').innerText = "MATCH OVER";
+        document.getElementById('msg-desc').innerText = data.winnerId === localPlayerId ? "🎉 최종 승리! 특허 등록 완료!" : "최종 탈락하였습니다.";
+      });
+    }
+
+    function spawnPlayerMesh(id, pData) {
+      const mesh = createPlayerMesh(pData.color);
+      mesh.position.copy(pData.position);
+      scene.add(mesh);
+
+      players[id] = {
+        mesh,
+        targetPos: mesh.position.clone(),
+        targetRotY: 0,
+        animState: 'idle',
+        layer: 3,
+        isAlive: true
+      };
+    }
+
+    // --- 5. 정밀 AABB 물리 충돌 및 추락 루프 ---
+    function updatePhysics(delta) {
+      if (!gameStarted || isSpectator || !localPhysics.isAlive) return;
+
+      // 1. 키보드 입력 및 velocity 연산
+      const moveDir = new THREE.Vector3();
+      if (keys.Up) moveDir.z -= 1;
+      if (keys.Down) moveDir.z += 1;
+      if (keys.Left) moveDir.x -= 1;
+      if (keys.Right) moveDir.x += 1;
+
+      moveDir.normalize();
+
+      localPhysics.velocity.x = moveDir.x * localPhysics.moveSpeed;
+      localPhysics.velocity.z = moveDir.z * localPhysics.moveSpeed;
+      localPhysics.velocity.y += localPhysics.gravity * delta;
+
+      if (keys.Space && localPhysics.isGrounded) {
+        localPhysics.velocity.y = localPhysics.jumpForce;
+        localPhysics.isGrounded = false;
+      }
+
+      // 위치 적용
+      localPhysics.position.x += localPhysics.velocity.x * delta;
+      localPhysics.position.y += localPhysics.velocity.y * delta;
+      localPhysics.position.z += localPhysics.velocity.z * delta;
+
+      // 회전값 연산
+      if (moveDir.length() > 0) {
+        localPhysics.rotationY = Math.atan2(moveDir.x, moveDir.z);
+      }
+
+      // 2. 발판 AABB 충돌 검사
+      localPhysics.isGrounded = false;
+      const playerPos = localPhysics.position;
+
+      for (const key in tiles) {
+        const tile = tiles[key];
+        if (tile.userData.isCollapsed) continue;
+
+        const tilePos = tile.position;
+        const dx = playerPos.x - tilePos.x;
+        const dz = playerPos.z - tilePos.z;
+        const distXZ = Math.sqrt(dx * dx + dz * dz);
+
+        // 발판 충돌 판정 범위
+        if (distXZ < TILE_RADIUS * 0.9 && playerPos.y >= tilePos.y + 0.1 && playerPos.y <= tilePos.y + 0.5) {
+          if (localPhysics.velocity.y <= 0) {
+            localPhysics.position.y = tilePos.y + 0.2;
+            localPhysics.velocity.y = 0;
+            localPhysics.isGrounded = true;
+            localPhysics.currentLayer = tile.userData.layer;
+
+            // 소켓 서버에 밟음 이벤트 전송
+            socket.emit('step_tile', {
+              tileKey: tile.userData.tileKey,
+              layer: tile.userData.layer,
+              isTrap: tile.userData.isTrap
+            });
+            break;
+          }
+        }
+      }
+
+      // 3. UI 바디 레이어 뱃지 동기화
+      updateLayerHUD(localPhysics.currentLayer);
+
+      // 4. 최하단 용암 추락 사망 판정
+      if (localPhysics.position.y <= 0 && localPhysics.isAlive) {
+        localPhysics.isAlive = false;
+        socket.emit('player_eliminated');
+        document.getElementById('spectator-panel').style.display = 'flex';
+      }
+
+      // 5. 서버에 위치 동기화 전송
+      socket.emit('player_update', {
+        position: localPhysics.position,
+        rotationY: localPhysics.rotationY,
+        velocity: localPhysics.velocity,
+        animState: localPhysics.isGrounded ? (moveDir.length() > 0 ? 'run' : 'idle') : 'jump',
+        layer: localPhysics.currentLayer
+      });
+
+      // 내 메쉬 위치 업데이트
+      if (players[localPlayerId]) {
+        players[localPlayerId].mesh.position.copy(localPhysics.position);
+        players[localPlayerId].mesh.rotation.y = localPhysics.rotationY;
+      }
+    }
+
+    // Dead Reckoning 위치 보정 인터폴레이션
+    function updateNetworkPlayers(delta) {
+      for (const id in players) {
+        if (id === localPlayerId) continue;
+        const p = players[id];
+        if (p.mesh && p.targetPos) {
+          // 선형 보간 (Lerp)
+          p.mesh.position.lerp(p.targetPos, delta * 12.0);
+          p.mesh.rotation.y = THREE.MathUtils.lerp(p.mesh.rotation.y, p.targetRotY, delta * 12.0);
+        }
+      }
+    }
+
+    function updateLayerHUD(layer) {
+      document.querySelectorAll('.layer-badge').forEach(el => el.classList.remove('active'));
+      const activeBadge = document.getElementById(`badge-${layer}`);
+      if (activeBadge) activeBadge.classList.add('active');
+    }
+
+    // --- 6. 키보드 입력 핸들러 ---
+    function setupInputListeners() {
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'w') keys.Up = true;
+        if (e.key === 'ArrowDown' || e.key === 's') keys.Down = true;
+        if (e.key === 'ArrowLeft' || e.key === 'a') keys.Left = true;
+        if (e.key === 'ArrowRight' || e.key === 'd') keys.Right = true;
+        if (e.key === ' ' || e.code === 'Space') keys.Space = true;
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowUp' || e.key === 'w') keys.Up = false;
+        if (e.key === 'ArrowDown' || e.key === 's') keys.Down = false;
+        if (e.key === 'ArrowLeft' || e.key === 'a') keys.Left = false;
+        if (e.key === 'ArrowRight' || e.key === 'd') keys.Right = false;
+        if (e.key === ' ' || e.code === 'Space') keys.Space = false;
+      });
+    }
+
+    // 관전자 개입 클릭 핸들러
+    function triggerCheer() {
+      const activePlayerIds = Object.keys(players).filter(id => players[id].isAlive);
+      if (activePlayerIds.length > 0) {
+        socket.emit('spectator_cheer', { targetPlayerId: activePlayerIds[0] });
+      }
+    }
+
+    function triggerObstacle() {
+      const activePlayerIds = Object.keys(players).filter(id => players[id].isAlive);
+      if (activePlayerIds.length > 0) {
+        socket.emit('spectator_drop_obstacle', { targetPlayerId: activePlayerIds[0] });
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- 7. 메인 게임 루프 ---
+    let lastTime = performance.now();
+	function animate() {
+	  requestAnimationFrame(animate);
+
+	  const now = performance.now();
+	  const delta = Math.min((now - lastTime) / 1000, 0.1);
+	  lastTime = now;
+
+	  // 1. 물리 엔진 및 네트워크 플레이어 연산
+	  updatePhysics(delta);
+	  updateNetworkPlayers(delta);
+
+	  // 2. 캐릭터 위주 카메라 추종 & 시야 방해 발판 가림 처리
+	  if (localPlayerId && players[localPlayerId] && players[localPlayerId].mesh) {
+		const playerPos = localPhysics.position; // 로컬 캐릭터 위치
+		const currentLayer = localPhysics.currentLayer; // 현재 내 레이어 (3, 2, 1)
+
+		// A. 카메라 위치 조정 (캐릭터 기준 뒤로 0, 위로 8, 깊이 10 -> 더 위에서 내려다보는 시점)
+		const targetCameraPos = new THREE.Vector3(
+		  playerPos.x,
+		  playerPos.y + 8.5,  // Y축 높이를 높여 상단 층 가림 축소
+		  playerPos.z + 9.5   // Z축 거리를 당겨 캐릭터 밀착 추적
+		);
+
+		// 부드러운 카메라 이동
+		camera.position.lerp(targetCameraPos, 0.12);
+
+		// 카메라는 항상 내 캐릭터의 머리 위쪽을 정중앙으로 바라봄
+		camera.lookAt(playerPos.x, playerPos.y + 0.8, playerPos.z);
+
+		// B. 내 현재 층보다 위에 있는 발판들의 투명도 제어 (시야 확보)
+		for (const key in tiles) {
+		  const tile = tiles[key];
+		  if (tile.userData.isCollapsed) continue;
+
+		  // 내 현재 위치보다 높은 층의 발판들은 반투명 처리하여 캐릭터가 비치도록 설정
+		  if (tile.userData.layer > currentLayer) {
+			tile.material.transparent = true;
+			tile.material.opacity = 0.25; // 상단 발판을 25% 반투명하게 변경
+		  } else {
+			tile.material.transparent = false;
+			tile.material.opacity = 1.0;  // 내 층 및 아래 층 발판은 불투명 유지
+		  }
+		}
+	  }
+
+	  // 3. Three.js 렌더링
+	  renderer.render(scene, camera);
+	}
+
+    // 초기화 및 게임 가동
+    window.onload = () => {
+      initThreeJS();
+      initSocket();
+      animate();
+    };
+  </script>
+</body>
+</html>

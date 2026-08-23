@@ -1,0 +1,824 @@
+/* ===========================================================================
+ * IP Guardians: Fast-Track Survival  —  Authoritative Game Server
+ * ---------------------------------------------------------------------------
+ * Express (static) + Socket.io (rooms, tile sync, 20Hz state broadcast)
+ *
+ * Responsibilities
+ *   1. Serve the single-file WebGL client from ./public
+ *   2. Match up to MAX_PLAYERS active players per room, unlimited spectators
+ *   3. Generate + own the 3-layer hex tile map (single source of truth)
+ *   4. Own tile disintegration timing so every client sees the same collapse
+ *   5. Relay spectator interventions (cheer_booster / drop_obstacle)
+ *   6. Broadcast player snapshots at TICK_HZ for client-side dead reckoning
+ * ========================================================================= */
+
+'use strict';
+
+const path = require('path');
+const http = require('http');
+const express = require('express');
+const { Server } = require('socket.io');
+
+/* ------------------------------------------------------------------ config */
+
+const PORT = parseInt(process.env.PORT, 10) || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+const STATIC_DIR = process.env.STATIC_DIR || 'public';
+
+const MAX_PLAYERS = 4;          // active runners per room
+const TICK_HZ = 20;             // 20Hz => 50ms snapshot interval
+const TICK_MS = 1000 / TICK_HZ;
+
+const LOBBY_WAIT_MS = parseInt(process.env.LOBBY_WAIT_MS, 10) || 20000;  // 정원이 안 차면 이만큼 기다렸다 시작
+const SOLO_WAIT_MS  = parseInt(process.env.SOLO_WAIT_MS, 10)  || 15000;  // 혼자일 때 대기 (탭 2개 열 시간 확보)
+const COUNTDOWN_MS = 5000;      // "심사 착수" countdown before the run
+const ROUND_MAX_MS = 300000;    // hard cap on a round (5 minutes)
+const RESET_DELAY_MS = 8000;    // podium screen duration before the next map
+
+// Tile collapse timings (seconds are converted to ms).
+const FUSE_NORMAL_MS = 800;     // 0.8s  standard patent tile
+const FUSE_TRAP_MS = 200;       // 0.2s  무단 카피캣 함정 블록
+
+// Spectator intervention economy.
+const BOOSTER_COOLDOWN_MS = 9000;
+const OBSTACLE_COOLDOWN_MS = 12000;
+const BOOSTER_TTL_MS = 7000;
+const OBSTACLE_FALL_MS = 1400;
+
+/* ----------------------------------------------------------- map constants */
+/* The client rebuilds geometry from exactly these numbers, so any change here
+ * automatically propagates — the client never hardcodes the layout.          */
+
+const HEX_SIZE = 3.2;           // circumradius of one hex tile
+const HEX_THICKNESS = 1.0;
+const GRID_RADIUS = 5;          // 5 rings => 91 tiles per layer
+const TRAP_CHANCE = 0.11;
+const LAVA_Y = -20;
+
+const LAYERS = [
+  { index: 3, y: 30, color: '#00ffcc', name: '우선심사 패스트트랙 레이어', short: 'FAST-TRACK' },
+  { index: 2, y: 15, color: '#0088ff', name: '의견제출통지 레이어', short: 'OFFICE ACTION' },
+  { index: 1, y: 0, color: '#aa00ff', name: '아이디어 구상 레이어', short: 'IDEATION' }
+];
+
+/* --------------------------------------------------------------- utilities */
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function axialToWorld(q, r) {
+  return {
+    x: HEX_SIZE * 1.5 * q,
+    z: HEX_SIZE * Math.sqrt(3) * (r + q / 2)
+  };
+}
+
+function makeRoomId() {
+  return 'RM-' + Math.random().toString(36).slice(2, 7).toUpperCase();
+}
+
+function clampName(raw) {
+  const s = String(raw || '').trim().replace(/[\u0000-\u001f<>]/g, '');
+  return (s.slice(0, 14) || '심사관' + Math.floor(Math.random() * 900 + 100));
+}
+
+const PLAYER_COLORS = ['#ffcc00', '#ff5599', '#66ff66', '#66ccff'];
+
+/* --------------------------------------------------------- map generation */
+
+function buildMap(seed) {
+  const rand = mulberry32(seed);
+  const tiles = [];
+  const spawns = [];
+
+  for (const layer of LAYERS) {
+    for (let q = -GRID_RADIUS; q <= GRID_RADIUS; q++) {
+      const rMin = Math.max(-GRID_RADIUS, -q - GRID_RADIUS);
+      const rMax = Math.min(GRID_RADIUS, -q + GRID_RADIUS);
+      for (let r = rMin; r <= rMax; r++) {
+        const { x, z } = axialToWorld(q, r);
+        const dist = (Math.abs(q) + Math.abs(q + r) + Math.abs(r)) / 2;
+
+        // Keep the top-layer spawn ring free of traps so nobody dies on frame 1.
+        const protectedSpawn = layer.index === 3 && dist >= GRID_RADIUS - 1;
+        const trap = !protectedSpawn && rand() < TRAP_CHANCE;
+
+        tiles.push({
+          id: 'L' + layer.index + '_' + q + '_' + r,
+          layer: layer.index,
+          q: q,
+          r: r,
+          x: +x.toFixed(4),
+          y: layer.y,
+          z: +z.toFixed(4),
+          trap: trap
+        });
+      }
+    }
+  }
+
+  // Four spawn points spread around the outer ring of the top layer.
+  const spawnAxials = [
+    { q: GRID_RADIUS - 1, r: 0 },
+    { q: -(GRID_RADIUS - 1), r: 0 },
+    { q: 0, r: GRID_RADIUS - 1 },
+    { q: 0, r: -(GRID_RADIUS - 1) }
+  ];
+  for (const a of spawnAxials) {
+    const { x, z } = axialToWorld(a.q, a.r);
+    spawns.push({ x: +x.toFixed(4), y: LAYERS[0].y + HEX_THICKNESS / 2, z: +z.toFixed(4) });
+  }
+
+  return { seed, tiles, spawns };
+}
+
+/* ------------------------------------------------------------- room model */
+
+const rooms = new Map();
+
+function createRoom() {
+  const id = makeRoomId();
+  const room = {
+    id,
+    seed: (Math.random() * 0xffffffff) >>> 0,
+    map: null,
+    tileState: new Map(),   // tileId -> 'idle' | 'warning' | 'broken'
+    players: new Map(),     // socketId -> player
+    spectators: new Map(),  // socketId -> { id, name }
+    phase: 'waiting',       // waiting | countdown | playing | ended
+    phaseEndsAt: 0,
+    roundStartedAt: 0,
+    winnerId: null,
+    timers: new Set(),
+    nextEntityId: 1,
+    seatColors: [...PLAYER_COLORS]
+  };
+  room.map = buildMap(room.seed);
+  for (const t of room.map.tiles) room.tileState.set(t.id, 'idle');
+  rooms.set(id, room);
+  console.log('[room] created ' + id + ' seed=' + room.seed);
+  return room;
+}
+
+function findOpenRoom() {
+  // 1순위: 아직 시작 안 한 방의 빈 자리
+  for (const room of rooms.values()) {
+    if (room.players.size < MAX_PLAYERS && (room.phase === 'waiting' || room.phase === 'countdown')) {
+      return room;
+    }
+  }
+  // 2순위: 진행 중이지만 자리가 남은 방. 이번 판은 관전하고 다음 판에 자동 승격된다.
+  // (새 방을 파버리면 탭 2개로 테스트할 때 서로 다른 방에 갇힙니다)
+  for (const room of rooms.values()) {
+    if (room.players.size < MAX_PLAYERS) return room;
+  }
+  return createRoom();
+}
+
+function roomTimeout(room, fn, ms) {
+  const t = setTimeout(() => {
+    room.timers.delete(t);
+    try { fn(); } catch (err) { console.error('[timer]', err); }
+  }, ms);
+  room.timers.add(t);
+  return t;
+}
+
+function clearRoomTimers(room) {
+  for (const t of room.timers) clearTimeout(t);
+  room.timers.clear();
+}
+
+function destroyRoom(room) {
+  clearRoomTimers(room);
+  rooms.delete(room.id);
+  console.log('[room] destroyed ' + room.id);
+}
+
+function aliveCount(room) {
+  let n = 0;
+  for (const p of room.players.values()) if (p.alive) n++;
+  return n;
+}
+
+function makePlayer(id, name, seat, room) {
+  const spawn = room.map.spawns[seat % room.map.spawns.length];
+  return {
+    id,
+    name,
+    color: PLAYER_COLORS[seat % PLAYER_COLORS.length],
+    seat,
+    alive: true,
+    placement: 0,
+    layer: 3,
+    anim: 'idle',
+    pos: { x: spawn.x, y: spawn.y, z: spawn.z },
+    vel: { x: 0, y: 0, z: 0 },
+    ry: 0,
+    wins: 0,
+    lastInput: Date.now()
+  };
+}
+
+function publicPlayer(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    color: p.color,
+    seat: p.seat,
+    alive: p.alive,
+    layer: p.layer,
+    placement: p.placement,
+    pos: p.pos,
+    ry: p.ry
+  };
+}
+
+function roomSnapshotMeta(room) {
+  return {
+    roomId: room.id,
+    phase: room.phase,
+    phaseEndsAt: room.phaseEndsAt,
+    alive: aliveCount(room),
+    total: room.players.size,
+    spectators: room.spectators.size,
+    winnerId: room.winnerId
+  };
+}
+
+/* --------------------------------------------------------- phase machine */
+
+function broadcastPhase(room) {
+  io.to(room.id).emit('phase', roomSnapshotMeta(room));
+}
+
+function evaluateLobby(room) {
+  if (room.phase !== 'waiting') return;
+  if (room.players.size === 0) return;
+
+  if (room.players.size >= MAX_PLAYERS) {
+    startCountdown(room);
+    return;
+  }
+
+  if (!room.lobbyDeadline) {
+    const wait = room.players.size >= 2 ? LOBBY_WAIT_MS : SOLO_WAIT_MS;
+    room.lobbyDeadline = Date.now() + wait;
+    room.phaseEndsAt = room.lobbyDeadline;
+    broadcastPhase(room);
+    roomTimeout(room, () => {
+      room.lobbyDeadline = null;
+      if (room.phase === 'waiting' && room.players.size > 0) startCountdown(room);
+    }, wait);
+  }
+}
+
+function startCountdown(room) {
+  if (room.phase !== 'waiting') return;
+  room.phase = 'countdown';
+  room.phaseEndsAt = Date.now() + COUNTDOWN_MS;
+  broadcastPhase(room);
+  console.log('[room] ' + room.id + ' countdown with ' + room.players.size + ' players');
+
+  roomTimeout(room, () => startRound(room), COUNTDOWN_MS);
+}
+
+function startRound(room) {
+  if (room.phase !== 'countdown') return;
+  room.phase = 'playing';
+  room.roundStartedAt = Date.now();
+  room.phaseEndsAt = room.roundStartedAt + ROUND_MAX_MS;
+  room.winnerId = null;
+
+  let seatIdx = 0;
+  for (const p of room.players.values()) {
+    const spawn = room.map.spawns[seatIdx % room.map.spawns.length];
+    p.alive = true;
+    p.placement = 0;
+    p.layer = 3;
+    p.pos = { x: spawn.x, y: spawn.y, z: spawn.z };
+    p.vel = { x: 0, y: 0, z: 0 };
+    p.ry = 0;
+    p.anim = 'idle';
+    seatIdx++;
+  }
+
+  broadcastPhase(room);
+  io.to(room.id).emit('round_start', {
+    startedAt: room.roundStartedAt,
+    players: [...room.players.values()].map(publicPlayer)
+  });
+
+  roomTimeout(room, () => {
+    if (room.phase === 'playing') endRound(room, null, 'timeout');
+  }, ROUND_MAX_MS);
+}
+
+function checkRoundEnd(room) {
+  if (room.phase !== 'playing') return;
+  const alive = [...room.players.values()].filter(p => p.alive);
+  const started = room.players.size;
+
+  // 주자가 한 명도 남지 않은 경우 (전원 새로고침/이탈).
+  // 이걸 처리하지 않으면 방이 ROUND_MAX_MS(5분) 동안 playing 에 묶여
+  // 그동안 접속하는 사람이 전부 관전자로 밀립니다 = "캐릭터가 안 나옴".
+  if (started === 0) {
+    endRound(room, null, 'abandoned');
+    return;
+  }
+
+  if (started >= 2 && alive.length <= 1) {
+    endRound(room, alive[0] || null, 'lastStanding');
+  } else if (started === 1 && alive.length === 0) {
+    endRound(room, null, 'wipe');
+  }
+}
+
+function endRound(room, winner, reason) {
+  if (room.phase === 'ended') return;
+  room.phase = 'ended';
+  room.winnerId = winner ? winner.id : null;
+  room.phaseEndsAt = Date.now() + RESET_DELAY_MS;
+
+  if (winner) {
+    winner.placement = 1;
+    winner.wins = (winner.wins || 0) + 1;
+  }
+
+  const standings = [...room.players.values()]
+    .sort((a, b) => (a.placement || 99) - (b.placement || 99))
+    .map(p => ({ id: p.id, name: p.name, color: p.color, placement: p.placement || 99 }));
+
+  // 아무도 안 남은 방은 곧바로 다음 판 준비로 넘어갑니다
+  if (reason === 'abandoned') room.phaseEndsAt = Date.now() + 1500;
+
+  io.to(room.id).emit('game_over', {
+    winnerId: room.winnerId,
+    winnerName: winner ? winner.name : null,
+    reason,
+    standings,
+    durationMs: Date.now() - room.roundStartedAt
+  });
+  broadcastPhase(room);
+  console.log('[room] ' + room.id + ' round over (' + reason + ') winner=' + (winner ? winner.name : 'none'));
+
+  roomTimeout(room, () => resetRoom(room), reason === 'abandoned' ? 1500 : RESET_DELAY_MS);
+}
+
+function resetRoom(room) {
+  clearRoomTimers(room);
+
+  if (room.players.size === 0 && room.spectators.size === 0) {
+    destroyRoom(room);
+    return;
+  }
+
+  room.seed = (Math.random() * 0xffffffff) >>> 0;
+  room.map = buildMap(room.seed);
+  room.tileState = new Map();
+  for (const t of room.map.tiles) room.tileState.set(t.id, 'idle');
+  room.phase = 'waiting';
+  room.phaseEndsAt = 0;
+  room.winnerId = null;
+  room.lobbyDeadline = null;
+  room.nextEntityId = 1;
+
+  for (const p of room.players.values()) {
+    p.alive = true;
+    p.placement = 0;
+    p.layer = 3;
+    // A runner who was eliminated last round got temporary spectator powers.
+    // Revoke them now that they are back on the grid.
+    room.spectators.delete(p.id);
+  }
+
+  // 라운드 중 난입해 관전자로 밀렸던 사람을 빈 자리에 승격시킨다.
+  for (const [sid, spec] of [...room.spectators]) {
+    if (room.players.size >= MAX_PLAYERS) break;
+    if (!spec.wantsPlay) continue;                 // 순수 관전자는 건드리지 않음
+    if (!io.sockets.sockets.get(sid)) { room.spectators.delete(sid); continue; }
+    room.players.set(sid, makePlayer(sid, spec.name, room.players.size, room));
+    room.spectators.delete(sid);
+    io.to(room.id).emit('toast', { kind: 'cheer', text: spec.name + ' 님이 이번 회차 주자로 참가합니다' });
+  }
+
+  // 좌석 번호와 색을 다시 정렬
+  let si = 0;
+  for (const p of room.players.values()) {
+    p.seat = si;
+    p.color = PLAYER_COLORS[si % PLAYER_COLORS.length];
+    const sp = room.map.spawns[si % room.map.spawns.length];
+    p.pos = { x: sp.x, y: sp.y, z: sp.z };
+    p.vel = { x: 0, y: 0, z: 0 };
+    si++;
+  }
+
+  io.to(room.id).emit('map_reset', {
+    seed: room.seed,
+    map: room.map,
+    players: [...room.players.values()].map(publicPlayer),
+    meta: roomSnapshotMeta(room)
+  });
+
+  evaluateLobby(room);
+}
+
+/* ---------------------------------------------------------- tile handling */
+
+function requestTileBreak(room, tileId, sourceId) {
+  if (room.phase !== 'playing') return;
+  const state = room.tileState.get(tileId);
+  if (state !== 'idle') return;
+
+  const tile = room.map.tiles.find(t => t.id === tileId);
+  if (!tile) return;
+
+  const fuse = tile.trap ? FUSE_TRAP_MS : FUSE_NORMAL_MS;
+  room.tileState.set(tileId, 'warning');
+
+  io.to(room.id).emit('tile_warn', {
+    tileId,
+    fuse,
+    trap: tile.trap,
+    by: sourceId || null,
+    at: Date.now()
+  });
+
+  roomTimeout(room, () => {
+    if (room.tileState.get(tileId) !== 'warning') return;
+    room.tileState.set(tileId, 'broken');
+    io.to(room.id).emit('tile_break', { tileId, at: Date.now() });
+  }, fuse);
+}
+
+function brokenTileIds(room) {
+  const out = [];
+  for (const [id, st] of room.tileState) if (st !== 'idle') out.push({ id, st });
+  return out;
+}
+
+/* -------------------------------------------------- express + socket wiring */
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  pingInterval: 10000,
+  pingTimeout: 20000,
+  maxHttpBufferSize: 1e6
+});
+
+app.disable('x-powered-by');
+/* HTML 은 절대 캐시하지 않습니다. 개발 중 index.html 을 고쳤는데 브라우저가
+ * 옛 파일을 계속 띄우는 사고를 막습니다. 이미지/텍스처만 캐시합니다.        */
+app.use(express.static(path.join(__dirname, STATIC_DIR), {
+  etag: true,
+  lastModified: true,
+  extensions: ['html'],
+  setHeaders: (res, filePath) => {
+    if (/\.html?$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
+  }
+}));
+
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({ ok: true, rooms: rooms.size, uptime: process.uptime() });
+});
+
+app.get('/api/rooms', (_req, res) => {
+  res.json([...rooms.values()].map(r => ({
+    id: r.id,
+    phase: r.phase,
+    players: r.players.size,
+    spectators: r.spectators.size
+  })));
+});
+
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, STATIC_DIR, 'index.html'));
+});
+
+/* --------------------------------------------------------- socket handlers */
+
+io.on('connection', (socket) => {
+  let room = null;
+  let role = null; // 'player' | 'spectator'
+
+  socket.emit('server_hello', {
+    now: Date.now(),
+    config: {
+      MAX_PLAYERS, TICK_HZ, HEX_SIZE, HEX_THICKNESS, GRID_RADIUS,
+      LAVA_Y, LAYERS, FUSE_NORMAL_MS, FUSE_TRAP_MS,
+      BOOSTER_TTL_MS, OBSTACLE_FALL_MS,
+      BOOSTER_COOLDOWN_MS, OBSTACLE_COOLDOWN_MS
+    }
+  });
+
+  socket.on('ping_probe', (clientSent) => {
+    socket.emit('pong_probe', { clientSent, serverTime: Date.now() });
+  });
+
+  socket.on('join', (payload = {}) => {
+    if (room) return;
+
+    const name = clampName(payload.name);
+    const wantSpectate = payload.mode === 'spectator';
+
+    if (payload.roomId && rooms.has(String(payload.roomId).toUpperCase())) {
+      room = rooms.get(String(payload.roomId).toUpperCase());
+    } else {
+      room = wantSpectate ? ([...rooms.values()][0] || createRoom()) : findOpenRoom();
+    }
+
+    const seatFull = room.players.size >= MAX_PLAYERS;
+    const midRound = room.phase === 'playing' || room.phase === 'ended';
+    role = (wantSpectate || seatFull || midRound) ? 'spectator' : 'player';
+
+    socket.join(room.id);
+
+    if (role === 'player') {
+      const player = makePlayer(socket.id, name, room.players.size, room);
+      room.players.set(socket.id, player);
+      socket.to(room.id).emit('player_joined', publicPlayer(player));
+    } else {
+      // wantsPlay: 주자로 들어오려 했지만 라운드 중이라 밀린 경우.
+      // 다음 맵 리셋에서 자동으로 주자로 승격됩니다.
+      room.spectators.set(socket.id, { id: socket.id, name, wantsPlay: !wantSpectate });
+      socket.to(room.id).emit('spectator_joined', { id: socket.id, name, wantsPlay: !wantSpectate });
+    }
+
+    socket.emit('init', {
+      selfId: socket.id,
+      role,
+      name,
+      roomId: room.id,
+      seed: room.seed,
+      map: room.map,
+      brokenTiles: brokenTileIds(room),
+      players: [...room.players.values()].map(publicPlayer),
+      meta: roomSnapshotMeta(room),
+      serverTime: Date.now()
+    });
+
+    broadcastPhase(room);
+    if (role === 'player') evaluateLobby(room);
+    console.log('[join] ' + name + ' as ' + role + ' -> ' + room.id +
+      ' (' + room.players.size + 'p/' + room.spectators.size + 's)');
+  });
+
+  /* ---- player state ingest (client-authoritative movement, server relays) */
+  socket.on('player_state', (s) => {
+    if (!room || role !== 'player') return;
+    const p = room.players.get(socket.id);
+    if (!p || !p.alive) return;
+    if (!s || !Array.isArray(s.p) || s.p.length !== 3) return;
+
+    p.pos.x = +s.p[0] || 0;
+    p.pos.y = +s.p[1] || 0;
+    p.pos.z = +s.p[2] || 0;
+    if (Array.isArray(s.v) && s.v.length === 3) {
+      p.vel.x = +s.v[0] || 0;
+      p.vel.y = +s.v[1] || 0;
+      p.vel.z = +s.v[2] || 0;
+    }
+    p.ry = +s.ry || 0;
+    p.layer = s.layer | 0;
+    p.anim = typeof s.anim === 'string' ? s.anim.slice(0, 12) : 'idle';
+    p.lastInput = Date.now();
+  });
+
+  socket.on('tile_step', (data = {}) => {
+    if (!room || role !== 'player') return;
+    const p = room.players.get(socket.id);
+    if (!p || !p.alive) return;
+    if (typeof data.tileId !== 'string') return;
+    requestTileBreak(room, data.tileId, socket.id);
+  });
+
+  socket.on('player_death', (data = {}) => {
+    if (!room || role !== 'player') return;
+    const p = room.players.get(socket.id);
+    if (!p || !p.alive) return;
+    if (room.phase !== 'playing') return;
+
+    p.alive = false;
+    p.anim = 'dead';
+    p.placement = aliveCount(room) + 1;
+
+    io.to(room.id).emit('eliminated', {
+      id: p.id,
+      name: p.name,
+      color: p.color,
+      placement: p.placement,
+      cause: typeof data.cause === 'string' ? data.cause.slice(0, 24) : 'lava',
+      alive: aliveCount(room)
+    });
+
+    // Eliminated runners immediately gain spectator intervention powers.
+    room.spectators.set(socket.id, { id: socket.id, name: p.name });
+    checkRoundEnd(room);
+  });
+
+  /* ------------------------------------------- spectator intervention API */
+
+  socket.on('cheer_booster', (data = {}) => {
+    if (!room) return;
+    const isSpectator = room.spectators.has(socket.id);
+    if (!isSpectator) return;
+    if (room.phase !== 'playing') return;
+
+    const now = Date.now();
+    const spec = room.spectators.get(socket.id);
+    if (spec.boosterAt && now - spec.boosterAt < BOOSTER_COOLDOWN_MS) {
+      socket.emit('action_denied', {
+        action: 'cheer_booster',
+        retryInMs: BOOSTER_COOLDOWN_MS - (now - spec.boosterAt)
+      });
+      return;
+    }
+
+    let target = room.players.get(String(data.targetId));
+    if (!target || !target.alive) {
+      target = [...room.players.values()].find(p => p.alive);
+    }
+    if (!target) return;
+
+    spec.boosterAt = now;
+    const entity = {
+      id: 'BST' + (room.nextEntityId++),
+      targetId: target.id,
+      x: target.pos.x,
+      y: target.pos.y - 1.6,
+      z: target.pos.z,
+      ttl: BOOSTER_TTL_MS,
+      by: spec.name,
+      at: now
+    };
+    io.to(room.id).emit('booster_spawn', entity);
+    io.to(room.id).emit('toast', {
+      kind: 'cheer',
+      text: spec.name + ' 님이 ' + target.name + ' 에게 우선심사 발판을 지원했습니다'
+    });
+
+    roomTimeout(room, () => {
+      io.to(room.id).emit('booster_expire', { id: entity.id });
+    }, BOOSTER_TTL_MS);
+  });
+
+  socket.on('drop_obstacle', (data = {}) => {
+    if (!room) return;
+    const isSpectator = room.spectators.has(socket.id);
+    if (!isSpectator) return;
+    if (room.phase !== 'playing') return;
+
+    const now = Date.now();
+    const spec = room.spectators.get(socket.id);
+    if (spec.obstacleAt && now - spec.obstacleAt < OBSTACLE_COOLDOWN_MS) {
+      socket.emit('action_denied', {
+        action: 'drop_obstacle',
+        retryInMs: OBSTACLE_COOLDOWN_MS - (now - spec.obstacleAt)
+      });
+      return;
+    }
+
+    // Prefer a live tile on the layer that currently holds the most runners.
+    const alive = [...room.players.values()].filter(p => p.alive);
+    if (alive.length === 0) return;
+
+    let targetLayer = alive[0].layer || 3;
+    if (data.targetId) {
+      const t = room.players.get(String(data.targetId));
+      if (t && t.alive) targetLayer = t.layer || targetLayer;
+    }
+
+    const candidates = room.map.tiles.filter(t =>
+      t.layer === targetLayer && room.tileState.get(t.id) === 'idle');
+    const pool = candidates.length ? candidates
+      : room.map.tiles.filter(t => room.tileState.get(t.id) === 'idle');
+    if (!pool.length) return;
+
+    const tile = pool[Math.floor(Math.random() * pool.length)];
+    spec.obstacleAt = now;
+
+    const entity = {
+      id: 'OBS' + (room.nextEntityId++),
+      tileId: tile.id,
+      x: tile.x,
+      y: tile.y,
+      z: tile.z,
+      fromY: tile.y + 46,
+      durationMs: OBSTACLE_FALL_MS,
+      by: spec.name,
+      at: now
+    };
+    io.to(room.id).emit('obstacle_drop', entity);
+    io.to(room.id).emit('toast', {
+      kind: 'obstacle',
+      text: spec.name + ' 님이 의견제출통지서를 투하했습니다'
+    });
+
+    roomTimeout(room, () => {
+      io.to(room.id).emit('obstacle_impact', { id: entity.id, tileId: tile.id });
+      requestTileBreak(room, tile.id, null);
+    }, OBSTACLE_FALL_MS);
+  });
+
+  socket.on('chat', (msg) => {
+    if (!room) return;
+    const text = String(msg || '').slice(0, 120).replace(/[\u0000-\u001f<>]/g, '');
+    if (!text) return;
+    const who = room.players.get(socket.id) || room.spectators.get(socket.id);
+    io.to(room.id).emit('chat', { name: who ? who.name : '익명', text, at: Date.now() });
+  });
+
+  /* --------------------------------------------------------- disconnect */
+  socket.on('disconnect', () => {
+    if (!room) return;
+
+    const wasPlayer = room.players.has(socket.id);
+    const p = room.players.get(socket.id);
+
+    room.players.delete(socket.id);
+    room.spectators.delete(socket.id);
+
+    if (wasPlayer) {
+      socket.to(room.id).emit('player_left', { id: socket.id, name: p ? p.name : '' });
+      checkRoundEnd(room);
+    } else {
+      socket.to(room.id).emit('spectator_left', { id: socket.id });
+    }
+
+    broadcastPhase(room);
+
+    if (room.players.size === 0 && room.spectators.size === 0) {
+      destroyRoom(room);
+    }
+    console.log('[left] ' + socket.id + ' from ' + room.id);
+  });
+});
+
+/* --------------------------------------------------- 20Hz snapshot broadcast */
+
+setInterval(() => {
+  const now = Date.now();
+  for (const room of rooms.values()) {
+    // 끊어진 소켓이 방에 남아 있으면 정리하고 라운드 종료 조건을 다시 봅니다
+    let pruned = false;
+    for (const id of [...room.players.keys()]) {
+      if (!io.sockets.sockets.get(id)) { room.players.delete(id); pruned = true; }
+    }
+    for (const id of [...room.spectators.keys()]) {
+      if (!io.sockets.sockets.get(id)) room.spectators.delete(id);
+    }
+    if (pruned) { broadcastPhase(room); checkRoundEnd(room); }
+
+    if (room.players.size === 0 && room.spectators.size === 0) continue;
+
+    const players = [];
+    for (const p of room.players.values()) {
+      players.push({
+        id: p.id,
+        p: [+p.pos.x.toFixed(3), +p.pos.y.toFixed(3), +p.pos.z.toFixed(3)],
+        v: [+p.vel.x.toFixed(3), +p.vel.y.toFixed(3), +p.vel.z.toFixed(3)],
+        ry: +p.ry.toFixed(3),
+        l: p.layer,
+        a: p.anim,
+        al: p.alive ? 1 : 0
+      });
+    }
+
+    io.to(room.id).emit('state', { t: now, players });
+  }
+}, TICK_MS);
+
+/* ------------------------------------------------------------- lifecycle */
+
+server.listen(PORT, HOST, () => {
+  console.log('==============================================');
+  console.log(' IP Guardians: Fast-Track Survival');
+  console.log(' listening on http://' + HOST + ':' + PORT);
+  console.log(' static dir: ' + path.join(__dirname, STATIC_DIR));
+  console.log(' tick: ' + TICK_HZ + 'Hz   seats/room: ' + MAX_PLAYERS);
+  console.log('==============================================');
+});
+
+function shutdown(signal) {
+  console.log('[' + signal + '] shutting down...');
+  io.close(() => {
+    server.close(() => process.exit(0));
+  });
+  setTimeout(() => process.exit(0), 5000).unref();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

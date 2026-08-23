@@ -1,0 +1,206 @@
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// 정적 파일 라우팅 (public 디렉터리)
+app.use(express.static(path.join(__dirname, 'public')));
+
+// 세션 및 룸 상태 관리
+const rooms = {};
+const MAX_PLAYERS_PER_ROOM = 4;
+
+function createRoom(roomId) {
+  return {
+    id: roomId,
+    players: {},
+    spectators: new Set(),
+    tileStates: {}, // tileKey: { layer, row, col, status: 'active'|'warning'|'collapsed' }
+    gameStarted: false,
+    aliveCount: 0
+  };
+}
+
+io.on('connection', (socket) => {
+  console.log(`[Connect] Client connected: ${socket.id}`);
+
+  // 매칭 및 룸 참가 처리
+  let currentRoomId = null;
+  for (const rId in rooms) {
+    if (!rooms[rId].gameStarted && Object.keys(rooms[rId].players).length < MAX_PLAYERS_PER_ROOM) {
+      currentRoomId = rId;
+      break;
+    }
+  }
+
+  if (!currentRoomId) {
+    currentRoomId = `room_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    rooms[currentRoomId] = createRoom(currentRoomId);
+  }
+
+  const room = rooms[currentRoomId];
+  socket.join(currentRoomId);
+
+  const playerCount = Object.keys(room.players).length;
+
+  if (playerCount < MAX_PLAYERS_PER_ROOM && !room.gameStarted) {
+    // 플레이어로 등록
+    const playerColors = ['#00ffcc', '#0088ff', '#ff0077', '#ffcc00'];
+    const spawnPositions = [
+      { x: -2, y: 15, z: -2 },
+      { x: 2, y: 15, z: -2 },
+      { x: -2, y: 15, z: 2 },
+      { x: 2, y: 15, z: 2 }
+    ];
+
+    room.players[socket.id] = {
+      id: socket.id,
+      index: playerCount,
+      color: playerColors[playerCount],
+      position: spawnPositions[playerCount],
+      rotationY: 0,
+      animState: 'idle',
+      layer: 3,
+      isAlive: true
+    };
+
+    socket.emit('init_player', {
+      playerId: socket.id,
+      roomId: currentRoomId,
+      isSpectator: false,
+      playerData: room.players[socket.id],
+      players: room.players
+    });
+
+    io.to(currentRoomId).emit('player_joined', {
+      players: room.players,
+      playerCount: Object.keys(room.players).length
+    });
+
+    // 4인 충원 시 게임 시작
+    if (Object.keys(room.players).length === MAX_PLAYERS_PER_ROOM) {
+      room.gameStarted = true;
+      room.aliveCount = MAX_PLAYERS_PER_ROOM;
+      io.to(currentRoomId).emit('start_game', { players: room.players });
+    }
+  } else {
+    // 관전자로 등록
+    room.spectators.add(socket.id);
+    socket.emit('init_player', {
+      playerId: socket.id,
+      roomId: currentRoomId,
+      isSpectator: true,
+      players: room.players
+    });
+  }
+
+  // 플레이어 이동 데이터 동기화 (Dead Reckoning 패킷)
+  socket.on('player_update', (data) => {
+    if (room.players[socket.id] && room.players[socket.id].isAlive) {
+      room.players[socket.id].position = data.position;
+      room.players[socket.id].rotationY = data.rotationY;
+      room.players[socket.id].velocity = data.velocity;
+      room.players[socket.id].animState = data.animState;
+      room.players[socket.id].layer = data.layer;
+
+      // 룸 내 타 참가자들에게 브로드캐스트
+      socket.to(currentRoomId).emit('player_moved', {
+        id: socket.id,
+        position: data.position,
+        rotationY: data.rotationY,
+        velocity: data.velocity,
+        animState: data.animState,
+        layer: data.layer,
+        timestamp: Date.now()
+      });
+    }
+  });
+
+  // 발판 밟음 이벤트 처리 (붕괴 타이머 및 상태 브로드캐스팅)
+  socket.on('step_tile', (tileData) => {
+    const { tileKey, layer, isTrap } = tileData;
+    if (!room.tileStates[tileKey]) {
+      const delay = isTrap ? 200 : 800; // 함정 0.2초, 일반 발판 0.8초
+      room.tileStates[tileKey] = { status: 'warning' };
+
+      io.to(currentRoomId).emit('tile_warning', { tileKey, layer, delay });
+
+      setTimeout(() => {
+        room.tileStates[tileKey].status = 'collapsed';
+        io.to(currentRoomId).emit('tile_collapsed', { tileKey, layer });
+      }, delay);
+    }
+  });
+
+  // 플레이어 탈락 처리
+  socket.on('player_eliminated', () => {
+    if (room.players[socket.id] && room.players[socket.id].isAlive) {
+      room.players[socket.id].isAlive = false;
+      room.aliveCount--;
+
+      io.to(currentRoomId).emit('player_died', {
+        id: socket.id,
+        remainingAlive: room.aliveCount
+      });
+
+      // 최후의 1인 승리 조건 체크
+      if (room.aliveCount <= 1 && room.gameStarted) {
+        let winnerId = null;
+        for (const pId in room.players) {
+          if (room.players[pId].isAlive) winnerId = pId;
+        }
+        io.to(currentRoomId).emit('game_over', { winnerId });
+      }
+    }
+  });
+
+  // 관전자 개입 이벤트: 응원 부스터 (황금 발판 생성)
+  socket.on('spectator_cheer', (data) => {
+    const { targetPlayerId } = data;
+    if (room.players[targetPlayerId] && room.players[targetPlayerId].isAlive) {
+      io.to(currentRoomId).emit('spawn_cheer_platform', {
+        targetPlayerId,
+        position: room.players[targetPlayerId].position
+      });
+    }
+  });
+
+  // 관전자 개입 이벤트: 방해 요소 (경고장 장애물 투하)
+  socket.on('spectator_drop_obstacle', (data) => {
+    const { targetPlayerId } = data;
+    if (room.players[targetPlayerId] && room.players[targetPlayerId].isAlive) {
+      const pos = room.players[targetPlayerId].position;
+      io.to(currentRoomId).emit('spawn_obstacle', {
+        position: { x: pos.x, y: pos.y + 8, z: pos.z }
+      });
+    }
+  });
+
+  // 퇴장 처리
+  socket.on('disconnect', () => {
+    console.log(`[Disconnect] Client disconnected: ${socket.id}`);
+    if (room) {
+      delete room.players[socket.id];
+      room.spectators.delete(socket.id);
+      io.to(currentRoomId).emit('player_left', { id: socket.id });
+
+      if (Object.keys(room.players).length === 0 && room.spectators.size === 0) {
+        delete rooms[currentRoomId];
+      }
+    }
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`[Server Ready] IP Guardians Server listening on port ${PORT}`);
+});

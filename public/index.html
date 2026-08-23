@@ -1,0 +1,2480 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>IP 가디언즈: 특허 패스트트랙 서바이벌</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ===========================================================================
+   Design tokens — "심사서류 × 네온 서바이벌"
+   Paper-stamp bureaucracy rendered on a void-black esports stage.
+   ========================================================================= */
+:root{
+  --void:#05060a;
+  --void-2:#0b0e16;
+  --paper:#ece7d8;
+  --ink:#12141c;
+  --stamp:#ff2d2d;
+  --l3:#00ffcc;   /* 우선심사 패스트트랙 */
+  --l2:#0088ff;   /* 의견제출통지 */
+  --l1:#aa00ff;   /* 아이디어 구상 */
+  --lava:#ff3a12;
+  --gold:#ffcc00;
+  --rule:rgba(236,231,216,.18);
+  --mono:'Chakra Petch',ui-monospace,Menlo,monospace;
+  --kr:'Noto Sans KR',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--void);color:var(--paper);font-family:var(--kr)}
+canvas{display:block}
+button{font-family:var(--mono);cursor:pointer;border:none;background:none;color:inherit}
+button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-offset:2px}
+
+#stage{position:fixed;inset:0}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+.panel{pointer-events:auto}
+
+/* ---------------------------------------------------- top status bar ---- */
+#topbar{
+  position:absolute;top:0;left:0;right:0;display:flex;align-items:stretch;
+  gap:1px;background:var(--rule);border-bottom:1px solid var(--rule);
+}
+.tb{background:rgba(5,6,10,.82);backdrop-filter:blur(8px);padding:9px 14px;display:flex;flex-direction:column;gap:2px}
+.tb .k{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:rgba(236,231,216,.45)}
+.tb .v{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.04em}
+#tbTitle{flex:1;justify-content:center}
+#tbTitle .v{font-family:var(--kr);font-weight:900;font-size:14px;letter-spacing:.02em}
+#tbTitle .v b{color:var(--l3)}
+#vAlive{color:var(--l3)}
+#vPing.bad{color:var(--stamp)}
+
+/* ------------------------------------------ signature: 심사단계 스탬프 ---- */
+#layerStack{
+  position:absolute;left:18px;top:96px;display:flex;flex-direction:column;gap:8px;width:196px;
+}
+.doc{
+  position:relative;background:rgba(236,231,216,.06);border:1px solid var(--rule);
+  padding:10px 12px 11px;transition:.28s cubic-bezier(.2,.8,.2,1);
+  clip-path:polygon(0 0,100% 0,100% calc(100% - 11px),calc(100% - 11px) 100%,0 100%);
+}
+.doc::after{
+  content:'';position:absolute;right:0;bottom:0;width:11px;height:11px;
+  background:var(--rule);clip-path:polygon(0 100%,100% 0,100% 100%);
+}
+.doc .no{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.4)}
+.doc .nm{font-size:12.5px;font-weight:700;margin-top:3px;line-height:1.3}
+.doc .alt{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:rgba(236,231,216,.35);margin-top:3px}
+.doc.on{background:rgba(236,231,216,.1);transform:translateX(10px)}
+.doc.on .nm{color:var(--layer-c)}
+.doc.on{border-color:var(--layer-c);box-shadow:-3px 0 0 var(--layer-c),0 0 26px -6px var(--layer-c)}
+.doc.on::before{
+  content:'심사중';position:absolute;right:12px;top:9px;font-family:var(--mono);
+  font-size:9px;letter-spacing:.16em;color:var(--stamp);border:1.5px solid var(--stamp);
+  padding:1px 5px;transform:rotate(-7deg);animation:stamp .5s cubic-bezier(.2,1.5,.4,1)
+}
+@keyframes stamp{from{transform:rotate(-7deg) scale(2.1);opacity:0}to{transform:rotate(-7deg) scale(1);opacity:1}}
+.doc[data-l="3"]{--layer-c:var(--l3)} .doc[data-l="2"]{--layer-c:var(--l2)} .doc[data-l="1"]{--layer-c:var(--l1)}
+
+/* ------------------------------------------------------- roster (right) -- */
+#roster{position:absolute;right:18px;top:96px;width:212px;display:flex;flex-direction:column;gap:6px}
+.rname{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.4);margin-bottom:2px}
+.rrow{
+  display:flex;align-items:center;gap:8px;padding:7px 10px;
+  background:rgba(11,14,22,.8);border:1px solid var(--rule);border-left-width:3px;font-size:12px;
+}
+.rrow.dead{opacity:.35;text-decoration:line-through}
+.rrow .lay{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.1em;opacity:.7}
+.rrow .you{font-family:var(--mono);font-size:8px;letter-spacing:.14em;background:var(--paper);color:var(--ink);padding:1px 4px}
+
+/* --------------------------------------------------- spectator controls -- */
+#spec{
+  position:absolute;left:50%;bottom:26px;transform:translateX(-50%);
+  display:none;flex-direction:column;align-items:center;gap:10px;width:min(560px,94vw)
+}
+#spec.show{display:flex}
+#specTargets{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.tgt{
+  border:1px solid var(--rule);background:rgba(11,14,22,.85);padding:6px 12px;
+  font-size:11px;letter-spacing:.06em;font-family:var(--kr);transition:.15s
+}
+.tgt.sel{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.tgt:hover:not(.sel){border-color:var(--paper)}
+#specBtns{display:flex;gap:10px;width:100%}
+.act{
+  flex:1;position:relative;overflow:hidden;padding:13px 10px 12px;border:1px solid;
+  background:rgba(11,14,22,.88);text-align:left;transition:.18s
+}
+.act .t{font-size:13px;font-weight:700;font-family:var(--kr);letter-spacing:.01em}
+.act .s{font-family:var(--mono);font-size:9px;letter-spacing:.15em;opacity:.55;margin-top:3px}
+.act .cd{position:absolute;left:0;bottom:0;height:2px;width:0%;transition:width .1s linear}
+#actCheer{border-color:var(--gold);color:var(--gold)} #actCheer .cd{background:var(--gold)}
+#actDrop{border-color:var(--stamp);color:var(--stamp)} #actDrop .cd{background:var(--stamp)}
+.act:disabled{opacity:.35;cursor:not-allowed}
+.act:not(:disabled):hover{transform:translateY(-2px)}
+
+/* -------------------------------------------------------------- toasts --- */
+#specBanner{
+  position:absolute;left:50%;top:52px;transform:translateX(-50%);display:none;
+  background:rgba(255,45,45,.14);border:1px solid var(--stamp);
+  color:var(--paper);font-size:12px;font-weight:700;letter-spacing:.02em;
+  padding:7px 18px;white-space:nowrap
+}
+#specBanner.show{display:block}
+#specBanner b{color:var(--stamp);font-family:var(--mono);letter-spacing:.14em;margin-right:8px}
+#toasts{position:absolute;left:50%;top:92px;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;align-items:center;width:max-content;max-width:80vw}
+.toast{
+  font-size:12px;padding:7px 15px;background:rgba(11,14,22,.92);border:1px solid var(--rule);
+  border-left:3px solid var(--paper);animation:tin .3s cubic-bezier(.2,.9,.3,1)
+}
+.toast.cheer{border-left-color:var(--gold)} .toast.obstacle{border-left-color:var(--stamp)}
+.toast.kill{border-left-color:var(--lava)}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+/* ------------------------------------------------------------- overlays -- */
+.screen{
+  position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:radial-gradient(120% 90% at 50% 40%,rgba(5,6,10,.72),rgba(5,6,10,.97));
+  pointer-events:auto;z-index:20
+}
+.screen.show{display:flex}
+.card{width:min(500px,92vw);border:1px solid var(--rule);background:rgba(11,14,22,.96);padding:34px 32px 30px}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.32em;color:var(--stamp)}
+h1{font-size:29px;font-weight:900;line-height:1.18;margin:11px 0 6px;letter-spacing:-.01em}
+h1 em{font-style:normal;color:var(--l3)}
+.sub{font-size:13px;line-height:1.75;color:rgba(236,231,216,.6)}
+.field{margin-top:22px}
+.field label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.45);margin-bottom:6px}
+input[type=text]{
+  width:100%;padding:12px 14px;background:rgba(236,231,216,.06);border:1px solid var(--rule);
+  color:var(--paper);font-family:var(--kr);font-size:15px
+}
+.modes{display:flex;gap:8px;margin-top:10px}
+.mode{flex:1;padding:11px;border:1px solid var(--rule);font-size:12px;font-family:var(--kr);transition:.15s}
+.mode.sel{background:var(--paper);color:var(--ink);border-color:var(--paper);font-weight:700}
+.cta{
+  width:100%;margin-top:22px;padding:15px;background:var(--l3);color:var(--ink);
+  font-size:15px;font-weight:700;letter-spacing:.04em;transition:.18s
+}
+.cta:hover{background:var(--paper)}
+.keys{margin-top:20px;padding-top:16px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:6px 16px}
+.keys span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:rgba(236,231,216,.45)}
+.keys b{color:var(--paper);font-weight:600}
+
+#countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none;z-index:15}
+#countdown.show{display:flex}
+#cdNum{font-family:var(--mono);font-size:150px;font-weight:700;line-height:1;color:var(--l3);text-shadow:0 0 60px rgba(0,255,204,.5)}
+#cdLabel{position:absolute;bottom:calc(50% - 118px);font-family:var(--mono);font-size:11px;letter-spacing:.36em;color:rgba(236,231,216,.55)}
+
+#result .card{text-align:center}
+#resultRank{margin-top:20px;display:flex;flex-direction:column;gap:5px}
+.rank{display:flex;gap:12px;align-items:center;padding:9px 13px;background:rgba(236,231,216,.05);border-left:3px solid;font-size:12.5px;text-align:left}
+.rank .p{font-family:var(--mono);font-size:15px;font-weight:700;min-width:26px}
+#resultHint{margin-top:20px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:rgba(236,231,216,.4)}
+
+#deadFlash{position:absolute;inset:0;background:radial-gradient(circle at 50% 60%,transparent 20%,rgba(255,58,18,.5));opacity:0;pointer-events:none;transition:opacity .35s;z-index:12}
+#deadFlash.on{opacity:1}
+
+#diag{
+  position:absolute;left:18px;bottom:18px;display:none;min-width:270px;
+  background:rgba(5,6,10,.94);border:1px solid var(--rule);border-left:3px solid var(--stamp);
+  padding:10px 12px;font-family:var(--mono);font-size:10.5px;line-height:1.7;letter-spacing:.02em
+}
+#diag.show{display:block}
+#diag b{display:block;color:var(--stamp);letter-spacing:.2em;margin-bottom:5px;font-size:9px}
+#diag .ok{color:var(--l3)} #diag .no{color:var(--stamp)} #diag .wa{color:var(--gold)}
+#hint{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:rgba(236,231,216,.35)}
+#hint.hide{display:none}
+
+@media (max-width:900px){
+  #layerStack{width:150px;top:88px;left:12px} #roster{width:160px;top:88px;right:12px}
+  .doc .nm{font-size:11px} h1{font-size:23px}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+<div id="deadFlash"></div>
+
+<div id="hud">
+  <div id="topbar">
+    <div class="tb panel"><span class="k">ROOM</span><span class="v" id="vRoom">—</span></div>
+    <div class="tb panel"><span class="k">생존</span><span class="v" id="vAlive">0/0</span></div>
+    <div class="tb" id="tbTitle"><span class="k" style="text-align:center">IP GUARDIANS</span><span class="v">특허 <b>패스트트랙</b> 서바이벌</span></div>
+    <div class="tb panel"><span class="k">관전자</span><span class="v" id="vSpec">0</span></div>
+    <div class="tb panel"><span class="k">RTT</span><span class="v" id="vPing">— ms</span></div>
+    <div class="tb panel"><span class="k">FPS</span><span class="v" id="vFps">60</span></div>
+  </div>
+
+  <div id="layerStack">
+    <div class="doc" data-l="3"><div class="no">LAYER 03</div><div class="nm">우선심사 패스트트랙 레이어</div><div class="alt">FAST-TRACK EXAMINATION</div></div>
+    <div class="doc" data-l="2"><div class="no">LAYER 02</div><div class="nm">의견제출통지 레이어</div><div class="alt">OFFICE ACTION</div></div>
+    <div class="doc" data-l="1"><div class="no">LAYER 01</div><div class="nm">아이디어 구상 레이어</div><div class="alt">IDEATION</div></div>
+  </div>
+
+  <div id="roster"><div class="rname">출원인 명단</div><div id="rosterList"></div></div>
+
+  <div id="specBanner">관전 중 · 다음 회차에 주자로 자동 참가합니다</div>
+  <div id="toasts"></div>
+
+  <div id="spec" class="panel">
+    <div id="specTargets"></div>
+    <div id="specBtns">
+      <button class="act" id="actCheer"><span class="t">우선심사 발판 지원</span><span class="s">CHEER BOOSTER</span><span class="cd"></span></button>
+      <button class="act" id="actDrop"><span class="t">의견제출통지서 투하</span><span class="s">DROP OBSTACLE</span><span class="cd"></span></button>
+    </div>
+  </div>
+
+  <div id="diag" class="panel"><b>진단 F2</b><div id="diagBody">대기</div></div>
+  <div id="hint">WASD 이동 · SPACE 점프 · SHIFT 질주 · 마우스 드래그로 시점 회전</div>
+</div>
+
+<div id="countdown"><div id="cdNum">5</div><div id="cdLabel">심사 착수까지</div></div>
+
+<div class="screen show" id="joinScreen">
+  <div class="card">
+    <div class="eyebrow">KIPO SURVIVAL PROTOCOL · 3-LAYER</div>
+    <h1>바닥이 무너지기 전에<br><em>등록결정</em>까지 살아남으세요.</h1>
+    <p class="sub">밟은 특허 심사 타일은 0.8초 뒤 붕괴합니다. 무단 카피캣 함정 블록은 0.2초. 3층에서 1층까지 떨어지면 그 아래는 용암입니다. 마지막 한 명이 등록결정을 받습니다.</p>
+    <div class="field">
+      <label for="nameInput">출원인 이름</label>
+      <input type="text" id="nameInput" maxlength="14" placeholder="예: 김심사" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label>참가 방식</label>
+      <div class="modes">
+        <button class="mode sel" data-mode="player">주자로 참가 (최대 4인)</button>
+        <button class="mode" data-mode="spectator">관전 + 개입</button>
+      </div>
+    </div>
+    <button class="cta" id="btnJoin">심사 대기열 입장</button>
+    <div class="keys">
+      <span><b>WASD</b> 이동</span><span><b>SPACE</b> 점프</span><span><b>SHIFT</b> 질주</span>
+      <span><b>드래그</b> 시점</span><span><b>휠</b> 줌</span>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="result">
+  <div class="card">
+    <div class="eyebrow" id="resultEyebrow">최종 처분</div>
+    <h1 id="resultTitle">등록결정</h1>
+    <p class="sub" id="resultSub"></p>
+    <div id="resultRank"></div>
+    <div id="resultHint">다음 심사 회차 준비 중…</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+/* ===========================================================================
+ * IP Guardians: Fast-Track Survival — WebGL client
+ * ---------------------------------------------------------------------------
+ *  · Three.js r128, no external control libs (custom orbit-follow rig)
+ *  · Client-side prediction for the local runner (authoritative locally,
+ *    relayed by the server) + dead reckoning for every remote runner
+ *  · Server owns tile fuse timing so collapse is identical on all clients
+ * ========================================================================= */
+'use strict';
+
+/* ============================ 0. constants ============================== */
+
+const PHYS = {
+  GRAVITY: -62,
+  JUMP_V: 21.5,
+  MOVE: 15.0,
+  SPRINT: 21.5,
+  ACCEL_GROUND: 120,
+  ACCEL_AIR: 42,
+  FRICTION: 12,
+  MAX_FALL: -90,
+  STEP: 1 / 60
+};
+
+const PLAYER = {
+  HALF_X: 0.78,
+  HALF_Z: 0.78,
+  HEIGHT: 3.1
+};
+
+const NET = {
+  SEND_HZ: 20,
+  INTERP_DELAY_MS: 110,   // render remotes this far in the past
+  EXTRAPOLATE_CAP_MS: 260 // never dead-reckon further than this
+};
+
+/* ============================ 1. DOM helpers ============================ */
+
+const $ = (id) => document.getElementById(id);
+const dom = {
+  stage: $('stage'), vRoom: $('vRoom'), vAlive: $('vAlive'), vSpec: $('vSpec'),
+  vPing: $('vPing'), vFps: $('vFps'), rosterList: $('rosterList'), toasts: $('toasts'),
+  spec: $('spec'), specTargets: $('specTargets'), actCheer: $('actCheer'), actDrop: $('actDrop'),
+  joinScreen: $('joinScreen'), nameInput: $('nameInput'), btnJoin: $('btnJoin'),
+  countdown: $('countdown'), cdNum: $('cdNum'), cdLabel: $('cdLabel'),
+  result: $('result'), resultTitle: $('resultTitle'), resultSub: $('resultSub'),
+  resultRank: $('resultRank'), resultEyebrow: $('resultEyebrow'),
+  deadFlash: $('deadFlash'), hint: $('hint'), docs: Array.from(document.querySelectorAll('.doc'))
+};
+
+function toast(text, kind) {
+  const el = document.createElement('div');
+  el.className = 'toast ' + (kind || '');
+  el.textContent = text;
+  dom.toasts.appendChild(el);
+  setTimeout(() => {
+    el.style.transition = 'opacity .35s';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 400);
+  }, 3600);
+  while (dom.toasts.children.length > 4) dom.toasts.firstChild.remove();
+}
+
+/* ============================ 2. game state ============================= */
+
+const G = {
+  socket: null,
+  selfId: null,
+  role: 'player',
+  name: '',
+  roomId: '—',
+  phase: 'waiting',
+  phaseEndsAt: 0,
+  cfg: null,
+  map: null,
+  tiles: new Map(),        // tileId -> tileRecord
+  layerTiles: { 1: [], 2: [], 3: [] },
+  layerY: { 1: 0, 2: 15, 3: 30 },
+  lavaY: -20,
+  hexSize: 3.2,
+  hexThick: 1.0,
+  players: new Map(),      // id -> remote record (includes self meta)
+  boosters: new Map(),
+  obstacles: new Map(),
+  selfAlive: true,
+  selfLayer: 3,
+  steppedTiles: new Set(),
+  serverOffset: 0,
+  rtt: 0,
+  specTarget: null,
+  cheerReadyAt: 0,
+  dropReadyAt: 0,
+  started: false
+};
+
+/* ============================ 3. three.js core ========================== */
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+dom.stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05060a);
+scene.fog = new THREE.FogExp2(0x05060a, 0.0075);
+
+const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 800);
+camera.position.set(0, 46, 34);
+
+scene.add(new THREE.HemisphereLight(0x9fd8ff, 0x180a24, 0.75));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.15);
+keyLight.position.set(38, 78, 26);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 220;
+keyLight.shadow.camera.left = -70;
+keyLight.shadow.camera.right = 70;
+keyLight.shadow.camera.top = 70;
+keyLight.shadow.camera.bottom = -70;
+keyLight.shadow.bias = -0.0009;
+scene.add(keyLight);
+scene.add(keyLight.target);
+
+const rimLight = new THREE.DirectionalLight(0x00ffcc, 0.5);
+rimLight.position.set(-30, 20, -34);
+scene.add(rimLight);
+
+const lavaLight = new THREE.PointLight(0xff3a12, 2.4, 130, 2);
+lavaLight.position.set(0, -14, 0);
+scene.add(lavaLight);
+
+/* --- world groups ------------------------------------------------------- */
+const worldGroup = new THREE.Group(); scene.add(worldGroup);
+const tileGroup = new THREE.Group(); worldGroup.add(tileGroup);
+const actorGroup = new THREE.Group(); worldGroup.add(actorGroup);
+const fxGroup = new THREE.Group(); worldGroup.add(fxGroup);
+
+/* --- 텍스처 슬롯 --------------------------------------------------------- *
+ * public/assets/ 에 파일을 넣으면 자동 적용됩니다.
+ *   character.glb     3D 캐릭터 모델 (애니메이션 포함)  ← 캐릭터 핵심
+ *   road_texture.png  1024x1024, 타일 상판 (선택, 그레이스케일)
+ * 파일이 없으면 절차적 3D 캐릭터가 쓰이므로 게임은 항상 동작합니다.        */
+const texLoader = new THREE.TextureLoader();
+const TEX = { road: null };
+
+function loadOptionalTexture(url, key, repeat) {
+  texLoader.load(
+    url,
+    (t) => {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      if (repeat) t.repeat.set(repeat, repeat);
+      t.encoding = THREE.sRGBEncoding;
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      TEX[key] = t;
+      if (key === 'road') {
+        for (const rec of G.tiles.values()) {
+          rec.mesh.material.map = t;
+          rec.mesh.material.needsUpdate = true;
+        }
+      }
+    },
+    undefined,
+    () => { /* 파일 없음 — 폴백 유지 */ }
+  );
+}
+loadOptionalTexture('assets/road_texture.png', 'road', 1);
+
+/* --- lava plane + void grid -------------------------------------------- */
+const lavaMat = new THREE.MeshStandardMaterial({
+  color: 0xff0000, emissive: 0xff2200, emissiveIntensity: 1.5,
+  roughness: 0.42, metalness: 0.0, transparent: true, opacity: 0.94
+});
+const lavaMesh = new THREE.Mesh(new THREE.PlaneGeometry(340, 340, 48, 48), lavaMat);
+lavaMesh.rotation.x = -Math.PI / 2;
+lavaMesh.position.y = -20;
+scene.add(lavaMesh);
+const lavaBase = lavaMesh.geometry.attributes.position.array.slice();
+
+const lavaGlow = new THREE.Mesh(
+  new THREE.PlaneGeometry(340, 340),
+  new THREE.MeshBasicMaterial({ color: 0xff5522, transparent: true, opacity: 0.25, depthWrite: false })
+);
+lavaGlow.rotation.x = -Math.PI / 2;
+lavaGlow.position.y = -19.2;
+scene.add(lavaGlow);
+
+/* ============================ 4. map building ========================== */
+
+const LAYER_COLORS = { 3: 0x00ffcc, 2: 0x0088ff, 1: 0xaa00ff };
+const TRAP_COLOR = 0x6b0d12;
+
+let hexGeo = null, trapGeo = null;
+
+function mapCfg() {
+  const c = G.cfg || {};
+  return {
+    HEX_SIZE: c.HEX_SIZE || 3.2,
+    HEX_THICKNESS: c.HEX_THICKNESS || 1.0,
+    LAVA_Y: (c.LAVA_Y !== undefined ? c.LAVA_Y : -20),
+    LAYERS: c.LAYERS || [{ index: 3, y: 30 }, { index: 2, y: 15 }, { index: 1, y: 0 }]
+  };
+}
+
+function buildMap(map, cfg) {
+  lastTransparencyLayer = -1;
+  // clear previous map
+  for (const rec of G.tiles.values()) {
+    tileGroup.remove(rec.mesh);
+    rec.mesh.geometry = null;
+    rec.mesh.material.dispose();
+  }
+  G.tiles.clear();
+  G.layerTiles = { 1: [], 2: [], 3: [] };
+
+  G.hexSize = cfg.HEX_SIZE;
+  G.hexThick = cfg.HEX_THICKNESS;
+  G.lavaY = cfg.LAVA_Y;
+  lavaMesh.position.y = cfg.LAVA_Y;
+  lavaGlow.position.y = cfg.LAVA_Y + 0.8;
+  lavaLight.position.y = cfg.LAVA_Y + 6;
+  for (const L of cfg.LAYERS) G.layerY[L.index] = L.y;
+
+  if (!hexGeo) {
+    hexGeo = new THREE.CylinderGeometry(G.hexSize * 0.965, G.hexSize * 0.9, G.hexThick, 6, 1);
+    trapGeo = new THREE.CylinderGeometry(G.hexSize * 0.965, G.hexSize * 0.9, G.hexThick * 1.12, 6, 1);
+  }
+
+  // AABB half-extents of a flat-top hexagon: adjacent boxes overlap in X and
+  // touch exactly in Z, so the plane is fully covered — no fall-through gaps.
+  const halfX = G.hexSize;
+  const halfZ = G.hexSize * Math.sqrt(3) / 2;
+
+  for (const t of map.tiles) {
+    const base = t.trap ? TRAP_COLOR : LAYER_COLORS[t.layer];
+    const mat = new THREE.MeshStandardMaterial({
+      color: base,
+      emissive: t.trap ? 0x330000 : base,
+      emissiveIntensity: t.trap ? 0.5 : 0.22,
+      roughness: t.trap ? 0.85 : 0.55,
+      metalness: t.trap ? 0.1 : 0.22,
+      transparent: true,
+      opacity: 1
+    });
+    if (TEX.road) mat.map = TEX.road;
+
+    const mesh = new THREE.Mesh(t.trap ? trapGeo : hexGeo, mat);
+    mesh.position.set(t.x, t.y, t.z);
+    mesh.receiveShadow = true;
+    mesh.castShadow = false;
+    tileGroup.add(mesh);
+
+    const rec = {
+      id: t.id, layer: t.layer, trap: !!t.trap,
+      x: t.x, y: t.y, z: t.z,
+      top: t.y + G.hexThick / 2,
+      minX: t.x - halfX, maxX: t.x + halfX,
+      minZ: t.z - halfZ, maxZ: t.z + halfZ,
+      state: 'idle', warnStart: 0, fuse: 800, breakStart: 0,
+      mesh, mat, baseColor: new THREE.Color(base), baseY: t.y
+    };
+    G.tiles.set(t.id, rec);
+    G.layerTiles[t.layer].push(rec);
+  }
+  applyLayerTransparency(3);
+}
+
+/* Upper floors turn translucent once the runner drops below them, so the
+ * camera never has an opaque ceiling between it and the player.            */
+let lastTransparencyLayer = -1;
+function applyLayerTransparency(currentLayer) {
+  if (currentLayer === lastTransparencyLayer) return;
+  lastTransparencyLayer = currentLayer;
+  for (const L of [1, 2, 3]) {
+    const target = L > currentLayer ? 0.16 : 1.0;
+    for (const rec of G.layerTiles[L]) {
+      if (rec.state === 'gone') continue;
+      rec.targetOpacity = target;
+    }
+  }
+}
+
+
+/* ============================ 5. 3D 캐릭터 ============================== *
+ * 두 가지 경로를 지원합니다.
+ *
+ *  A) assets/character.glb 가 있으면 → 진짜 3D 모델 + 스켈레탈 애니메이션
+ *  B) 없으면 → 절차적 3D 치비 캐릭터 (지오메트리로 조립, 에셋 불필요)
+ *
+ * 두 경로 모두 동일한 인터페이스를 노출하므로 나머지 코드는 신경 쓰지 않습니다.
+ * ======================================================================== */
+
+function makeNameplate(text, colorHex) {
+  const c = document.createElement('canvas');
+  c.width = 320; c.height = 84;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(5,6,10,0.78)';
+  g.fillRect(0, 18, 320, 48);
+  g.fillStyle = colorHex;
+  g.fillRect(0, 18, 5, 48);
+  g.font = '700 30px "Noto Sans KR", sans-serif';
+  g.fillStyle = '#ece7d8';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, 164, 43);
+  const tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  spr.scale.set(7.2, 1.9, 1);
+  spr.renderOrder = 999;
+  return spr;
+}
+
+/* ---------------------------------------------------------------------------
+ * A) GLB 3D 모델 파이프라인
+ * ------------------------------------------------------------------------- */
+const CHAR = { ready: false, scene: null, clips: {}, scale: 1,
+               yOffset: 0, xOffset: 0, zOffset: 0, error: null };
+
+const MODEL_PATH   = 'assets/character.glb';
+const MODEL_HEIGHT = 3.30;   // 이 키에 맞춰 자동 스케일. 발끝은 자동으로 y=0
+/* Z-up 으로 저장된 모델(누워서 나옴)이면 -Math.PI/2 로 바꾸세요.
+ * 콘솔에 "모델이 누워 있는 것 같습니다" 경고가 뜨면 이 값입니다.        */
+const MODEL_ROTATION_X = 0;
+/* 0 이면 자동 측정. 자동이 실패할 때만 배율을 직접 넣으세요.
+ * 콘솔에 "모델 크기를 잴 수 없습니다" 가 뜨면 이 값을 씁니다.            */
+const MODEL_SCALE = 0;
+/* 애니메이션 클립을 순서로 직접 지정합니다. null 이면 자동.
+ * Blender 로 합치면 이름이 전부 'mixamo.com' 이 되어 구분이 안 되므로,
+ * 게임에서 동작이 뒤바뀌어 보이면 여기 숫자를 조정하세요.
+ *   예: const MODEL_CLIP_INDEX = { idle: 0, run: 1, jump: 2, dead: 3 };   */
+const MODEL_CLIP_INDEX = null;
+
+/* Mixamo / Meshy 는 클립 이름이 제각각이라 후보를 넉넉히 둡니다.
+ * MODEL_CLIP_ORDER 순서로 배정하며, 배정된 클립은 후보 풀에서 빠집니다.
+ * (그래야 "Falling Back Death" 가 fall 로 잘못 잡히지 않습니다)            */
+const MODEL_CLIPS = {
+  dead: ['death', 'dying', 'die', 'knocked out', 'falling back death', 'dead'],
+  run:  ['running', 'run', 'jog', 'sprint', 'fast run'],
+  jump: ['jumping', 'jump up', 'jump'],
+  fall: ['falling idle', 'falling', 'fall'],
+  idle: ['breathing idle', 'idle', 'standing', 'stand', 'tpose', 't-pose']
+};
+const MODEL_CLIP_ORDER = ['dead', 'run', 'jump', 'fall', 'idle'];
+
+function pickClip(animations, candidates) {
+  const lower = animations.map(a => ({ a, n: a.name.toLowerCase() }));
+  for (const c of candidates) {
+    const hit = lower.find(x => x.n === c);
+    if (hit) return hit.a;
+  }
+  for (const c of candidates) {
+    const hit = lower.find(x => x.n.includes(c));
+    if (hit) return hit.a;
+  }
+  return null;
+}
+
+/* ---------------------------------------------------------------------------
+ * 모델 실측 — 스킨드 메시는 지오메트리 바운딩박스가 실제 렌더 크기와 다릅니다.
+ * (bindMatrix / bindMatrixInverse 때문에 노드 스케일이 상쇄되기도 하고,
+ *  Blender 익스포트가 정점에 스케일을 구워 넣기도 합니다)
+ * 그래서 boneTransform 으로 실제 스키닝된 정점 위치를 계산해 측정합니다.
+ * 이 값이 화면에 그려지는 크기와 정확히 일치합니다.
+ * ------------------------------------------------------------------------- */
+function fmtDim(v) {
+  const f = (n) => (Math.abs(n) >= 0.01 || n === 0) ? n.toFixed(2) : n.toExponential(2);
+  return f(v.x) + ' x ' + f(v.y) + ' x ' + f(v.z);
+}
+
+function measureObject(obj) {
+  obj.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  const v = new THREE.Vector3();
+  let sampled = 0;
+
+  obj.traverse((o) => {
+    if (o.isSkinnedMesh && o.geometry && o.skeleton && typeof o.boneTransform === 'function') {
+      if (o.skeleton.update) o.skeleton.update();
+      const pos = o.geometry.attributes.position;
+      if (!pos) return;
+      const step = Math.max(1, Math.floor(pos.count / 600));   // 메시당 최대 600점 샘플
+      for (let i = 0; i < pos.count; i += step) {
+        o.boneTransform(i, v);
+        v.applyMatrix4(o.matrixWorld);
+        box.expandByPoint(v);
+        sampled++;
+      }
+    } else if (o.isMesh && o.geometry) {
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      if (o.geometry.boundingBox) {
+        box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
+        sampled++;
+      }
+    }
+  });
+
+  const size = box.isEmpty() ? new THREE.Vector3() : box.getSize(new THREE.Vector3());
+  return { box, size, sampled, valid: sampled > 0 && isFinite(size.y) && size.y > 1e-9 };
+}
+
+function loadCharacterModel() {
+  if (typeof THREE.GLTFLoader !== 'function') {
+    console.warn('[IPG] GLTFLoader 미로드 — 절차적 캐릭터를 사용합니다');
+    return;
+  }
+  const loader = new THREE.GLTFLoader();
+
+  /* Sketchfab 다운로드는 Draco 압축인 경우가 많습니다.
+   * DRACOLoader 가 있으면 붙여 줍니다 (없어도 비압축 모델은 정상 동작).  */
+  if (typeof THREE.DRACOLoader === 'function') {
+    const draco = new THREE.DRACOLoader();
+    draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+    loader.setDRACOLoader(draco);
+  }
+
+  loader.load(
+    MODEL_PATH,
+    (gltf) => {
+      try {
+        applyLoadedModel(gltf);
+      } catch (err) {
+        console.error('[IPG] 모델 적용 실패:', err);
+        CHAR.ready = false;
+      }
+    },
+    undefined,
+    (err) => {
+      // 조용히 넘기지 않습니다. 파일이 있는데 실패한 것인지 구분되어야 합니다.
+      console.warn('[IPG] character.glb 를 불러오지 못했습니다 — 절차적 캐릭터를 사용합니다.',
+        (err && (err.message || err.type)) || err);
+      CHAR.error = String((err && (err.message || err.type)) || 'not found');
+    }
+  );
+}
+
+function applyLoadedModel(gltf) {
+  const root = gltf.scene || (gltf.scenes && gltf.scenes[0]);
+  if (!root) { console.warn('[IPG] GLB 에 scene 이 없습니다'); return; }
+
+  /* 모델 자신의 트랜스폼(스케일/회전/위치)은 절대 건드리지 않습니다.
+   * Sketchfab 모델은 루트에 0.01 같은 스케일을 갖고 있는 경우가 많아서,
+   * 여기를 덮어쓰면 모델이 수백 배로 커지거나 화면 밖으로 나갑니다.
+   * 대신 바깥에 컨테이너를 하나 씌우고 거기에만 보정을 겁니다.          */
+  if (MODEL_ROTATION_X) root.rotation.x += MODEL_ROTATION_X;
+  root.updateMatrixWorld(true);
+
+  /* 여기서 재는 값은 참고용입니다. 최종 배율은 아바타를 조립한 뒤
+   * 실제 월드 크기를 다시 재서 보정하므로(fitAvatarScale), 이 단계에서
+   * 조금 틀려도 결과는 정확합니다.                                       */
+  const m = measureObject(root);
+  CHAR.measure = m;
+  CHAR.scale = (m.valid && m.size.y > 1e-9) ? (MODEL_HEIGHT / m.size.y) : 1;
+  CHAR.yOffset = 0;
+  CHAR.xOffset = 0;
+  CHAR.zOffset = 0;
+
+  let meshCount = 0, skinned = 0;
+  root.traverse((o) => {
+    if (!o.isMesh && !o.isSkinnedMesh) return;
+    meshCount++;
+    if (o.isSkinnedMesh) skinned++;
+    o.castShadow = true;
+    o.receiveShadow = false;
+    o.frustumCulled = false;
+    o.visible = true;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach((m) => {
+      if (!m) return;
+      if (m.map) m.map.encoding = THREE.sRGBEncoding;
+      // 완전 투명하게 저장된 머티리얼을 되살립니다 (간혹 이런 모델이 있습니다)
+      if (m.transparent && m.opacity === 0) { m.opacity = 1; m.transparent = false; }
+      m.side = THREE.FrontSide;
+      m.depthWrite = true;
+    });
+  });
+
+  const allAnims = (gltf.animations || []).slice();
+  let pool = allAnims.slice();
+  let matchedByName = 0;
+  for (const key of MODEL_CLIP_ORDER) {
+    const clip = pickClip(pool, MODEL_CLIPS[key]);
+    if (!clip) continue;
+    CHAR.clips[key] = clip;
+    pool = pool.filter((c) => c !== clip);
+    matchedByName++;
+  }
+
+  /* Blender 로 합치면 클립 이름이 전부 'mixamo.com' / 'mixamo.com.001' 처럼
+   * 나오는 경우가 많습니다. 이러면 이름으로는 구분이 불가능하므로
+   * 순서(인덱스) 기준으로 배정합니다. MODEL_CLIP_INDEX 로 직접 지정할 수도
+   * 있습니다.                                                             */
+  const namesUseless = allAnims.length >= 2 &&
+    (matchedByName <= 1 || allAnims.every((a) => /^mixamo\.com/i.test(a.name)));
+
+  if (MODEL_CLIP_INDEX) {
+    CHAR.clips = {};
+    for (const key of Object.keys(MODEL_CLIP_INDEX)) {
+      const idx = MODEL_CLIP_INDEX[key];
+      if (allAnims[idx]) CHAR.clips[key] = allAnims[idx];
+    }
+    CHAR.clipMode = '수동 지정 (MODEL_CLIP_INDEX)';
+  } else if (namesUseless) {
+    CHAR.clips = {};
+    const order = ['idle', 'run', 'jump', 'dead'];
+    allAnims.forEach((clip, i) => { if (order[i]) CHAR.clips[order[i]] = clip; });
+    CHAR.clipMode = '순서 기준 (이름으로 구분 불가)';
+    console.warn(
+      '[IPG] 애니메이션 이름이 전부 비슷해서(' + allAnims.map((a) => a.name).join(', ') + ') ' +
+      '순서대로 배정했습니다: ' +
+      Object.keys(CHAR.clips).map((k, i) => k + '=' + i + '번').join(', ') + '\n' +
+      '  순서가 다르면 index.html 에서 이렇게 지정하세요:\n' +
+      '  const MODEL_CLIP_INDEX = { idle: 0, run: 1, jump: 2, dead: 3 };'
+    );
+  } else {
+    CHAR.clipMode = '이름 기준';
+  }
+  /* 남은 구멍 메우기.
+   * 애니메이션이 하나도 없는 모델(Sketchfab 다수)에서 undefined 가
+   * 클립 맵에 들어가면 이후 전부 터지므로, 값이 있을 때만 채웁니다.     */
+  const anims = gltf.animations || [];
+  if (!CHAR.clips.idle && anims.length) CHAR.clips.idle = anims[0];
+  const fill = (key, src) => { if (!CHAR.clips[key] && src) CHAR.clips[key] = src; };
+  fill('fall', CHAR.clips.jump || CHAR.clips.idle);
+  fill('jump', CHAR.clips.fall || CHAR.clips.idle);
+  fill('run',  CHAR.clips.idle);
+  for (const k of Object.keys(CHAR.clips)) {
+    if (!CHAR.clips[k]) delete CHAR.clips[k];
+  }
+
+  if (meshCount === 0) {
+    console.warn('[IPG] GLB 에 메시가 없습니다 — 절차적 캐릭터를 유지합니다');
+    return;
+  }
+
+  CHAR.scene = root;
+  CHAR.size = m.size;
+  CHAR.meshCount = meshCount;
+  CHAR.skinned = skinned;
+  CHAR.animNames = anims.map((a) => a.name);
+  CHAR.ready = true;
+
+  console.log(
+    '[IPG] 3D 캐릭터 로드 완료\n' +
+    '  원본 크기 : ' + fmtDim(m.size) + (m.valid ? '' : '  (측정 실패)') + '\n' +
+    '  적용 배율 : ' + CHAR.scale.toFixed(4) + '  (목표 키 ' + MODEL_HEIGHT + ')\n' +
+    '  메시      : ' + meshCount + '개 (스킨드 ' + skinned + '개)\n' +
+    '  애니메이션: ' + (anims.length ? anims.map((a) => a.name).join(', ') : '없음 (정지 자세로 표시됩니다)') + '\n' +
+    '  배정 방식 : ' + (CHAR.clipMode || '이름 기준') + '\n' +
+    '  매칭 결과 : ' + (Object.keys(CHAR.clips).length
+      ? Object.keys(CHAR.clips).map((k) => k + '=' + CHAR.clips[k].name).join(' / ')
+      : '없음')
+  );
+
+  if (m.valid && m.size.y > 1e-6 && m.size.z > m.size.y * 1.6) {
+    console.warn('[IPG] 모델이 누워 있는 것 같습니다 (깊이 > 높이). ' +
+      'index.html 의 MODEL_ROTATION_X 를 -Math.PI/2 로 바꿔 보세요.');
+  }
+
+  rebuildAllAvatars();
+}
+
+/* 모델이 늦게 도착해도 이미 만들어진 캐릭터를 그 자리에서 교체합니다 */
+function rebuildAllAvatars() {
+  for (const rec of G.players.values()) {
+    if (!rec || !rec.avatar || !rec.avatar.group) continue;
+    actorGroup.remove(rec.avatar.group);
+    rec.avatar = buildAvatar(rec.color, rec.name);
+    actorGroup.add(rec.avatar.group);
+  }
+  if (typeof local !== 'undefined' && local && local.avatar) {
+    actorGroup.remove(local.avatar.group);
+    local.avatar = buildAvatar(local.color, G.name || '나');
+    actorGroup.add(local.avatar.group);
+  }
+}
+
+function buildAvatar(colorHex, name) {
+  return CHAR.ready ? buildModelAvatar(colorHex, name)
+                    : buildProceduralAvatar(colorHex, name);
+}
+
+function buildModelAvatar(colorHex, name) {
+  const group = new THREE.Group();
+  const col = new THREE.Color(colorHex);
+
+  const model = (THREE.SkeletonUtils && THREE.SkeletonUtils.clone)
+    ? THREE.SkeletonUtils.clone(CHAR.scene)
+    : CHAR.scene.clone(true);
+
+  /* 컨테이너에 담아 보정합니다. 모델 자신의 스케일/회전/위치는 그대로 둡니다.
+   * (Sketchfab 모델은 루트에 0.01 같은 스케일을 갖고 있는 경우가 많습니다) */
+  const holder = new THREE.Group();
+  holder.add(model);
+  group.add(holder);
+  fitAvatarScale(holder);
+
+  /* 머티리얼을 인스턴스마다 복제해 플레이어 색을 입힙니다.
+   * 원본 텍스처는 그대로 두고 발광만 물들여 4인을 구분합니다.
+   * 머티리얼 이름에 'accent' 가 들어 있으면 완전히 플레이어 색으로 칠합니다. */
+  const skinMats = [];
+  model.traverse((o) => {
+    if (!o.isMesh && !o.isSkinnedMesh) return;
+    const src = Array.isArray(o.material) ? o.material : [o.material];
+    const cloned = src.map((m) => {
+      if (!m) return m;
+      const c = m.clone();
+      const nm = (c.name || '').toLowerCase();
+      if (nm.includes('accent') || nm.includes('suit')) {
+        if (c.color) c.color.copy(col);
+      }
+      if (c.emissive) {
+        c.emissive.copy(col).multiplyScalar(0.16);
+        c.emissiveIntensity = 1.0;
+      }
+      skinMats.push(c);
+      return c;
+    });
+    o.material = Array.isArray(o.material) ? cloned : cloned[0];
+  });
+
+  const ring = makeColorRing(col);
+  group.add(ring);
+
+  const blob = makeShadowBlob();
+  group.add(blob);
+
+  const plate = makeNameplate(name, colorHex);
+  plate.position.y = MODEL_HEIGHT + 0.85;
+  group.add(plate);
+
+  const mixer = new THREE.AnimationMixer(model);
+  const actions = {};
+  for (const key of Object.keys(CHAR.clips)) {
+    const act = mixer.clipAction(CHAR.clips[key]);
+    if (key === 'dead') { act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; }
+    actions[key] = act;
+  }
+  const startKey = actions.idle ? 'idle' : Object.keys(actions)[0];
+  if (startKey) actions[startKey].play();
+
+  return {
+    isModel: true,
+    group, holder, model, mixer, actions, ring, blob, plate, skinMats,
+    height: MODEL_HEIGHT,
+    current: startKey || null,
+    clock: 0
+  };
+}
+
+/* ---------------------------------------------------------------------------
+ * 조립된 아바타의 실제 월드 크기를 재서 배율을 확정합니다.
+ *
+ * 모델 하나만 따로 재는 것보다 이 방식이 확실합니다. 부모 계층의 스케일,
+ * bindMatrix 상쇄, Blender 가 정점에 구워 넣은 스케일 등 무슨 사정이 있든
+ * "화면에 그려지는 크기" 를 직접 재서 맞추기 때문입니다.
+ * 한 번 보정한 뒤 다시 재서 오차가 남으면 한 번 더 잡습니다.
+ * ------------------------------------------------------------------------- */
+function fitAvatarScale(holder) {
+  if (MODEL_SCALE > 0) {
+    holder.scale.setScalar(MODEL_SCALE);
+    const m0 = measureObject(holder);
+    if (m0.valid) holder.position.set(-((m0.box.min.x + m0.box.max.x) / 2), -m0.box.min.y,
+                                      -((m0.box.min.z + m0.box.max.z) / 2));
+    return;
+  }
+
+  holder.scale.setScalar(1);
+  holder.position.set(0, 0, 0);
+
+  for (let pass = 0; pass < 2; pass++) {
+    const m = measureObject(holder);
+    if (!m.valid || m.size.y <= 1e-9) {
+      console.warn('[IPG] 모델 크기를 잴 수 없습니다. index.html 의 MODEL_SCALE 에 ' +
+                   '배율을 직접 넣어 주세요 (예: const MODEL_SCALE = 0.01;)');
+      holder.scale.setScalar(1);
+      return;
+    }
+    const k = MODEL_HEIGHT / m.size.y;
+    if (Math.abs(k - 1) < 0.002) break;              // 이미 목표 크기
+    holder.scale.multiplyScalar(k);
+    holder.updateMatrixWorld(true);
+  }
+
+  // 발끝을 y=0 에, 가로 중심을 원점에 맞춥니다
+  const f = measureObject(holder);
+  if (f.valid) {
+    holder.position.set(
+      -((f.box.min.x + f.box.max.x) / 2),
+      -f.box.min.y,
+      -((f.box.min.z + f.box.max.z) / 2)
+    );
+    CHAR.scale = holder.scale.x;
+    CHAR.fitted = { h: f.size.y, scale: holder.scale.x };
+  }
+}
+
+function crossFadeTo(av, key, dur) {
+  if (!av.actions || !av.actions[key] || av.current === key) return;
+  const next = av.actions[key];
+  const prev = av.current ? av.actions[av.current] : null;
+  next.reset();
+  next.setEffectiveWeight(1);
+  next.enabled = true;
+  next.play();
+  if (prev && prev !== next) prev.crossFadeTo(next, dur === undefined ? 0.18 : dur, false);
+  av.current = key;
+}
+
+/* ---------------------------------------------------------------------------
+ * 공통 부속: 플레이어 색 링 + 접지 그림자
+ * ------------------------------------------------------------------------- */
+function makeColorRing(col) {
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.72, 1.00, 32),
+    new THREE.MeshBasicMaterial({
+      color: col, transparent: true, opacity: 0.85,
+      side: THREE.DoubleSide, depthWrite: false, toneMapped: false
+    })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.07;
+  return ring;
+}
+
+function makeShadowBlob() {
+  const blob = new THREE.Mesh(
+    new THREE.CircleGeometry(0.98, 24),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false })
+  );
+  blob.rotation.x = -Math.PI / 2;
+  blob.position.y = 0.05;
+  return blob;
+}
+
+/* 공중에 뜨면 그림자를 작고 옅게 — 3층에서 낙하할 때 착지 지점을 읽는 단서 */
+function updateGroundShadow(av, feetY, groundY, grounded) {
+  if (!av || !av.blob) return;
+  const gap = Math.max(0, feetY - groundY);
+  const t = THREE.MathUtils.clamp(1 - gap / 16, 0.18, 1);
+  av.blob.scale.setScalar(t);
+  av.blob.material.opacity = 0.34 * t;
+  av.blob.position.y = (groundY - feetY) + 0.05;
+  av.blob.visible = gap < 34;
+  if (av.ring) {
+    av.ring.position.y = grounded ? 0.07 : (groundY - feetY) + 0.07;
+    av.ring.scale.setScalar(grounded ? 1 : t);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * B) 절차적 3D 치비 캐릭터 — character.glb 가 없을 때 쓰이는 폴백.
+ *    이미지 에셋을 전혀 쓰지 않고 지오메트리만으로 조립하므로,
+ *    씬 조명에 제대로 반응하는 "진짜" 3D 입니다.
+ * ------------------------------------------------------------------------- */
+const CHIBI = {
+  height:  3.30,
+  headR:   0.86,   // 머리 반지름. 키우면 더 귀엽고 줄이면 동작이 또렷해집니다
+  headY:   2.30,
+  skin:    0xffd9be,
+  hair:    0x3b2a22,
+  shell:   0xf5f0e4,
+  dark:    0x1c2030,
+  eye:     0x2a1d16
+};
+
+function makeLimb(len, rad, limbMat, capMat, capScale) {
+  const pivot = new THREE.Group();
+  const seg = new THREE.Mesh(new THREE.CapsuleLikeGeometry(rad, len), limbMat);
+  seg.position.y = -len / 2;
+  seg.castShadow = true;
+  pivot.add(seg);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(rad * 1.32, 14, 12), capMat);
+  cap.position.y = -len;
+  if (capScale) cap.scale.set(capScale[0], capScale[1], capScale[2]);
+  cap.castShadow = true;
+  pivot.add(cap);
+  return pivot;
+}
+
+/* three r128 에는 CapsuleGeometry 가 없어서 원기둥으로 대체합니다 */
+THREE.CapsuleLikeGeometry = function (rad, len) {
+  return new THREE.CylinderGeometry(rad, rad * 0.94, len, 12);
+};
+
+function buildProceduralAvatar(colorHex, name) {
+  const group = new THREE.Group();
+  const col = new THREE.Color(colorHex);
+  const C = CHIBI;
+
+  const suitMat = new THREE.MeshStandardMaterial({
+    color: col, roughness: 0.45, metalness: 0.06,
+    emissive: col.clone().multiplyScalar(0.14), emissiveIntensity: 1.0
+  });
+  const skinMat = new THREE.MeshStandardMaterial({ color: C.skin, roughness: 0.66, metalness: 0.0 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: C.hair, roughness: 0.55, metalness: 0.05 });
+  const shellMat = new THREE.MeshStandardMaterial({ color: C.shell, roughness: 0.42, metalness: 0.04 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: C.dark, roughness: 0.5, metalness: 0.2 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: C.eye, roughness: 0.25, metalness: 0.0 });
+  const glossMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+  const bulbMat = new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xffc233, emissiveIntensity: 2.2 });
+
+  /* --- 몸통 --- */
+  const bodyPivot = new THREE.Group();
+  group.add(bodyPivot);
+
+  const torso = new THREE.Mesh(new THREE.SphereGeometry(0.66, 22, 18), suitMat);
+  torso.scale.set(1.0, 0.96, 0.86);
+  torso.position.y = 1.16;
+  torso.castShadow = true;
+  bodyPivot.add(torso);
+
+  const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.46, 0.18, 18), shellMat);
+  collar.position.y = 1.66;
+  collar.castShadow = true;
+  bodyPivot.add(collar);
+
+  const badge = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.06, 18), shellMat);
+  badge.rotation.x = Math.PI / 2;
+  badge.position.set(0, 1.22, 0.56);
+  bodyPivot.add(badge);
+  const badgeCore = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.08, 14), bulbMat);
+  badgeCore.rotation.x = Math.PI / 2;
+  badgeCore.position.set(0, 1.22, 0.59);
+  bodyPivot.add(badgeCore);
+
+  /* --- 머리 (전부 3D 지오메트리, 텍스처 없음) --- */
+  const headPivot = new THREE.Group();
+  headPivot.position.y = C.headY;
+  group.add(headPivot);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(C.headR, 28, 22), skinMat);
+  head.scale.set(1.0, 0.98, 0.96);
+  head.castShadow = true;
+  headPivot.add(head);
+
+  // 머리카락: 윗머리 캡 + 뒷머리 + 앞머리 세 덩어리
+  const hairTop = new THREE.Mesh(
+    new THREE.SphereGeometry(C.headR * 1.05, 28, 20, 0, Math.PI * 2, 0, 0.95), hairMat);
+  hairTop.scale.copy(head.scale);
+  hairTop.castShadow = true;
+  headPivot.add(hairTop);
+
+  const hairBack = new THREE.Mesh(
+    new THREE.SphereGeometry(C.headR * 1.04, 24, 16,
+      Math.PI / 2 + 0.80, Math.PI * 2 - 1.60, 0.70, 0.95), hairMat);
+  hairBack.scale.copy(head.scale);
+  headPivot.add(hairBack);
+
+  for (const [bx, bsz, brot] of [[-0.40, 0.24, -0.30], [0.02, 0.27, 0.06], [0.42, 0.22, 0.32]]) {
+    const bang = new THREE.Mesh(new THREE.SphereGeometry(bsz, 12, 10), hairMat);
+    bang.position.set(bx, C.headR * 0.62, C.headR * 0.66);
+    bang.scale.set(1.25, 0.62, 0.62);
+    bang.rotation.z = brot;
+    bang.castShadow = true;
+    headPivot.add(bang);
+  }
+
+  // 눈: 반구 + 하이라이트 (평면 데칼이 아니라 실제 볼륨)
+  const eyes = [];
+  for (const sx of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 14), eyeMat);
+    eye.position.set(sx * 0.33, 0.02, C.headR * 0.80);
+    eye.scale.set(0.85, 1.0, 0.55);
+    headPivot.add(eye);
+    eyes.push(eye);
+
+    const gloss = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), glossMat);
+    gloss.position.set(sx * 0.30, 0.07, C.headR * 0.86);
+    headPivot.add(gloss);
+
+    // 눈썹
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.05, 0.06), hairMat);
+    brow.position.set(sx * 0.33, 0.24, C.headR * 0.80);
+    brow.rotation.z = sx * -0.12;
+    headPivot.add(brow);
+  }
+
+  // 코 + 입 (작은 볼륨)
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), skinMat);
+  nose.position.set(0, -0.12, C.headR * 0.96);
+  headPivot.add(nose);
+
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.10, 0.026, 8, 18, Math.PI), eyeMat);
+  mouth.position.set(0, -0.30, C.headR * 0.84);
+  mouth.rotation.x = -0.25;
+  mouth.rotation.z = Math.PI;
+  headPivot.add(mouth);
+
+  // 귀
+  for (const sx of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), skinMat);
+    ear.position.set(sx * C.headR * 0.96, -0.06, 0);
+    ear.scale.set(0.45, 1.0, 0.80);
+    headPivot.add(ear);
+  }
+
+  // 특허 전구 안테나
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.42, 8), darkMat);
+  antenna.position.set(0.20, C.headR * 0.92, 0);
+  antenna.rotation.z = -0.24;
+  headPivot.add(antenna);
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 12), bulbMat);
+  bulb.position.set(0.29, C.headR * 0.92 + 0.24, 0);
+  headPivot.add(bulb);
+
+  /* --- 팔다리 --- */
+  const armL = makeLimb(0.56, 0.155, suitMat, shellMat, [1.05, 0.9, 1.05]);
+  const armR = makeLimb(0.56, 0.155, suitMat, shellMat, [1.05, 0.9, 1.05]);
+  armL.position.set(-0.64, 1.44, 0);
+  armR.position.set(0.64, 1.44, 0);
+  armL.rotation.z = 0.20;
+  armR.rotation.z = -0.20;
+
+  const legL = makeLimb(0.50, 0.185, darkMat, shellMat, [1.0, 0.85, 1.25]);
+  const legR = makeLimb(0.50, 0.185, darkMat, shellMat, [1.0, 0.85, 1.25]);
+  legL.position.set(-0.27, 0.72, 0);
+  legR.position.set(0.27, 0.72, 0);
+
+  group.add(armL, armR, legL, legR);
+
+  const ring = makeColorRing(col);
+  group.add(ring);
+  const blob = makeShadowBlob();
+  group.add(blob);
+  const plate = makeNameplate(name, colorHex);
+  plate.position.y = C.height + 0.85;
+  group.add(plate);
+
+  return {
+    isModel: false,
+    group, bodyPivot, torso, headPivot, eyes, mouth,
+    armL, armR, legL, legR, ring, blob, plate,
+    skinMats: [suitMat, shellMat],
+    height: C.height,
+    phase: Math.random() * 6.28,
+    clock: 0,
+    landSquash: 0,
+    baseArmZ: 0.20
+  };
+}
+
+/* ---------------------------------------------------------------------------
+ * 애니메이션 — GLB 는 클립 크로스페이드, 절차적은 진자 + 스쿼시
+ * ------------------------------------------------------------------------- */
+function animateAvatar(av, dt, speed01, state) {
+  if (!av) return;
+  av.clock += dt;
+
+  /* --- A) GLB 모델 --- */
+  if (av.isModel) {
+    let key = av.actions[state] ? state : 'idle';
+    crossFadeTo(av, key, state === 'dead' ? 0.12 : 0.18);
+    if (av.actions.run) av.actions.run.setEffectiveTimeScale(0.7 + speed01 * 0.9);
+    av.mixer.update(dt);
+    av.plate.visible = state !== 'dead';
+    if (av.ring) av.ring.visible = state !== 'dead';
+    return;
+  }
+
+  /* --- B) 절차적 캐릭터 --- */
+  const L = (a, b, k) => THREE.MathUtils.lerp(a, b, Math.min(1, k));
+
+  if (state === 'dead') {
+    av.group.rotation.x = Math.min(av.group.rotation.x + dt * 3.6, Math.PI / 2.15);
+    av.group.rotation.z = Math.sin(av.clock * 5.5) * 0.10;
+    av.headPivot.rotation.z = Math.sin(av.clock * 9) * 0.20;
+    av.armL.rotation.x = L(av.armL.rotation.x, -0.6, dt * 6);
+    av.armR.rotation.x = L(av.armR.rotation.x, -0.6, dt * 6);
+    av.legL.rotation.x = L(av.legL.rotation.x, 0.5, dt * 6);
+    av.legR.rotation.x = L(av.legR.rotation.x, 0.5, dt * 6);
+    av.eyes.forEach((e) => e.scale.set(0.85, 0.22, 0.55));
+    av.plate.visible = false;
+    if (av.ring) av.ring.visible = false;
+    return;
+  }
+  av.plate.visible = true;
+  if (av.ring) av.ring.visible = true;
+  av.group.rotation.x *= 0.82;
+  av.group.rotation.z *= 0.82;
+  av.eyes.forEach((e) => e.scale.set(0.85, 1.0, 0.55));
+
+  /* 스쿼시 & 스트레치 */
+  let sx = 1, sy = 1;
+  if (state === 'jump') { sy = 1.16; sx = 0.90; av.landSquash = 1; }
+  else if (state === 'fall') { sy = 1.08; sx = 0.95; av.landSquash = 1; }
+  else if (av.landSquash > 0) {
+    av.landSquash = Math.max(0, av.landSquash - dt * 5.0);
+    sy = 1 - av.landSquash * 0.28;
+    sx = 1 + av.landSquash * 0.22;
+  }
+  const sm = Math.min(1, dt * 20);
+  av.group.scale.set(L(av.group.scale.x, sx, sm), L(av.group.scale.y, sy, sm), L(av.group.scale.z, sx, sm));
+
+  /* 공중 포즈 */
+  if (state === 'jump' || state === 'fall') {
+    const up = state === 'jump';
+    av.armL.rotation.x = L(av.armL.rotation.x, up ? -2.4 : -1.5, dt * 11);
+    av.armR.rotation.x = L(av.armR.rotation.x, up ? -2.4 : -1.5, dt * 11);
+    av.armL.rotation.z = L(av.armL.rotation.z, av.baseArmZ + 0.32, dt * 11);
+    av.armR.rotation.z = L(av.armR.rotation.z, -av.baseArmZ - 0.32, dt * 11);
+    av.legL.rotation.x = L(av.legL.rotation.x, up ? -0.72 : -0.28, dt * 11);
+    av.legR.rotation.x = L(av.legR.rotation.x, up ? -0.34 : 0.28, dt * 11);
+    av.bodyPivot.rotation.x = L(av.bodyPivot.rotation.x, up ? -0.14 : 0.16, dt * 9);
+    av.headPivot.rotation.x = L(av.headPivot.rotation.x, up ? -0.18 : 0.14, dt * 9);
+    av.headPivot.position.y = L(av.headPivot.position.y, CHIBI.headY, dt * 9);
+    return;
+  }
+
+  /* 지상: 진자 러닝 + 머리 관성 */
+  av.phase += dt * (4.2 + speed01 * 11.0);
+  const s = Math.sin(av.phase);
+  const amp = 0.16 + speed01 * 1.0;
+
+  av.legL.rotation.x = s * amp;
+  av.legR.rotation.x = -s * amp;
+  av.armL.rotation.x = -s * amp * 0.9;
+  av.armR.rotation.x = s * amp * 0.9;
+  av.armL.rotation.z = L(av.armL.rotation.z, av.baseArmZ + speed01 * 0.16, dt * 10);
+  av.armR.rotation.z = L(av.armR.rotation.z, -av.baseArmZ - speed01 * 0.16, dt * 10);
+
+  const bounce = Math.abs(Math.sin(av.phase)) * (0.03 + speed01 * 0.10);
+  av.bodyPivot.position.y = L(av.bodyPivot.position.y, bounce, dt * 18);
+  av.headPivot.position.y = L(av.headPivot.position.y, CHIBI.headY + bounce * 1.30, dt * 11);
+  av.bodyPivot.rotation.x = L(av.bodyPivot.rotation.x, speed01 * 0.17, dt * 8);
+  av.headPivot.rotation.x = L(av.headPivot.rotation.x, -speed01 * 0.10 + Math.sin(av.phase) * 0.03, dt * 7);
+  av.headPivot.rotation.z = Math.sin(av.phase * 0.5) * (0.02 + speed01 * 0.05);
+
+  if (speed01 < 0.05) {
+    const breathe = Math.sin(av.clock * 1.9) * 0.016;
+    av.torso.scale.set(1.0, 0.96 + breathe, 0.86);
+  } else {
+    av.torso.scale.set(1.0, 0.96, 0.86);
+  }
+}
+
+/* ============================ 6. local runner =========================== */
+
+const local = {
+  pos: new THREE.Vector3(0, 30.5, 0),
+  vel: new THREE.Vector3(0, 0, 0),
+  ry: 0,
+  grounded: false,
+  groundTile: null,
+  layer: 3,
+  anim: 'idle',
+  avatar: null,
+  coyote: 0,
+  jumpBuffer: 0,
+  alive: true,
+  color: '#ffcc00'
+};
+
+/* ============================ 7. input ================================= */
+
+const keys = Object.create(null);
+window.addEventListener('keydown', (e) => {
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  keys[e.code] = true;
+  if (e.code === 'Space') local.jumpBuffer = 0.16;
+});
+window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+const cam = { yaw: 0, pitch: 0.62, dist: 20, targetDist: 20, height: 3.2, dragging: false, lx: 0, ly: 0 };
+
+renderer.domElement.addEventListener('mousedown', (e) => {
+  cam.dragging = true; cam.lx = e.clientX; cam.ly = e.clientY;
+});
+window.addEventListener('mouseup', () => { cam.dragging = false; });
+window.addEventListener('mousemove', (e) => {
+  if (!cam.dragging) return;
+  cam.yaw -= (e.clientX - cam.lx) * 0.0055;
+  cam.pitch = THREE.MathUtils.clamp(cam.pitch + (e.clientY - cam.ly) * 0.0042, 0.08, 1.36);
+  cam.lx = e.clientX; cam.ly = e.clientY;
+});
+renderer.domElement.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  cam.targetDist = THREE.MathUtils.clamp(cam.targetDist + e.deltaY * 0.02, 10, 46);
+}, { passive: false });
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ============================ 8. physics =============================== */
+
+/** AABB overlap test between the runner box and a tile box (XZ plane). */
+function aabbOverlapXZ(px, pz, rec) {
+  return (px + PLAYER.HALF_X > rec.minX) && (px - PLAYER.HALF_X < rec.maxX) &&
+         (pz + PLAYER.HALF_Z > rec.minZ) && (pz - PLAYER.HALF_Z < rec.maxZ);
+}
+
+/** Point-in-box test — decides which hex actually *owns* the runner. */
+function pointInXZ(px, pz, rec) {
+  return px >= rec.minX && px <= rec.maxX && pz >= rec.minZ && pz <= rec.maxZ;
+}
+
+/**
+ * Sweep the runner's feet from prevY to nextY and return the highest solid
+ * surface crossed. Supports tiles (per layer) and spectator boosters.
+ */
+function findLanding(px, pz, prevY, nextY) {
+  let best = null;
+
+  for (const L of [3, 2, 1]) {
+    const surf = G.layerY[L] + G.hexThick / 2;
+    if (prevY < surf - 0.02) continue;      // already below this floor
+    if (nextY > surf) continue;             // haven't reached it yet
+    let owner = null, ownerD = Infinity;
+    for (const rec of G.layerTiles[L]) {
+      if (rec.state === 'gone') continue;
+      if (!pointInXZ(px, pz, rec)) continue;
+      const d = (px - rec.x) * (px - rec.x) + (pz - rec.z) * (pz - rec.z);
+      if (d < ownerD) { ownerD = d; owner = rec; }
+    }
+    if (owner && (!best || surf > best.surf)) best = { surf, tile: owner, layer: L };
+  }
+
+  for (const b of G.boosters.values()) {
+    const surf = b.y + 0.5;
+    if (prevY < surf - 0.02 || nextY > surf) continue;
+    const dx = px - b.x, dz = pz - b.z;
+    if (dx * dx + dz * dz > 3.6 * 3.6) continue;
+    if (!best || surf > best.surf) best = { surf, tile: null, layer: b.layer || currentLayerOf(surf), booster: b };
+  }
+  return best;
+}
+
+/** Is the runner still supported at its current feet height? */
+function supportAt(px, pz, feetY) {
+  for (const L of [3, 2, 1]) {
+    const surf = G.layerY[L] + G.hexThick / 2;
+    if (Math.abs(feetY - surf) > 0.12) continue;
+    let owner = null, ownerD = Infinity;
+    for (const rec of G.layerTiles[L]) {
+      if (rec.state === 'gone') continue;
+      if (!pointInXZ(px, pz, rec)) continue;
+      const d = (px - rec.x) * (px - rec.x) + (pz - rec.z) * (pz - rec.z);
+      if (d < ownerD) { ownerD = d; owner = rec; }
+    }
+    if (owner) return { tile: owner, layer: L, surf };
+  }
+  for (const b of G.boosters.values()) {
+    const surf = b.y + 0.5;
+    if (Math.abs(feetY - surf) > 0.12) continue;
+    const dx = px - b.x, dz = pz - b.z;
+    if (dx * dx + dz * dz <= 3.6 * 3.6) return { tile: null, layer: currentLayerOf(surf), surf, booster: b };
+  }
+  return null;
+}
+
+/* 주어진 위치 아래에 있는 가장 가까운 바닥의 y.
+ * 2.5D 는 원근 단서가 약해서, 그림자로 높이를 읽게 하는 것이 매우 중요합니다. */
+function groundYUnder(px, pz, fromY) {
+  let best = G.lavaY;
+  for (const L of [1, 2, 3]) {
+    const surf = G.layerY[L] + G.hexThick / 2;
+    if (surf > fromY + 0.05) continue;
+    for (const rec of G.layerTiles[L]) {
+      if (rec.state === 'gone') continue;
+      if (!pointInXZ(px, pz, rec)) continue;
+      if (surf > best) best = surf;
+      break;
+    }
+  }
+  for (const b of G.boosters.values()) {
+    const surf = b.y + 0.5;
+    if (surf > fromY + 0.05) continue;
+    const dx = px - b.x, dz = pz - b.z;
+    if (dx * dx + dz * dz <= 3.6 * 3.6 && surf > best) best = surf;
+  }
+  return best;
+}
+
+function currentLayerOf(y) {
+  if (y >= G.layerY[3] - 3) return 3;
+  if (y >= G.layerY[2] - 3) return 2;
+  return 1;
+}
+
+function stepPhysics(dt) {
+  if (!local.alive) return;
+
+  // ---- horizontal intent (camera-relative) ----
+  const fwd = new THREE.Vector3(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw));
+  const right = new THREE.Vector3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
+  const wish = new THREE.Vector3();
+  if (keys['KeyW'] || keys['ArrowUp']) wish.add(fwd);
+  if (keys['KeyS'] || keys['ArrowDown']) wish.sub(fwd);
+  if (keys['KeyD'] || keys['ArrowRight']) wish.add(right);
+  if (keys['KeyA'] || keys['ArrowLeft']) wish.sub(right);
+
+  const sprinting = keys['ShiftLeft'] || keys['ShiftRight'];
+  const maxSpeed = sprinting ? PHYS.SPRINT : PHYS.MOVE;
+  const accel = local.grounded ? PHYS.ACCEL_GROUND : PHYS.ACCEL_AIR;
+
+  if (wish.lengthSq() > 0) {
+    wish.normalize();
+    local.vel.x += wish.x * accel * dt;
+    local.vel.z += wish.z * accel * dt;
+    local.ry = Math.atan2(wish.x, wish.z);
+  } else if (local.grounded) {
+    const f = Math.max(0, 1 - PHYS.FRICTION * dt);
+    local.vel.x *= f; local.vel.z *= f;
+  }
+
+  const hs = Math.hypot(local.vel.x, local.vel.z);
+  if (hs > maxSpeed) {
+    local.vel.x = local.vel.x / hs * maxSpeed;
+    local.vel.z = local.vel.z / hs * maxSpeed;
+  }
+
+  // ---- jump (with coyote time + input buffering) ----
+  local.coyote = local.grounded ? 0.11 : Math.max(0, local.coyote - dt);
+  local.jumpBuffer = Math.max(0, local.jumpBuffer - dt);
+  if (local.jumpBuffer > 0 && local.coyote > 0) {
+    local.vel.y = PHYS.JUMP_V;
+    local.grounded = false;
+    local.coyote = 0;
+    local.jumpBuffer = 0;
+    local.groundTile = null;
+  }
+
+  // ---- integrate ----
+  const prevY = local.pos.y;
+  local.vel.y = Math.max(PHYS.MAX_FALL, local.vel.y + PHYS.GRAVITY * dt);
+
+  local.pos.x += local.vel.x * dt;
+  local.pos.z += local.vel.z * dt;
+  const nextY = local.pos.y + local.vel.y * dt;
+
+  // ---- ground resolution ----
+  local.grounded = false;
+  if (local.vel.y <= 0) {
+    const hit = findLanding(local.pos.x, local.pos.z, prevY, nextY);
+    if (hit) {
+      local.pos.y = hit.surf;
+      local.vel.y = 0;
+      local.grounded = true;
+      local.layer = hit.layer;
+      local.groundTile = hit.tile;
+      if (hit.tile) onSteppedOn(hit.tile);
+    } else {
+      local.pos.y = nextY;
+    }
+  } else {
+    local.pos.y = nextY;
+  }
+
+  if (local.grounded) {
+    const sup = supportAt(local.pos.x, local.pos.z, local.pos.y);
+    if (!sup) { local.grounded = false; }
+    else {
+      local.layer = sup.layer;
+      local.groundTile = sup.tile;
+      if (sup.tile) onSteppedOn(sup.tile);
+    }
+  }
+
+  // ---- animation state ----
+  if (!local.grounded) local.anim = local.vel.y > 1.5 ? 'jump' : 'fall';
+  else local.anim = hs > 1.2 ? 'run' : 'idle';
+
+  // ---- lava / out-of-bounds ----
+  if (local.pos.y <= G.lavaY + 1.2) eliminateSelf('lava');
+  if (Math.abs(local.pos.x) > 170 || Math.abs(local.pos.z) > 170) eliminateSelf('void');
+}
+
+/** Fire tile_step exactly once per tile per round. */
+function onSteppedOn(rec) {
+  if (!rec || rec.state !== 'idle') return;
+  if (G.steppedTiles.has(rec.id)) return;
+  if (G.phase !== 'playing') return;
+  G.steppedTiles.add(rec.id);
+  // optimistic local warning so the feedback is instant; server re-syncs below
+  startWarn(rec, rec.trap ? 200 : 800);
+  G.socket.emit('tile_step', { tileId: rec.id });
+}
+
+function eliminateSelf(cause) {
+  if (!local.alive) return;
+  local.alive = false;
+  G.selfAlive = false;
+  local.anim = 'dead';
+  dom.deadFlash.classList.add('on');
+  setTimeout(() => dom.deadFlash.classList.remove('on'), 700);
+  G.socket.emit('player_death', { cause });
+  G.role = 'spectator';
+  updateSpectatorUI();
+  toast('심사 탈락 — 이제 관전자로 개입할 수 있습니다', 'kill');
+}
+
+/* ============================ 9. tile FX =============================== */
+
+function startWarn(rec, fuse) {
+  if (rec.state === 'gone' || rec.state === 'warn') return;
+  rec.state = 'warn';
+  rec.warnStart = performance.now();
+  rec.fuse = fuse;
+}
+
+function breakTile(rec) {
+  if (!rec || rec.state === 'gone') return;
+  rec.state = 'gone';
+  rec.breakStart = performance.now();
+  spawnDebris(rec);
+}
+
+const debris = [];
+const debrisGeo = new THREE.TetrahedronGeometry(0.55);
+function spawnDebris(rec) {
+  for (let i = 0; i < 6; i++) {
+    const m = new THREE.Mesh(debrisGeo, new THREE.MeshStandardMaterial({
+      color: rec.baseColor, emissive: rec.baseColor, emissiveIntensity: 0.6, transparent: true
+    }));
+    m.position.set(rec.x + (Math.random() - 0.5) * 3.4, rec.y, rec.z + (Math.random() - 0.5) * 3.4);
+    fxGroup.add(m);
+    debris.push({
+      mesh: m,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 7, Math.random() * 5 + 1.5, (Math.random() - 0.5) * 7),
+      spin: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6),
+      life: 1.6
+    });
+  }
+  if (debris.length > 220) {
+    const old = debris.splice(0, debris.length - 220);
+    old.forEach((d) => { fxGroup.remove(d.mesh); d.mesh.material.dispose(); });
+  }
+}
+
+function updateDebris(dt) {
+  for (let i = debris.length - 1; i >= 0; i--) {
+    const d = debris[i];
+    d.life -= dt;
+    if (d.life <= 0) {
+      fxGroup.remove(d.mesh); d.mesh.material.dispose(); debris.splice(i, 1); continue;
+    }
+    d.vel.y += PHYS.GRAVITY * 0.55 * dt;
+    d.mesh.position.addScaledVector(d.vel, dt);
+    d.mesh.rotation.x += d.spin.x * dt;
+    d.mesh.rotation.y += d.spin.y * dt;
+    d.mesh.material.opacity = Math.min(1, d.life / 0.8);
+  }
+}
+
+function updateTiles(dt, now) {
+  for (const rec of G.tiles.values()) {
+    const mesh = rec.mesh;
+
+    if (rec.state === 'warn') {
+      const p = Math.min(1, (now - rec.warnStart) / rec.fuse);
+      const blink = Math.sin(p * Math.PI * (rec.trap ? 16 : 10)) * 0.5 + 0.5;
+      rec.mat.emissiveIntensity = 0.3 + blink * 2.6;
+      rec.mat.color.copy(rec.baseColor).lerp(new THREE.Color(0xff2d2d), 0.35 + p * 0.55);
+      mesh.position.y = rec.baseY + Math.sin(now * 0.05) * 0.09 * p;
+      mesh.scale.setScalar(1 - p * 0.06);
+    } else if (rec.state === 'gone') {
+      const t = (now - rec.breakStart) / 420;
+      if (t < 1) {
+        mesh.visible = true;
+        mesh.position.y = rec.baseY - t * t * 26;
+        mesh.rotation.x = t * 1.1;
+        mesh.rotation.z = t * 0.8;
+        rec.mat.opacity = Math.max(0, 1 - t);
+        mesh.scale.setScalar(Math.max(0.01, 1 - t * 0.5));
+      } else if (mesh.visible) {
+        mesh.visible = false;
+      }
+      continue;
+    } else {
+      // idle — breathe the emissive very gently so the grid feels alive
+      rec.mat.emissiveIntensity = rec.trap
+        ? 0.45 + Math.sin(now * 0.004 + rec.x) * 0.2
+        : 0.2 + Math.sin(now * 0.0016 + rec.x * 0.2 + rec.z * 0.2) * 0.07;
+      rec.mat.color.copy(rec.baseColor);
+    }
+
+    if (rec.targetOpacity !== undefined) {
+      rec.mat.opacity += (rec.targetOpacity - rec.mat.opacity) * Math.min(1, dt * 6);
+    }
+  }
+}
+
+/* ============================ 10. boosters & obstacles ================= */
+
+const boosterGeo = new THREE.CylinderGeometry(3.5, 3.2, 0.9, 24);
+function spawnBooster(e) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffcc00, emissive: 0xffaa00, emissiveIntensity: 1.5,
+    metalness: 0.7, roughness: 0.25, transparent: true, opacity: 0.95
+  });
+  const mesh = new THREE.Mesh(boosterGeo, mat);
+  mesh.position.set(e.x, e.y, e.z);
+  mesh.castShadow = true;
+  fxGroup.add(mesh);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(3.6, 5.0, 32),
+    new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(e.x, e.y + 0.6, e.z);
+  fxGroup.add(ring);
+
+  G.boosters.set(e.id, {
+    id: e.id, x: e.x, y: e.y, z: e.z, mesh, ring, mat,
+    layer: currentLayerOf(e.y), born: performance.now(), ttl: e.ttl || 7000
+  });
+}
+
+function removeBooster(id) {
+  const b = G.boosters.get(id);
+  if (!b) return;
+  fxGroup.remove(b.mesh); fxGroup.remove(b.ring);
+  b.mesh.material.dispose(); b.ring.material.dispose();
+  G.boosters.delete(id);
+}
+
+function updateBoosters(dt, now) {
+  for (const b of G.boosters.values()) {
+    const age = now - b.born;
+    const left = b.ttl - age;
+    b.mesh.rotation.y += dt * 1.1;
+    b.ring.rotation.z += dt * 0.6;
+    const s = 1 + Math.sin(now * 0.006) * 0.04;
+    b.ring.scale.setScalar(s);
+    if (left < 1600) {
+      const blink = Math.sin(now * 0.03) * 0.5 + 0.5;
+      b.mat.opacity = 0.35 + blink * 0.6;
+      b.ring.material.opacity = 0.15 + blink * 0.4;
+    }
+    if (left <= 0) removeBooster(b.id);
+  }
+}
+
+const obsGeo = new THREE.BoxGeometry(4.6, 0.45, 3.4);
+function spawnObstacle(e) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xece7d8, emissive: 0xff2d2d, emissiveIntensity: 0.35, roughness: 0.85
+  });
+  const mesh = new THREE.Mesh(obsGeo, mat);
+  mesh.position.set(e.x, e.fromY, e.z);
+  mesh.rotation.y = Math.random() * 3.14;
+  mesh.castShadow = true;
+  fxGroup.add(mesh);
+
+  const marker = new THREE.Mesh(
+    new THREE.RingGeometry(2.6, 4.0, 24),
+    new THREE.MeshBasicMaterial({ color: 0xff2d2d, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false })
+  );
+  marker.rotation.x = -Math.PI / 2;
+  marker.position.set(e.x, e.y + 0.7, e.z);
+  fxGroup.add(marker);
+
+  G.obstacles.set(e.id, {
+    id: e.id, mesh, marker, mat,
+    x: e.x, y: e.y, z: e.z, fromY: e.fromY,
+    born: performance.now(), duration: e.durationMs || 1400, impacted: false
+  });
+}
+
+function updateObstacles(dt, now) {
+  for (const o of G.obstacles.values()) {
+    const p = Math.min(1, (now - o.born) / o.duration);
+    o.mesh.position.y = o.fromY + (o.y + 1.2 - o.fromY) * (p * p);
+    o.mesh.rotation.z = Math.sin(p * 9) * 0.3;
+    o.marker.material.opacity = 0.25 + (Math.sin(now * 0.02) * 0.5 + 0.5) * 0.55;
+    o.marker.scale.setScalar(1.35 - p * 0.35);
+
+    if (p >= 1 && !o.impacted) {
+      o.impacted = true;
+      // knockback for the local runner if caught in the blast radius
+      const dx = local.pos.x - o.x, dz = local.pos.z - o.z;
+      const d = Math.hypot(dx, dz);
+      if (local.alive && d < 6.5 && Math.abs(local.pos.y - o.y) < 5) {
+        const k = (1 - d / 6.5) * 26;
+        local.vel.x += (dx / (d || 1)) * k;
+        local.vel.z += (dz / (d || 1)) * k;
+        local.vel.y = Math.max(local.vel.y, 9);
+        local.grounded = false;
+      }
+      setTimeout(() => removeObstacle(o.id), 520);
+    }
+  }
+}
+
+function removeObstacle(id) {
+  const o = G.obstacles.get(id);
+  if (!o) return;
+  fxGroup.remove(o.mesh); fxGroup.remove(o.marker);
+  o.mesh.material.dispose(); o.marker.material.dispose();
+  G.obstacles.delete(id);
+}
+
+/* ============================ 11. dead reckoning ====================== */
+/**
+ * Remote runners are rendered INTERP_DELAY_MS in the past and interpolated
+ * between the two snapshots that bracket that render time. When the newest
+ * snapshot is older than the render time (packet loss / jitter spike) we
+ * extrapolate with the last known velocity, capped at EXTRAPOLATE_CAP_MS so
+ * a stalled peer never rockets off the map.
+ */
+class RemoteRunner {
+  constructor(meta) {
+    this.id = meta.id;
+    this.name = meta.name;
+    this.color = meta.color;
+    this.alive = meta.alive !== false;
+    this.layer = meta.layer || 3;
+    this.anim = 'idle';
+    this.buffer = [];
+    this.render = new THREE.Vector3(meta.pos ? meta.pos.x : 0, meta.pos ? meta.pos.y : 30.5, meta.pos ? meta.pos.z : 0);
+    this.renderRy = 0;
+    this.speed01 = 0;
+    this.avatar = buildAvatar(meta.color, meta.name);
+    this.avatar.group.position.copy(this.render);
+    actorGroup.add(this.avatar.group);
+  }
+
+  push(s, localNow) {
+    this.buffer.push({
+      t: localNow,
+      p: new THREE.Vector3(s.p[0], s.p[1], s.p[2]),
+      v: new THREE.Vector3(s.v[0], s.v[1], s.v[2]),
+      ry: s.ry, anim: s.a, layer: s.l, alive: !!s.al
+    });
+    if (this.buffer.length > 24) this.buffer.shift();
+  }
+
+  update(dt, localNow) {
+    const renderTime = localNow - NET.INTERP_DELAY_MS;
+    const buf = this.buffer;
+    let target = null, vel = null;
+
+    if (buf.length === 0) {
+      target = this.render.clone();
+    } else if (buf.length === 1 || renderTime <= buf[0].t) {
+      target = buf[0].p.clone();
+      this.renderRy = buf[0].ry;
+      this.anim = buf[0].anim; this.layer = buf[0].layer; this.alive = buf[0].alive;
+    } else {
+      let a = null, b = null;
+      for (let i = buf.length - 1; i > 0; i--) {
+        if (buf[i - 1].t <= renderTime && buf[i].t >= renderTime) { a = buf[i - 1]; b = buf[i]; break; }
+      }
+      if (a && b) {
+        // --- interpolation path ---
+        const span = Math.max(1, b.t - a.t);
+        const k = THREE.MathUtils.clamp((renderTime - a.t) / span, 0, 1);
+        target = a.p.clone().lerp(b.p, k);
+        this.renderRy = lerpAngle(a.ry, b.ry, k);
+        this.anim = k < 0.5 ? a.anim : b.anim;
+        this.layer = b.layer; this.alive = b.alive;
+        vel = b.v;
+      } else {
+        // --- dead reckoning (extrapolation) path ---
+        const last = buf[buf.length - 1];
+        const ahead = Math.min(renderTime - last.t, NET.EXTRAPOLATE_CAP_MS) / 1000;
+        target = last.p.clone().addScaledVector(last.v, Math.max(0, ahead));
+        this.renderRy = last.ry;
+        this.anim = last.anim; this.layer = last.layer; this.alive = last.alive;
+        vel = last.v;
+      }
+    }
+
+    // Critically-damped smoothing removes the residual snap on the seams.
+    const smooth = 1 - Math.pow(0.0009, dt);
+    this.render.lerp(target, smooth);
+
+    const av = this.avatar;
+    av.group.position.copy(this.render);
+
+    av.group.rotation.y = lerpAngle(av.group.rotation.y, this.renderRy, Math.min(1, dt * 14));
+    this.speed01 = vel ? THREE.MathUtils.clamp(Math.hypot(vel.x, vel.z) / PHYS.SPRINT, 0, 1) : 0;
+    animateAvatar(av, dt, this.speed01, this.alive ? this.anim : 'dead');
+    av.group.visible = true;
+    updateGroundShadow(av, this.render.y,
+      groundYUnder(this.render.x, this.render.z, this.render.y),
+      this.anim !== 'jump' && this.anim !== 'fall');
+  }
+
+  dispose() {
+    actorGroup.remove(this.avatar.group);
+  }
+}
+
+function lerpAngle(a, b, k) {
+  let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * k;
+}
+
+/* ============================ 12. camera rig ========================== */
+
+const camTarget = new THREE.Vector3();
+const camDesired = new THREE.Vector3();
+
+function updateCamera(dt) {
+  const focus = local.alive ? local.pos : spectateFocus();
+
+  camTarget.lerp(
+    new THREE.Vector3(focus.x, focus.y + cam.height, focus.z),
+    Math.min(1, dt * 8)
+  );
+
+  // Auto pitch: ease the camera up while the runner is plummeting so the
+  // landing zone below stays framed, and pull it down on the top layer.
+  const falling = THREE.MathUtils.clamp(-local.vel.y / 45, 0, 1);
+  const autoPitch = 0.5 + falling * 0.42;
+  cam.pitch = THREE.MathUtils.lerp(cam.pitch, THREE.MathUtils.clamp(cam.pitch, 0.08, 1.36), 1);
+  const usedPitch = cam.dragging ? cam.pitch : THREE.MathUtils.lerp(cam.pitch, autoPitch, dt * 0.9);
+  if (!cam.dragging) cam.pitch = usedPitch;
+
+  cam.dist += (cam.targetDist - cam.dist) * Math.min(1, dt * 5);
+
+  const horiz = Math.cos(cam.pitch) * cam.dist;
+  camDesired.set(
+    camTarget.x + Math.sin(cam.yaw) * horiz,
+    camTarget.y + Math.sin(cam.pitch) * cam.dist,
+    camTarget.z + Math.cos(cam.yaw) * horiz
+  );
+  camera.position.lerp(camDesired, Math.min(1, dt * 9));
+  camera.lookAt(camTarget);
+
+  keyLight.position.set(focus.x + 38, focus.y + 70, focus.z + 26);
+  keyLight.target.position.set(focus.x, focus.y, focus.z);
+  keyLight.target.updateMatrixWorld();
+
+  applyLayerTransparency(local.alive ? local.layer : currentLayerOf(focus.y));
+}
+
+function spectateFocus() {
+  if (G.specTarget) {
+    const r = G.players.get(G.specTarget);
+    if (r && r.alive) return r.render;
+  }
+  for (const r of G.players.values()) if (r.alive) return r.render;
+  return new THREE.Vector3(0, G.layerY[2], 0);
+}
+
+/* ============================ 13. HUD ================================= */
+
+function updateLayerStack(layer) {
+  for (const d of dom.docs) {
+    d.classList.toggle('on', parseInt(d.dataset.l, 10) === layer);
+  }
+}
+
+function updateRoster() {
+  const rows = [];
+  const entries = [...G.players.values()].sort((a, b) => (b.alive - a.alive));
+  for (const r of entries) {
+    const isSelf = r.id === G.selfId;
+    rows.push(
+      '<div class="rrow' + (r.alive ? '' : ' dead') + '" style="border-left-color:' + (r.color || '#888') + '">' +
+      '<span>' + escapeHtml(safeName(r.name)) + '</span>' +
+      (isSelf ? '<span class="you">YOU</span>' : '') +
+      '<span class="lay">' + (r.alive ? 'L' + (r.layer || 3) : 'OUT') + '</span>' +
+      '</div>'
+    );
+  }
+  if (!rows.length) rows.push('<div class="rrow" style="border-left-color:#333;opacity:.5">대기 중…</div>');
+  dom.rosterList.innerHTML = rows.join('');
+}
+
+/* 어떤 경로로 들어오든 화면에 undefined 가 찍히지 않게 하는 안전망 */
+function safeName(v, fallback) {
+  if (typeof v === 'string' && v.trim()) return v.trim();
+  return fallback || '익명 출원인';
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function updateSpectatorUI() {
+  const isSpec = G.role === 'spectator';
+  dom.spec.classList.toggle('show', isSpec);
+  dom.hint.classList.toggle('hide', isSpec);
+
+  /* 관전 중에는 내 캐릭터가 화면에 없는 것이 정상입니다.
+   * 이걸 알려주지 않으면 "캐릭터가 안 나온다" 로 오해하게 됩니다.        */
+  const banner = document.getElementById('specBanner');
+  banner.classList.toggle('show', isSpec);
+  if (isSpec) {
+    banner.innerHTML = (G.phase === 'playing')
+      ? '<b>관전 중</b>진행 중인 회차라 관전으로 참가했습니다 · 다음 회차에 자동으로 주자가 됩니다'
+      : '<b>관전 중</b>내 캐릭터는 표시되지 않습니다 · 주자로 뛰려면 새로고침 후 "주자로 참가" 선택';
+  }
+  if (!isSpec) return;
+
+  const alive = [...G.players.values()].filter((p) => p.alive);
+  if (!G.specTarget || !alive.find((p) => p.id === G.specTarget)) {
+    G.specTarget = alive.length ? alive[0].id : null;
+  }
+  dom.specTargets.innerHTML = alive.length
+    ? alive.map((p) =>
+        '<button class="tgt' + (p.id === G.specTarget ? ' sel' : '') + '" data-id="' + p.id + '">' +
+        escapeHtml(safeName(p.name)) + '</button>').join('')
+    : '<span style="font-size:11px;opacity:.5">주자가 없습니다</span>';
+}
+
+dom.specTargets.addEventListener('click', (e) => {
+  const b = e.target.closest('.tgt');
+  if (!b) return;
+  G.specTarget = b.dataset.id;
+  updateSpectatorUI();
+});
+
+dom.actCheer.addEventListener('click', () => {
+  if (performance.now() < G.cheerReadyAt) return;
+  G.socket.emit('cheer_booster', { targetId: G.specTarget });
+});
+dom.actDrop.addEventListener('click', () => {
+  if (performance.now() < G.dropReadyAt) return;
+  G.socket.emit('drop_obstacle', { targetId: G.specTarget });
+});
+
+function updateActionCooldowns(now) {
+  const cd = (btn, readyAt, total) => {
+    const left = readyAt - now;
+    const bar = btn.querySelector('.cd');
+    if (left > 0) {
+      btn.disabled = true;
+      bar.style.width = (100 - (left / total) * 100).toFixed(1) + '%';
+    } else {
+      btn.disabled = G.phase !== 'playing';
+      bar.style.width = '100%';
+    }
+  };
+  cd(dom.actCheer, G.cheerReadyAt, G.cfg ? G.cfg.BOOSTER_COOLDOWN_MS : 9000);
+  cd(dom.actDrop, G.dropReadyAt, G.cfg ? G.cfg.OBSTACLE_COOLDOWN_MS : 12000);
+}
+
+let cdVisible = false;
+function updateCountdown() {
+  if (G.phase === 'countdown' && G.phaseEndsAt) {
+    const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
+    dom.cdNum.textContent = Math.ceil(left / 1000);
+    dom.cdLabel.textContent = '심사 착수까지';
+    if (!cdVisible) { dom.countdown.classList.add('show'); cdVisible = true; }
+  } else if (G.phase === 'waiting' && G.phaseEndsAt) {
+    const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
+    dom.cdNum.textContent = Math.ceil(left / 1000);
+    dom.cdLabel.textContent = '출원인 모집 중';
+    if (!cdVisible) { dom.countdown.classList.add('show'); cdVisible = true; }
+  } else if (cdVisible) {
+    dom.countdown.classList.remove('show');
+    cdVisible = false;
+  }
+}
+
+function showResult(data) {
+  const won = data.winnerId === G.selfId;
+  dom.resultEyebrow.textContent = won ? '최종 처분 · REGISTERED' : '최종 처분 · REJECTED';
+  dom.resultTitle.innerHTML = won ? '등록결정' : (data.winnerName ? '거절결정' : '전원 탈락');
+  dom.resultSub.textContent = won
+    ? '마지막까지 바닥을 지켜냈습니다. 패스트트랙 심사를 통과했습니다.'
+    : (data.winnerName ? escapeHtml(data.winnerName) + ' 님이 등록결정을 받았습니다.' : '남은 주자가 없습니다.');
+  dom.resultRank.innerHTML = (data.standings || []).map((s) =>
+    '<div class="rank" style="border-left-color:' + s.color + '">' +
+    '<span class="p">' + (s.placement === 99 ? '—' : s.placement) + '</span>' +
+    '<span>' + escapeHtml(s.name) + '</span></div>').join('');
+  dom.result.classList.add('show');
+}
+
+/* ============================ 14. networking ========================== */
+
+function connect(name, mode) {
+  /* polling 으로 먼저 붙은 뒤 websocket 으로 업그레이드합니다.
+   * socket.io-client 4.8 부터 tryAllTransports 기본값이 false 라서,
+   * websocket 을 첫 transport 로 지정하면 사내 프록시/방화벽이 ws 업그레이드를
+   * 막을 때 polling 으로 넘어가지 못하고 연결 자체가 실패합니다.            */
+  const socket = io({
+    transports: ['polling', 'websocket'],
+    tryAllTransports: true,
+    upgrade: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelayMax: 4000,
+    timeout: 8000
+  });
+  G.socket = socket;
+  G.name = name;
+
+  socket.on('connect', () => {
+    socket.emit('join', { name, mode });
+    // 재연결마다 인터벌이 쌓이지 않도록 기존 것을 먼저 정리
+    if (G.pingTimer) clearInterval(G.pingTimer);
+    G.pingTimer = setInterval(() => socket.emit('ping_probe', Date.now()), 3000);
+    socket.emit('ping_probe', Date.now());
+  });
+
+  socket.on('pong_probe', (d) => {
+    G.rtt = Date.now() - d.clientSent;
+    G.serverOffset = d.serverTime - (d.clientSent + G.rtt / 2);
+    dom.vPing.textContent = G.rtt + ' ms';
+    dom.vPing.classList.toggle('bad', G.rtt > 160);
+  });
+
+  socket.on('server_hello', (d) => { G.cfg = d.config; });
+
+  socket.on('init', (d) => {
+    G.selfId = d.selfId;
+    G.role = d.role;
+    G.roomId = d.roomId;
+    G.map = d.map;
+    G.cfg = G.cfg || {};
+    dom.vRoom.textContent = d.roomId;
+
+    buildMap(d.map, mapCfg());
+
+    for (const b of d.brokenTiles || []) {
+      const rec = G.tiles.get(b.id);
+      if (!rec) continue;
+      if (b.st === 'broken') { rec.state = 'gone'; rec.mesh.visible = false; }
+      else startWarn(rec, 800);
+    }
+
+    syncPlayers(d.players);
+    applyMeta(d.meta);
+
+    if (d.role === 'player') {
+      const me = d.players.find((p) => p.id === d.selfId);
+      if (me) {
+        local.pos.set(me.pos.x, me.pos.y, me.pos.z);
+        local.color = me.color;
+      }
+      local.alive = true;
+      G.selfAlive = true;
+      if (!local.avatar) {
+        local.avatar = buildAvatar(local.color, d.name);
+        actorGroup.add(local.avatar.group);
+      }
+    }
+    updateSpectatorUI();
+    updateRoster();
+    G.started = true;
+  });
+
+  socket.on('phase', (meta) => applyMeta(meta));
+
+  socket.on('round_start', (d) => {
+    dom.result.classList.remove('show');
+    G.steppedTiles.clear();
+    syncPlayers(d.players);
+    const me = d.players.find((p) => p.id === G.selfId);
+    if (me && G.role === 'player') {
+      local.pos.set(me.pos.x, me.pos.y, me.pos.z);
+      local.vel.set(0, 0, 0);
+      local.alive = true;
+      local.layer = 3;
+      local.anim = 'idle';
+      G.selfAlive = true;
+      if (local.avatar) {
+        local.avatar.group.rotation.set(0, 0, 0);
+        local.avatar.group.scale.set(1, 1, 1);
+        local.avatar.landSquash = 0;
+      }
+    }
+    updateSpectatorUI();
+    toast('심사 개시 — 바닥이 무너집니다', 'obstacle');
+  });
+
+  socket.on('map_reset', (d) => {
+    dom.result.classList.remove('show');
+    for (const id of [...G.boosters.keys()]) removeBooster(id);
+    for (const id of [...G.obstacles.keys()]) removeObstacle(id);
+    G.steppedTiles.clear();
+    G.map = d.map;
+    buildMap(d.map, mapCfg());
+    syncPlayers(d.players);
+    applyMeta(d.meta);
+    const mine = d.players.find((p) => p.id === G.selfId);
+    if (mine) {
+      // 관전자였다가 이번 회차에 주자로 승격된 경우도 여기서 처리됩니다.
+      G.role = 'player';
+      local.alive = true;
+      G.selfAlive = true;
+      local.color = mine.color;
+      local.pos.set(mine.pos.x, mine.pos.y, mine.pos.z);
+      local.vel.set(0, 0, 0);
+      local.layer = 3;
+      local.anim = 'idle';
+      if (!local.avatar) {
+        local.avatar = buildAvatar(local.color, safeName(mine.name, G.name));
+        actorGroup.add(local.avatar.group);
+      }
+      local.avatar.group.rotation.set(0, 0, 0);
+      local.avatar.group.scale.set(1, 1, 1);
+      local.avatar.landSquash = 0;
+    } else {
+      G.role = 'spectator';
+    }
+    updateSpectatorUI();
+  });
+
+  socket.on('player_joined', (p) => {
+    if (!p || !p.id || p.id === G.selfId) return;
+    p.name = safeName(p.name);
+    if (!G.players.has(p.id)) G.players.set(p.id, new RemoteRunner(p));
+    updateRoster(); updateSpectatorUI();
+    toast(p.name + ' 님이 출원했습니다');
+  });
+
+  socket.on('player_left', (p) => {
+    const r = G.players.get(p.id);
+    if (r) { r.dispose(); G.players.delete(p.id); }
+    updateRoster(); updateSpectatorUI();
+  });
+
+  socket.on('spectator_joined', (s) => {
+    if (!s) return;
+    toast(safeName(s.name) + ' 님이 관전을 시작했습니다');
+  });
+
+  socket.on('state', (snap) => {
+    const now = performance.now();
+    for (const s of snap.players) {
+      if (s.id === G.selfId) continue;         // never overwrite local prediction
+      let r = G.players.get(s.id);
+      if (!r) continue;
+      r.push(s, now);
+      r.alive = !!s.al;
+      r.layer = s.l;
+    }
+  });
+
+  socket.on('tile_warn', (d) => {
+    const rec = G.tiles.get(d.tileId);
+    if (rec) startWarn(rec, d.fuse);
+  });
+
+  socket.on('tile_break', (d) => breakTile(G.tiles.get(d.tileId)));
+
+  socket.on('booster_spawn', (e) => {
+    spawnBooster(e);
+    if (G.role === 'spectator') G.cheerReadyAt = performance.now() + (G.cfg.BOOSTER_COOLDOWN_MS || 9000);
+  });
+  socket.on('booster_expire', (e) => removeBooster(e.id));
+
+  socket.on('obstacle_drop', (e) => {
+    spawnObstacle(e);
+    if (G.role === 'spectator') G.dropReadyAt = performance.now() + (G.cfg.OBSTACLE_COOLDOWN_MS || 12000);
+  });
+  socket.on('obstacle_impact', (e) => { /* tile break arrives via tile_warn/break */ });
+
+  socket.on('eliminated', (d) => {
+    const r = G.players.get(d.id);
+    if (r) r.alive = false;
+    if (d.id !== G.selfId) toast(safeName(d.name) + ' 님 탈락 · ' + d.placement + '위', 'kill');
+    updateRoster(); updateSpectatorUI();
+  });
+
+  socket.on('game_over', (d) => { showResult(d); updateRoster(); });
+
+  socket.on('toast', (d) => toast(d.text, d.kind));
+  socket.on('chat', (d) => toast(safeName(d.name) + ': ' + d.text));
+
+  socket.on('action_denied', (d) => {
+    const s = Math.ceil(d.retryInMs / 1000);
+    toast('재사용까지 ' + s + '초 남았습니다');
+  });
+
+  socket.on('disconnect', (reason) => {
+    dom.vRoom.textContent = '연결끊김';
+    toast('서버 연결이 끊어졌습니다 — 재연결 중 (' + reason + ')', 'kill');
+  });
+
+  /* 연결 자체가 안 되는 상황을 조용히 넘기지 않고 화면에 알립니다.
+   * 예전에는 아무 표시 없이 로스터가 "대기 중…" 으로 멈춰 있어서
+   * 서버가 죽은 것인지 매칭 대기인지 구분할 수 없었습니다.                  */
+  let connectFails = 0;
+  socket.on('connect_error', (err) => {
+    connectFails++;
+    dom.vRoom.textContent = '연결실패';
+    dom.vPing.textContent = '— ms';
+    dom.vPing.classList.add('bad');
+    if (connectFails === 1 || connectFails % 5 === 0) {
+      toast('서버에 연결할 수 없습니다 (' + (err && err.message ? err.message : 'unknown') + ') — 재시도 ' + connectFails + '회', 'kill');
+    }
+    console.error('[IPG] socket connect_error #' + connectFails + ':', err);
+  });
+
+  socket.io.on('reconnect', (n) => toast('서버에 다시 연결되었습니다 (' + n + '회 시도)'));
+}
+
+function applyMeta(meta) {
+  if (!meta) return;
+  G.phase = meta.phase;
+  G.phaseEndsAt = meta.phaseEndsAt;
+  dom.vAlive.textContent = meta.alive + '/' + meta.total;
+  dom.vSpec.textContent = meta.spectators;
+  dom.vRoom.textContent = meta.roomId || G.roomId;
+}
+
+function syncPlayers(list) {
+  const seen = new Set();
+  for (const p of list) {
+    seen.add(p.id);
+    if (p.id === G.selfId) {
+      G.players.set(p.id, Object.assign(G.players.get(p.id) || {}, {
+        id: p.id, name: p.name, color: p.color, alive: p.alive, layer: p.layer, isSelf: true,
+        render: local.pos
+      }));
+      continue;
+    }
+    let r = G.players.get(p.id);
+    if (!r || !(r instanceof RemoteRunner)) {
+      if (r && r.dispose) r.dispose();
+      r = new RemoteRunner(p);
+      G.players.set(p.id, r);
+    } else {
+      r.alive = p.alive;
+      r.layer = p.layer;
+    }
+  }
+  for (const [id, r] of [...G.players]) {
+    if (!seen.has(id)) { if (r.dispose) r.dispose(); G.players.delete(id); }
+  }
+  updateRoster();
+}
+
+/* ============================ 15. main loop =========================== */
+
+let lastTime = performance.now();
+let accumulator = 0;
+let sendAccum = 0;
+let fpsAccum = 0, fpsFrames = 0;
+
+function frame() {
+  requestAnimationFrame(frame);
+  const now = performance.now();
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+  if (dt > 0.25) dt = 0.25;
+
+  /* --- fixed-step physics for the local runner --- */
+  if (G.started && G.role === 'player' && local.alive && G.phase === 'playing') {
+    accumulator += dt;
+    let guard = 0;
+    while (accumulator >= PHYS.STEP && guard++ < 8) {
+      stepPhysics(PHYS.STEP);
+      accumulator -= PHYS.STEP;
+    }
+  } else {
+    accumulator = 0;
+  }
+
+  /* --- local avatar --- */
+  if (local.avatar) {
+    local.avatar.group.position.copy(local.pos);
+    local.avatar.group.rotation.y = lerpAngle(local.avatar.group.rotation.y, local.ry, Math.min(1, dt * 16));
+    const sp = THREE.MathUtils.clamp(Math.hypot(local.vel.x, local.vel.z) / PHYS.SPRINT, 0, 1);
+    animateAvatar(local.avatar, dt, sp, local.alive ? local.anim : 'dead');
+    local.avatar.group.visible = true;
+    updateGroundShadow(local.avatar, local.pos.y, groundYUnder(local.pos.x, local.pos.z, local.pos.y), local.grounded);
+  }
+
+  /* --- remote runners (dead reckoning) --- */
+  for (const r of G.players.values()) if (r instanceof RemoteRunner) r.update(dt, now);
+
+  /* --- world --- */
+  updateTiles(dt, now);
+  updateDebris(dt);
+  updateBoosters(dt, now);
+  updateObstacles(dt, now);
+  updateCamera(dt);
+
+  // lava surface ripple
+  const pos = lavaMesh.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const bx = lavaBase[i * 3], by = lavaBase[i * 3 + 1];
+    pos.array[i * 3 + 2] = Math.sin(bx * 0.06 + now * 0.0011) * 1.1 + Math.cos(by * 0.07 + now * 0.0014) * 1.1;
+  }
+  pos.needsUpdate = true;
+  lavaMat.emissiveIntensity = 1.25 + Math.sin(now * 0.002) * 0.35;
+
+  /* --- 20Hz uplink --- */
+  if (G.started && G.socket && G.role === 'player' && local.alive) {
+    sendAccum += dt;
+    if (sendAccum >= 1 / NET.SEND_HZ) {
+      sendAccum = 0;
+      G.socket.emit('player_state', {
+        p: [local.pos.x, local.pos.y, local.pos.z],
+        v: [local.vel.x, local.vel.y, local.vel.z],
+        ry: local.ry,
+        layer: local.layer,
+        anim: local.anim
+      });
+    }
+  }
+
+  /* --- HUD --- */
+  updateLayerStack(local.alive ? local.layer : currentLayerOf(spectateFocus().y));
+  updateCountdown();
+  updateActionCooldowns(now);
+
+  fpsAccum += dt; fpsFrames++;
+  if (fpsAccum >= 0.5) {
+    dom.vFps.textContent = Math.round(fpsFrames / fpsAccum);
+    fpsAccum = 0; fpsFrames = 0;
+    updateRoster();
+  }
+
+  renderer.render(scene, camera);
+}
+
+/* ============================ 15.5 진단 패널 ========================== */
+/* 연결이 안 되거나 라운드가 시작되지 않을 때, 어느 단계에서 막혔는지
+ * 즉시 확인할 수 있게 합니다. F2 로 토글. join 후 5초간 init 이 오지
+ * 않으면 자동으로 펼쳐집니다.                                             */
+const diagEl = document.getElementById('diag');
+const diagBody = document.getElementById('diagBody');
+let diagAuto = false;
+
+function renderDiag() {
+  if (!diagEl.classList.contains('show')) return;
+  const s = G.socket;
+  const conn = s && s.connected;
+  const tr = conn && s.io && s.io.engine ? s.io.engine.transport.name : '—';
+  const row = (label, ok, val) =>
+    '<div>' + label.padEnd(14, ' ').replace(/ /g, '&nbsp;') +
+    '<span class="' + (ok === true ? 'ok' : ok === false ? 'no' : 'wa') + '">' + val + '</span></div>';
+
+  diagBody.innerHTML =
+    row('socket.io', typeof io !== 'undefined', typeof io !== 'undefined' ? '로드됨' : '없음') +
+    row('연결', !!conn, conn ? '연결됨 / ' + tr : '끊김') +
+    row('init 수신', G.started, G.started ? '완료' : '대기중') +
+    row('룸', !!G.roomId && G.roomId !== '—', G.roomId) +
+    row('내 역할', null, G.role) +
+    row('타일', G.tiles.size > 0, G.tiles.size + '개') +
+    row('주자', null, G.players.size + '명') +
+    row('phase', null, G.phase) +
+    row('내 아바타', !!local.avatar,
+        local.avatar ? '생성됨' : (G.role === 'spectator' ? '없음 (관전자)' : '없음')) +
+    row('원인', G.role === 'player' || !!local.avatar, 
+        local.avatar ? '정상' : (G.role === 'spectator' ? '관전자는 캐릭터 없음' : 'init 미수신')) +
+    row('WebGL', true, renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1') +
+    row('3D 모델', CHAR.ready, CHAR.ready
+        ? ('적용됨 x' + CHAR.scale.toFixed(3))
+        : (CHAR.error ? '실패: ' + CHAR.error : '없음 (절차적)')) +
+    row('클립', true, CHAR.ready ? (Object.keys(CHAR.clips).join(',') || '없음') : '—');
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'F2') { e.preventDefault(); diagEl.classList.toggle('show'); renderDiag(); }
+});
+setInterval(renderDiag, 500);
+
+/* ============================ 16. boot ================================ */
+
+let joinMode = 'player';
+document.querySelectorAll('.mode').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.mode').forEach((x) => x.classList.remove('sel'));
+    b.classList.add('sel');
+    joinMode = b.dataset.mode;
+  });
+});
+
+dom.nameInput.value = '심사관' + Math.floor(Math.random() * 900 + 100);
+
+/* assets/character.glb 가 있으면 절차적 캐릭터를 대체합니다 */
+loadCharacterModel();
+
+
+dom.btnJoin.addEventListener('click', () => {
+  if (typeof io === 'undefined') {
+    alert('socket.io 클라이언트를 불러오지 못했습니다.\n\n' +
+          '이 페이지는 반드시 게임 서버(기본 http://localhost:3000)를 통해 열어야 합니다.\n' +
+          'index.html 파일을 직접 열거나 다른 포트의 정적 서버로 열면 동작하지 않습니다.');
+    return;
+  }
+  const name = (dom.nameInput.value || '').trim() || '익명출원인';
+  dom.joinScreen.classList.remove('show');
+  G.role = joinMode;
+  connect(name, joinMode);
+  updateSpectatorUI();
+
+  // 5초 안에 init 이 안 오면 진단 패널을 자동으로 펼칩니다.
+  setTimeout(() => {
+    if (!G.started && !diagAuto) {
+      diagAuto = true;
+      diagEl.classList.add('show');
+      renderDiag();
+      toast('서버 응답이 없습니다 — 좌하단 진단 패널을 확인하세요', 'kill');
+    }
+  }, 5000);
+});
+
+dom.nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') dom.btnJoin.click(); });
+
+frame();
+</script>
+</body>
+</html>
