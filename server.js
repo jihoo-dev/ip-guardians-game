@@ -21,6 +21,21 @@ const { Server } = require('socket.io');
 
 /* ------------------------------------------------------------------ config */
 
+/* 개발용 테스트 모드. true로 바꾸면 아래가 적용됩니다 (기본은 반드시 false):
+ *   - 타일이 밟혀도 무너지지 않는다 (requestTileBreak 가 아무것도 하지 않음)
+ *   - 바닥에서 떨어져도 탈락하지 않는다 (서버가 player_death 를 무시함)
+ *   - 클라이언트 왼쪽 레이어 안내문을 클릭하면 그 레이어로 순간이동한다
+ * false일 때 실제 게임 로직/밸런스는 지금과 완전히 동일합니다.               */
+const DEV_MODE = false;
+
+/** DEV_MODE 배속 헬퍼. 앞으로 층별 이벤트 타이머를 추가할 때
+ *  const MY_TIMER_MS = devMs(실제값, DEV_MODE용 짧은 값); 형태로 감싸두면
+ *  DEV_MODE 에서 자동으로 짧아집니다. (지금은 연결된 타이머가 없습니다 —
+ *  타일 붕괴는 DEV_MODE에서 아예 일어나지 않아 시간을 당길 필요가 없어서요.) */
+function devMs(normalMs, devModeMs) {
+  return DEV_MODE ? devModeMs : normalMs;
+}
+
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const STATIC_DIR = process.env.STATIC_DIR || 'public';
@@ -30,14 +45,10 @@ const TICK_HZ = 20;             // 20Hz => 50ms snapshot interval
 const TICK_MS = 1000 / TICK_HZ;
 
 const LOBBY_WAIT_MS = parseInt(process.env.LOBBY_WAIT_MS, 10) || 20000;  // 정원이 안 차면 이만큼 기다렸다 시작
-const SOLO_WAIT_MS  = parseInt(process.env.SOLO_WAIT_MS, 10)  || 15000;  // 혼자일 때 대기 (탭 2개 열 시간 확보)
-const COUNTDOWN_MS = 5000;      // "심사 착수" countdown before the run
+const SOLO_WAIT_MS  = parseInt(process.env.SOLO_WAIT_MS, 10)  || 3000;   // 혼자일 때 대기
+const COUNTDOWN_MS = 0;         // "심사 착수" countdown before the run
 const ROUND_MAX_MS = 300000;    // hard cap on a round (5 minutes)
 const RESET_DELAY_MS = 8000;    // podium screen duration before the next map
-
-// Tile collapse timings (seconds are converted to ms).
-const FUSE_NORMAL_MS = 800;     // 0.8s  standard patent tile
-const FUSE_TRAP_MS = 200;       // 0.2s  무단 카피캣 함정 블록
 
 // Spectator intervention economy.
 const BOOSTER_COOLDOWN_MS = 9000;
@@ -51,15 +62,51 @@ const OBSTACLE_FALL_MS = 1400;
 
 const HEX_SIZE = 3.2;           // circumradius of one hex tile
 const HEX_THICKNESS = 1.0;
-const GRID_RADIUS = 5;          // 5 rings => 91 tiles per layer
-const TRAP_CHANCE = 0.11;
+const GRID_RADIUS = 7;          // 7 rings => 169 tiles per layer (~2x)
 const LAVA_Y = -20;
 
+// 5개 층. index 1 = 맨 위(스폰), index 5 = 맨 아래(바로 아래가 용암).
+// name/color 는 그대로 클라이언트로 전달되며, special 은 그 층 전용 특수타일 태그입니다.
 const LAYERS = [
-  { index: 3, y: 30, color: '#00ffcc', name: '우선심사 패스트트랙 레이어', short: 'FAST-TRACK' },
-  { index: 2, y: 15, color: '#0088ff', name: '의견제출통지 레이어', short: 'OFFICE ACTION' },
-  { index: 1, y: 0, color: '#aa00ff', name: '아이디어 구상 레이어', short: 'IDEATION' }
+  { index: 1, y: 60, color: '#00ffcc', name: '우선심사 패스트트랙 레이어', short: 'FAST-TRACK', special: 'fasttrack' },
+  { index: 2, y: 45, color: '#0088ff', name: '의견제출통지 레이어', short: 'OFFICE ACTION', special: 'officeaction' },
+  { index: 3, y: 30, color: '#ff8a00', name: '실체심사/선행기술조사 레이어', short: 'PRIOR ART SEARCH', special: 'priorart' },
+  { index: 4, y: 15, color: '#ff4fd8', name: '청구항 레이어', short: 'CLAIMS', special: 'claims' },
+  { index: 5, y: 0, color: '#aa00ff', name: '아이디어 레이어', short: 'IDEATION', special: 'idea' }
 ];
+const TOP_LAYER_INDEX = LAYERS[0].index;
+
+/* --------------------------------------------------------------- tile types
+ * 모든 층 공통 비율. 합이 1이 되도록 유지하세요 — 바꾸고 싶으면 이 값만 고치면 됩니다. */
+const TILE_TYPE_RATIO = {
+  normal: 0.60,       // 일반: 0.7~1.0초 후 붕괴
+  weak: 0.10,         // 취약 (구 함정 타일 재활용): 0.2~0.3초 후 붕괴
+  reinforced: 0.10,   // 강화: 밟으면 금이 가고, 누구든 두 번째로 밟거나 3초 후 붕괴
+  special: 0.20       // 특수: 지금은 일반처럼 동작. 층별 태그만 부여 (기능은 추후 추가)
+};
+
+const FUSE_NORMAL_MIN_MS = 700, FUSE_NORMAL_MAX_MS = 1000; // 일반 / (특수 중 위상 타일이 아닌 것)
+const FUSE_WEAK_MIN_MS = 200, FUSE_WEAK_MAX_MS = 300;       // 취약
+const REINFORCED_CRACK_TIMEOUT_MS = 3000;                   // 강화: 금 간 뒤 자동 붕괴까지
+const FUSE_REINFORCED_BREAK_MS = 250;                        // 강화: 두 번째로 밟힌 뒤 붕괴까지
+
+/* --------------------------------------------------------------- phase tiles
+ * 청구항 레이어(special: 'claims')의 특수타일 = 위상 타일. 밟아도 무너지지
+ * 않는다 — 대신 방 전체가 같은 리듬으로 ON(실체)/OFF(비활성)를 반복하며,
+ * OFF인 동안엔 지지력이 없어 그 위의 플레이어가 아래로 떨어진다.            */
+const PHASE_TILE_SPECIAL = 'claims';
+const PHASE_TILE_ON_MS = 2000;   // 실체 상태 지속 시간
+const PHASE_TILE_OFF_MS = 1000;  // 비활성 상태 지속 시간
+
+/* ------------------------------------------------------------ fasttrack tile
+ * 우선심사 패스트트랙 레이어(맨 위층, special: 'fasttrack')의 특수타일 = 신속심사
+ * 타일. 밟으면 진행 방향(정지 중이면 마지막 이동 방향)으로 서버가 대시 이동을
+ * 계산해 모든 클라이언트에 반영한다. 대시 착지 지점에 타일이 없으면 그대로
+ * 아래로 떨어진다 — 이후 처리는 기존 낙하/탈락 로직을 그대로 탄다(DEV_MODE 포함).
+ * 대시를 발동시킨 뒤 타일 자체는 일반 타일과 똑같이 붕괴한다.                 */
+const FASTTRACK_TILE_SPECIAL = 'fasttrack';
+const FASTTRACK_DASH_TILES = 2;          // 대시 거리 (칸 수)
+const FASTTRACK_DASH_MIN_SPEED = 0.5;    // 이 속도 이상이어야 "지금 이동 중"으로 보고 그 방향을 쓴다
 
 /* --------------------------------------------------------------- utilities */
 
@@ -85,6 +132,21 @@ function makeRoomId() {
   return 'RM-' + Math.random().toString(36).slice(2, 7).toUpperCase();
 }
 
+function randRange(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+/** 시드 기반 rand() 로 TILE_TYPE_RATIO 비율에 맞는 타일 종류 하나를 뽑는다. */
+function pickTileType(rand) {
+  const roll = rand();
+  let acc = 0;
+  for (const type in TILE_TYPE_RATIO) {
+    acc += TILE_TYPE_RATIO[type];
+    if (roll < acc) return type;
+  }
+  return 'normal';
+}
+
 function clampName(raw) {
   const s = String(raw || '').trim().replace(/[\u0000-\u001f<>]/g, '');
   return (s.slice(0, 14) || '심사관' + Math.floor(Math.random() * 900 + 100));
@@ -107,9 +169,10 @@ function buildMap(seed) {
         const { x, z } = axialToWorld(q, r);
         const dist = (Math.abs(q) + Math.abs(q + r) + Math.abs(r)) / 2;
 
-        // Keep the top-layer spawn ring free of traps so nobody dies on frame 1.
-        const protectedSpawn = layer.index === 3 && dist >= GRID_RADIUS - 1;
-        const trap = !protectedSpawn && rand() < TRAP_CHANCE;
+        // Keep the top-layer spawn ring on plain "normal" tiles so nobody dies on frame 1.
+        const protectedSpawn = layer.index === TOP_LAYER_INDEX && dist >= GRID_RADIUS - 1;
+        const type = protectedSpawn ? 'normal' : pickTileType(rand);
+        const specialType = type === 'special' ? layer.special : null;
 
         tiles.push({
           id: 'L' + layer.index + '_' + q + '_' + r,
@@ -119,7 +182,8 @@ function buildMap(seed) {
           x: +x.toFixed(4),
           y: layer.y,
           z: +z.toFixed(4),
-          trap: trap
+          type: type,
+          specialType: specialType
         });
       }
     }
@@ -150,13 +214,15 @@ function createRoom() {
     id,
     seed: (Math.random() * 0xffffffff) >>> 0,
     map: null,
-    tileState: new Map(),   // tileId -> 'idle' | 'warning' | 'broken'
+    tileState: new Map(),   // tileId -> 'idle' | 'cracked' | 'warning' | 'broken'
+    crackedBy: new Map(),   // tileId -> { by: socketId|null } — 강화 타일의 첫 번째 타격자
     players: new Map(),     // socketId -> player
     spectators: new Map(),  // socketId -> { id, name }
     phase: 'waiting',       // waiting | countdown | playing | ended
     phaseEndsAt: 0,
     roundStartedAt: 0,
     winnerId: null,
+    phaseTileOn: true,      // 위상 타일 방 전체 공유 ON/OFF 상태
     timers: new Set(),
     nextEntityId: 1,
     seatColors: [...PLAYER_COLORS]
@@ -218,12 +284,13 @@ function makePlayer(id, name, seat, room) {
     seat,
     alive: true,
     placement: 0,
-    layer: 3,
+    layer: TOP_LAYER_INDEX,
     anim: 'idle',
     pos: { x: spawn.x, y: spawn.y, z: spawn.z },
     vel: { x: 0, y: 0, z: 0 },
     ry: 0,
     wins: 0,
+    lastMoveDir: null, // 신속심사 타일 대시용 — 마지막으로 유의미하게 움직인 수평 방향
     lastInput: Date.now()
   };
 }
@@ -303,13 +370,16 @@ function startRound(room) {
     const spawn = room.map.spawns[seatIdx % room.map.spawns.length];
     p.alive = true;
     p.placement = 0;
-    p.layer = 3;
+    p.layer = TOP_LAYER_INDEX;
     p.pos = { x: spawn.x, y: spawn.y, z: spawn.z };
     p.vel = { x: 0, y: 0, z: 0 };
     p.ry = 0;
     p.anim = 'idle';
     seatIdx++;
   }
+
+  room.phaseTileOn = true;
+  schedulePhaseToggle(room);
 
   broadcastPhase(room);
   io.to(room.id).emit('round_start', {
@@ -320,6 +390,16 @@ function startRound(room) {
   roomTimeout(room, () => {
     if (room.phase === 'playing') endRound(room, null, 'timeout');
   }, ROUND_MAX_MS);
+}
+
+/** 위상 타일 방 전체 동기화 사이클. 라운드가 끝나면(clearRoomTimers) 자동으로 멈춘다. */
+function schedulePhaseToggle(room) {
+  const waitMs = room.phaseTileOn ? PHASE_TILE_ON_MS : PHASE_TILE_OFF_MS;
+  roomTimeout(room, () => {
+    room.phaseTileOn = !room.phaseTileOn;
+    io.to(room.id).emit('phase_tile', { on: room.phaseTileOn, at: Date.now() });
+    schedulePhaseToggle(room);
+  }, waitMs);
 }
 
 function checkRoundEnd(room) {
@@ -384,17 +464,19 @@ function resetRoom(room) {
   room.seed = (Math.random() * 0xffffffff) >>> 0;
   room.map = buildMap(room.seed);
   room.tileState = new Map();
+  room.crackedBy = new Map();
   for (const t of room.map.tiles) room.tileState.set(t.id, 'idle');
   room.phase = 'waiting';
   room.phaseEndsAt = 0;
   room.winnerId = null;
   room.lobbyDeadline = null;
   room.nextEntityId = 1;
+  room.phaseTileOn = true;
 
   for (const p of room.players.values()) {
     p.alive = true;
     p.placement = 0;
-    p.layer = 3;
+    p.layer = TOP_LAYER_INDEX;
     // A runner who was eliminated last round got temporary spectator powers.
     // Revoke them now that they are back on the grid.
     room.spectators.delete(p.id);
@@ -425,7 +507,8 @@ function resetRoom(room) {
     seed: room.seed,
     map: room.map,
     players: [...room.players.values()].map(publicPlayer),
-    meta: roomSnapshotMeta(room)
+    meta: roomSnapshotMeta(room),
+    phaseTileOn: room.phaseTileOn
   });
 
   evaluateLobby(room);
@@ -433,30 +516,110 @@ function resetRoom(room) {
 
 /* ---------------------------------------------------------- tile handling */
 
-function requestTileBreak(room, tileId, sourceId) {
-  if (room.phase !== 'playing') return;
-  const state = room.tileState.get(tileId);
-  if (state !== 'idle') return;
+const HEX_HALF_X = HEX_SIZE;
+const HEX_HALF_Z = HEX_SIZE * Math.sqrt(3) / 2;
 
-  const tile = room.map.tiles.find(t => t.id === tileId);
-  if (!tile) return;
+/** 어떤 층의 (x, z) 위치를 실제로 차지하는 타일을 찾는다 (클라이언트 pointInXZ와 동일 로직). */
+function findTileAt(room, layer, x, z) {
+  let owner = null, ownerD = Infinity;
+  for (const t of room.map.tiles) {
+    if (t.layer !== layer) continue;
+    if (x < t.x - HEX_HALF_X || x > t.x + HEX_HALF_X) continue;
+    if (z < t.z - HEX_HALF_Z || z > t.z + HEX_HALF_Z) continue;
+    const d = (x - t.x) * (x - t.x) + (z - t.z) * (z - t.z);
+    if (d < ownerD) { ownerD = d; owner = t; }
+  }
+  return owner;
+}
 
-  const fuse = tile.trap ? FUSE_TRAP_MS : FUSE_NORMAL_MS;
-  room.tileState.set(tileId, 'warning');
+/** 신속심사 타일: 진행 방향(없으면 마지막 이동 방향)으로 대시. 방향 기록이 없으면 발동하지 않는다. */
+function triggerFasttrackDash(room, tile, player) {
+  const speed = Math.hypot(player.vel.x, player.vel.z);
+  const dir = speed > FASTTRACK_DASH_MIN_SPEED
+    ? { x: player.vel.x / speed, z: player.vel.z / speed }
+    : player.lastMoveDir;
+  if (!dir) return;
 
+  const dashDist = FASTTRACK_DASH_TILES * HEX_SIZE * Math.sqrt(3);
+  const destX = +(player.pos.x + dir.x * dashDist).toFixed(4);
+  const destZ = +(player.pos.z + dir.z * dashDist).toFixed(4);
+  const landingTile = findTileAt(room, tile.layer, destX, destZ);
+  const solid = !!landingTile && room.tileState.get(landingTile.id) !== 'broken';
+
+  player.pos.x = destX;
+  player.pos.z = destZ;
+  player.vel.x = 0;
+  player.vel.z = 0;
+
+  io.to(room.id).emit('fasttrack_dash', {
+    playerId: player.id,
+    x: destX, y: player.pos.y, z: destZ,
+    dirX: dir.x, dirZ: dir.z,
+    fellThrough: !solid,
+    at: Date.now()
+  });
+}
+
+/** 타일 종류별 붕괴까지 걸리는 시간(ms)을 하나 뽑는다. */
+function pickFuseMs(type) {
+  if (type === 'weak') return randRange(FUSE_WEAK_MIN_MS, FUSE_WEAK_MAX_MS);
+  return randRange(FUSE_NORMAL_MIN_MS, FUSE_NORMAL_MAX_MS); // normal, special
+}
+
+function beginWarn(room, tile, fuse, sourceId) {
+  room.tileState.set(tile.id, 'warning');
   io.to(room.id).emit('tile_warn', {
-    tileId,
+    tileId: tile.id,
     fuse,
-    trap: tile.trap,
+    type: tile.type,
     by: sourceId || null,
     at: Date.now()
   });
 
   roomTimeout(room, () => {
-    if (room.tileState.get(tileId) !== 'warning') return;
-    room.tileState.set(tileId, 'broken');
-    io.to(room.id).emit('tile_break', { tileId, at: Date.now() });
+    if (room.tileState.get(tile.id) !== 'warning') return;
+    room.tileState.set(tile.id, 'broken');
+    io.to(room.id).emit('tile_break', { tileId: tile.id, at: Date.now() });
   }, fuse);
+}
+
+/** 강화 타일 첫 타격: 금이 가고, 3초 안에 두 번째 타격이 없으면 스스로 붕괴한다. */
+function crackTile(room, tile, sourceId) {
+  room.tileState.set(tile.id, 'cracked');
+  room.crackedBy.set(tile.id, { by: sourceId || null });
+
+  io.to(room.id).emit('tile_crack', {
+    tileId: tile.id,
+    by: sourceId || null,
+    at: Date.now()
+  });
+
+  roomTimeout(room, () => {
+    if (room.tileState.get(tile.id) !== 'cracked') return;
+    beginWarn(room, tile, FUSE_REINFORCED_BREAK_MS, null);
+  }, REINFORCED_CRACK_TIMEOUT_MS);
+}
+
+function requestTileBreak(room, tileId, sourceId) {
+  if (DEV_MODE) return; // 개발용 테스트 모드: 타일이 무너지지 않는다
+  const tile = room.map.tiles.find(t => t.id === tileId);
+  if (!tile) return;
+  if (tile.specialType === PHASE_TILE_SPECIAL) return; // 위상 타일: 밟아도 무너지지 않는다 (ON/OFF 주기만 반복)
+  if (room.phase !== 'playing') return;
+  const state = room.tileState.get(tileId);
+
+  if (tile.type === 'reinforced') {
+    if (state === 'idle') { crackTile(room, tile, sourceId); return; }
+    if (state === 'cracked') {
+      const crack = room.crackedBy.get(tileId);
+      if (crack && crack.by === sourceId) return; // 자기 자신이 계속 밟는 건 두 번째 타격으로 치지 않음
+      beginWarn(room, tile, FUSE_REINFORCED_BREAK_MS, sourceId);
+    }
+    return;
+  }
+
+  if (state !== 'idle') return;
+  beginWarn(room, tile, pickFuseMs(tile.type), sourceId);
 }
 
 function brokenTileIds(room) {
@@ -518,8 +681,13 @@ io.on('connection', (socket) => {
   socket.emit('server_hello', {
     now: Date.now(),
     config: {
+      DEV_MODE,
       MAX_PLAYERS, TICK_HZ, HEX_SIZE, HEX_THICKNESS, GRID_RADIUS,
-      LAVA_Y, LAYERS, FUSE_NORMAL_MS, FUSE_TRAP_MS,
+      LAVA_Y, LAYERS, TILE_TYPE_RATIO,
+      FUSE_NORMAL_MIN_MS, FUSE_NORMAL_MAX_MS, FUSE_WEAK_MIN_MS, FUSE_WEAK_MAX_MS,
+      REINFORCED_CRACK_TIMEOUT_MS, FUSE_REINFORCED_BREAK_MS,
+      PHASE_TILE_SPECIAL, PHASE_TILE_ON_MS, PHASE_TILE_OFF_MS,
+      FASTTRACK_TILE_SPECIAL, FASTTRACK_DASH_TILES,
       BOOSTER_TTL_MS, OBSTACLE_FALL_MS,
       BOOSTER_COOLDOWN_MS, OBSTACLE_COOLDOWN_MS
     }
@@ -568,7 +736,8 @@ io.on('connection', (socket) => {
       brokenTiles: brokenTileIds(room),
       players: [...room.players.values()].map(publicPlayer),
       meta: roomSnapshotMeta(room),
-      serverTime: Date.now()
+      serverTime: Date.now(),
+      phaseTileOn: room.phaseTileOn
     });
 
     broadcastPhase(room);
@@ -592,6 +761,10 @@ io.on('connection', (socket) => {
       p.vel.y = +s.v[1] || 0;
       p.vel.z = +s.v[2] || 0;
     }
+    const hSpeed = Math.hypot(p.vel.x, p.vel.z);
+    if (hSpeed > FASTTRACK_DASH_MIN_SPEED) {
+      p.lastMoveDir = { x: p.vel.x / hSpeed, z: p.vel.z / hSpeed };
+    }
     p.ry = +s.ry || 0;
     p.layer = s.layer | 0;
     p.anim = typeof s.anim === 'string' ? s.anim.slice(0, 12) : 'idle';
@@ -603,10 +776,21 @@ io.on('connection', (socket) => {
     const p = room.players.get(socket.id);
     if (!p || !p.alive) return;
     if (typeof data.tileId !== 'string') return;
+
+    if (room.phase === 'playing') {
+      const tile = room.map.tiles.find(t => t.id === data.tileId);
+      // DEV_MODE에서도 대시는 확인할 수 있어야 하므로 requestTileBreak와 별도로 처리한다.
+      if (tile && tile.specialType === FASTTRACK_TILE_SPECIAL &&
+          room.tileState.get(tile.id) !== 'broken') {
+        triggerFasttrackDash(room, tile, p);
+      }
+    }
+
     requestTileBreak(room, data.tileId, socket.id);
   });
 
   socket.on('player_death', (data = {}) => {
+    if (DEV_MODE) return; // 개발용 테스트 모드: 떨어져도 탈락하지 않는다
     if (!room || role !== 'player') return;
     const p = room.players.get(socket.id);
     if (!p || !p.alive) return;

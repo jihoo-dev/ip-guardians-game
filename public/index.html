@@ -18,9 +18,11 @@
   --paper:#ece7d8;
   --ink:#12141c;
   --stamp:#ff2d2d;
-  --l3:#00ffcc;   /* 우선심사 패스트트랙 */
-  --l2:#0088ff;   /* 의견제출통지 */
-  --l1:#aa00ff;   /* 아이디어 구상 */
+  --l3:#00ffcc;   /* 팔레트 슬롯 — 1층 우선심사 패스트트랙 (+ 앱 전역 강조색) */
+  --l2:#0088ff;   /* 팔레트 슬롯 — 2층 의견제출통지 */
+  --l1:#aa00ff;   /* 팔레트 슬롯 — 5층 아이디어 */
+  --l4:#ff8a00;   /* 팔레트 슬롯 — 3층 실체심사/선행기술조사 */
+  --l5:#ff4fd8;   /* 팔레트 슬롯 — 4층 청구항 */
   --lava:#ff3a12;
   --gold:#ffcc00;
   --rule:rgba(236,231,216,.18);
@@ -56,7 +58,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
   position:absolute;left:18px;top:96px;display:flex;flex-direction:column;gap:8px;width:196px;
 }
 .doc{
-  position:relative;background:rgba(236,231,216,.06);border:1px solid var(--rule);
+  position:relative;background:rgba(0,0,0,.6);border:1px solid var(--rule);
   padding:10px 12px 11px;transition:.28s cubic-bezier(.2,.8,.2,1);
   clip-path:polygon(0 0,100% 0,100% calc(100% - 11px),calc(100% - 11px) 100%,0 100%);
 }
@@ -67,7 +69,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
 .doc .no{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.4)}
 .doc .nm{font-size:12.5px;font-weight:700;margin-top:3px;line-height:1.3}
 .doc .alt{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:rgba(236,231,216,.35);margin-top:3px}
-.doc.on{background:rgba(236,231,216,.1);transform:translateX(10px)}
+.doc.on{background:rgba(0,0,0,.72);transform:translateX(10px)}
 .doc.on .nm{color:var(--layer-c)}
 .doc.on{border-color:var(--layer-c);box-shadow:-3px 0 0 var(--layer-c),0 0 26px -6px var(--layer-c)}
 .doc.on::before{
@@ -76,7 +78,12 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
   padding:1px 5px;transform:rotate(-7deg);animation:stamp .5s cubic-bezier(.2,1.5,.4,1)
 }
 @keyframes stamp{from{transform:rotate(-7deg) scale(2.1);opacity:0}to{transform:rotate(-7deg) scale(1);opacity:1}}
-.doc[data-l="3"]{--layer-c:var(--l3)} .doc[data-l="2"]{--layer-c:var(--l2)} .doc[data-l="1"]{--layer-c:var(--l1)}
+.doc[data-l="1"]{--layer-c:var(--l3)} .doc[data-l="2"]{--layer-c:var(--l2)} .doc[data-l="3"]{--layer-c:var(--l4)} .doc[data-l="4"]{--layer-c:var(--l5)} .doc[data-l="5"]{--layer-c:var(--l1)}
+
+/* 개발용 테스트 모드에서만 활성화 — 레이어 안내문 클릭으로 순간이동 */
+#layerStack.devmode{pointer-events:auto}
+#layerStack.devmode .doc{cursor:pointer}
+#layerStack.devmode .doc:hover{background:rgba(0,0,0,.82);transform:translateX(4px)}
 
 /* ------------------------------------------------------- roster (right) -- */
 #roster{position:absolute;right:18px;top:96px;width:212px;display:flex;flex-direction:column;gap:6px}
@@ -211,9 +218,11 @@ input[type=text]{
   </div>
 
   <div id="layerStack">
-    <div class="doc" data-l="3"><div class="no">LAYER 03</div><div class="nm">우선심사 패스트트랙 레이어</div><div class="alt">FAST-TRACK EXAMINATION</div></div>
+    <div class="doc" data-l="1"><div class="no">LAYER 01</div><div class="nm">우선심사 패스트트랙 레이어</div><div class="alt">FAST-TRACK EXAMINATION</div></div>
     <div class="doc" data-l="2"><div class="no">LAYER 02</div><div class="nm">의견제출통지 레이어</div><div class="alt">OFFICE ACTION</div></div>
-    <div class="doc" data-l="1"><div class="no">LAYER 01</div><div class="nm">아이디어 구상 레이어</div><div class="alt">IDEATION</div></div>
+    <div class="doc" data-l="3"><div class="no">LAYER 03</div><div class="nm">실체심사/선행기술조사 레이어</div><div class="alt">PRIOR ART SEARCH</div></div>
+    <div class="doc" data-l="4"><div class="no">LAYER 04</div><div class="nm">청구항 레이어</div><div class="alt">CLAIMS</div></div>
+    <div class="doc" data-l="5"><div class="no">LAYER 05</div><div class="nm">아이디어 레이어</div><div class="alt">IDEATION</div></div>
   </div>
 
   <div id="roster"><div class="rname">출원인 명단</div><div id="rosterList"></div></div>
@@ -237,9 +246,9 @@ input[type=text]{
 
 <div class="screen show" id="joinScreen">
   <div class="card">
-    <div class="eyebrow">KIPO SURVIVAL PROTOCOL · 3-LAYER</div>
+    <div class="eyebrow">KIPO SURVIVAL PROTOCOL · 5-LAYER</div>
     <h1>바닥이 무너지기 전에<br><em>등록결정</em>까지 살아남으세요.</h1>
-    <p class="sub">밟은 특허 심사 타일은 0.8초 뒤 붕괴합니다. 무단 카피캣 함정 블록은 0.2초. 3층에서 1층까지 떨어지면 그 아래는 용암입니다. 마지막 한 명이 등록결정을 받습니다.</p>
+    <p class="sub">타일 종류에 따라 밟으면 0.2~1초 사이에 붕괴합니다. 강화 타일은 금이 간 뒤 두 번째로 밟히거나 3초가 지나면 무너집니다. 1층에서 5층까지 떨어지면 그 아래는 용암입니다. 마지막 한 명이 등록결정을 받습니다.</p>
     <div class="field">
       <label for="nameInput">출원인 이름</label>
       <input type="text" id="nameInput" maxlength="14" placeholder="예: 김심사" autocomplete="off" />
@@ -322,7 +331,8 @@ const dom = {
   countdown: $('countdown'), cdNum: $('cdNum'), cdLabel: $('cdLabel'),
   result: $('result'), resultTitle: $('resultTitle'), resultSub: $('resultSub'),
   resultRank: $('resultRank'), resultEyebrow: $('resultEyebrow'),
-  deadFlash: $('deadFlash'), hint: $('hint'), docs: Array.from(document.querySelectorAll('.doc'))
+  deadFlash: $('deadFlash'), hint: $('hint'), docs: Array.from(document.querySelectorAll('.doc')),
+  layerStack: $('layerStack')
 };
 
 function toast(text, kind) {
@@ -351,8 +361,10 @@ const G = {
   cfg: null,
   map: null,
   tiles: new Map(),        // tileId -> tileRecord
-  layerTiles: { 1: [], 2: [], 3: [] },
-  layerY: { 1: 0, 2: 15, 3: 30 },
+  layerTiles: {},          // layerIndex -> tileRecord[], filled in buildMap()
+  layerY: {},              // layerIndex -> world y, filled in buildMap()
+  layerIndices: [1, 2, 3, 4, 5], // top -> bottom, replaced with cfg order in buildMap()
+  midLayerIndex: 3,
   lavaY: -20,
   hexSize: 3.2,
   hexThick: 1.0,
@@ -360,7 +372,7 @@ const G = {
   boosters: new Map(),
   obstacles: new Map(),
   selfAlive: true,
-  selfLayer: 3,
+  selfLayer: 1,
   steppedTiles: new Set(),
   serverOffset: 0,
   rtt: 0,
@@ -468,10 +480,55 @@ scene.add(lavaGlow);
 
 /* ============================ 4. map building ========================== */
 
-const LAYER_COLORS = { 3: 0x00ffcc, 2: 0x0088ff, 1: 0xaa00ff };
-const TRAP_COLOR = 0x6b0d12;
+/* 타일 종류 4종의 색상. 특수는 층마다 다른 태그(specialType)별로 색이 다릅니다. */
+const TILE_COLORS = {
+  normal: 0x8a94a6,
+  weak: 0x6b0d12,
+  reinforced: 0xf2b134,
+  special: {
+    fasttrack: 0x00ffcc,
+    officeaction: 0x0088ff,
+    priorart: 0xff8a00,
+    claims: 0xff4fd8,
+    idea: 0xaa00ff
+  }
+};
+const TILE_MATERIAL_PROFILE = {
+  normal: { emissiveBoost: 0x000000, intensity: 0.22, roughness: 0.55, metalness: 0.22 },
+  weak: { emissiveBoost: 0x330000, intensity: 0.5, roughness: 0.85, metalness: 0.1 },
+  reinforced: { emissiveBoost: 0x1a1200, intensity: 0.35, roughness: 0.3, metalness: 0.55 },
+  special: { emissiveBoost: 0x000000, intensity: 0.28, roughness: 0.45, metalness: 0.28 }
+};
+function tileBaseColor(t) {
+  if (t.type === 'special') return TILE_COLORS.special[t.specialType] || TILE_COLORS.normal;
+  return TILE_COLORS[t.type] || TILE_COLORS.normal;
+}
 
-let hexGeo = null, trapGeo = null;
+// 위상 타일(청구항 레이어 특수타일) — OFF일 때 이 정도까지 반투명해진다.
+const PHASE_OFF_OPACITY = 0.3;
+
+let hexGeo = null, trapGeo = null, hexEdgesGeo = null, dashArrowGeo = null;
+const phaseOutlineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+const dashArrowMat = new THREE.MeshStandardMaterial({
+  color: 0xffffff, emissive: 0x00ffcc, emissiveIntensity: 1.3,
+  transparent: true, opacity: 0.92, side: THREE.DoubleSide
+});
+
+/* 신속심사 타일(패스트트랙 레이어 특수타일) 위에 떠서 계속 회전하는 화살촉 —
+ * 실제 대시 방향은 밟는 순간의 진행 방향이라 타일 자체엔 고정된 방향이 없으므로,
+ * "밟으면 튀어나간다"는 느낌만 회전하는 화살표로 표현한다. */
+function makeDashArrowGeo(size) {
+  const len = size * 0.55, wid = size * 0.34;
+  const s = new THREE.Shape();
+  s.moveTo(len * 0.5, 0);
+  s.lineTo(-len * 0.35, wid * 0.5);
+  s.lineTo(-len * 0.1, 0);
+  s.lineTo(-len * 0.35, -wid * 0.5);
+  s.closePath();
+  const geo = new THREE.ShapeGeometry(s);
+  geo.rotateX(-Math.PI / 2); // 평평하게 눕혀서 바닥 위에 떠 있게
+  return geo;
+}
 
 function mapCfg() {
   const c = G.cfg || {};
@@ -479,7 +536,9 @@ function mapCfg() {
     HEX_SIZE: c.HEX_SIZE || 3.2,
     HEX_THICKNESS: c.HEX_THICKNESS || 1.0,
     LAVA_Y: (c.LAVA_Y !== undefined ? c.LAVA_Y : -20),
-    LAYERS: c.LAYERS || [{ index: 3, y: 30 }, { index: 2, y: 15 }, { index: 1, y: 0 }]
+    LAYERS: c.LAYERS || [
+      { index: 1, y: 60 }, { index: 2, y: 45 }, { index: 3, y: 30 }, { index: 4, y: 15 }, { index: 5, y: 0 }
+    ]
   };
 }
 
@@ -490,9 +549,15 @@ function buildMap(map, cfg) {
     tileGroup.remove(rec.mesh);
     rec.mesh.geometry = null;
     rec.mesh.material.dispose();
+    if (rec.outlineMesh) tileGroup.remove(rec.outlineMesh); // geometry/material은 공유 자원이라 dispose 안 함
+    if (rec.dashArrow) tileGroup.remove(rec.dashArrow);
   }
   G.tiles.clear();
-  G.layerTiles = { 1: [], 2: [], 3: [] };
+  G.layerTiles = {};
+  G.layerY = {};
+  // cfg.LAYERS는 서버가 항상 맨 위 -> 맨 아래 순서로 보낸다.
+  G.layerIndices = cfg.LAYERS.map((L) => L.index);
+  G.midLayerIndex = G.layerIndices[Math.floor(G.layerIndices.length / 2)];
 
   G.hexSize = cfg.HEX_SIZE;
   G.hexThick = cfg.HEX_THICKNESS;
@@ -500,12 +565,17 @@ function buildMap(map, cfg) {
   lavaMesh.position.y = cfg.LAVA_Y;
   lavaGlow.position.y = cfg.LAVA_Y + 0.8;
   lavaLight.position.y = cfg.LAVA_Y + 6;
-  for (const L of cfg.LAYERS) G.layerY[L.index] = L.y;
+  for (const L of cfg.LAYERS) { G.layerY[L.index] = L.y; G.layerTiles[L.index] = []; }
 
   if (!hexGeo) {
     hexGeo = new THREE.CylinderGeometry(G.hexSize * 0.965, G.hexSize * 0.9, G.hexThick, 6, 1);
     trapGeo = new THREE.CylinderGeometry(G.hexSize * 0.965, G.hexSize * 0.9, G.hexThick * 1.12, 6, 1);
+    hexEdgesGeo = new THREE.EdgesGeometry(hexGeo);
+    dashArrowGeo = makeDashArrowGeo(G.hexSize);
   }
+
+  const phaseTileSpecial = (G.cfg && G.cfg.PHASE_TILE_SPECIAL) || 'claims';
+  const fasttrackTileSpecial = (G.cfg && G.cfg.FASTTRACK_TILE_SPECIAL) || 'fasttrack';
 
   // AABB half-extents of a flat-top hexagon: adjacent boxes overlap in X and
   // touch exactly in Z, so the plane is fully covered — no fall-through gaps.
@@ -513,47 +583,69 @@ function buildMap(map, cfg) {
   const halfZ = G.hexSize * Math.sqrt(3) / 2;
 
   for (const t of map.tiles) {
-    const base = t.trap ? TRAP_COLOR : LAYER_COLORS[t.layer];
+    const base = tileBaseColor(t);
+    const prof = TILE_MATERIAL_PROFILE[t.type] || TILE_MATERIAL_PROFILE.normal;
+    const isWeak = t.type === 'weak';
     const mat = new THREE.MeshStandardMaterial({
       color: base,
-      emissive: t.trap ? 0x330000 : base,
-      emissiveIntensity: t.trap ? 0.5 : 0.22,
-      roughness: t.trap ? 0.85 : 0.55,
-      metalness: t.trap ? 0.1 : 0.22,
+      emissive: prof.emissiveBoost || base,
+      emissiveIntensity: prof.intensity,
+      roughness: prof.roughness,
+      metalness: prof.metalness,
       transparent: true,
       opacity: 1
     });
     if (TEX.road) mat.map = TEX.road;
 
-    const mesh = new THREE.Mesh(t.trap ? trapGeo : hexGeo, mat);
+    const mesh = new THREE.Mesh(isWeak ? trapGeo : hexGeo, mat);
     mesh.position.set(t.x, t.y, t.z);
     mesh.receiveShadow = true;
     mesh.castShadow = false;
     tileGroup.add(mesh);
 
+    const isPhaseTile = t.type === 'special' && t.specialType === phaseTileSpecial;
+    let outlineMesh = null;
+    if (isPhaseTile) {
+      outlineMesh = new THREE.LineSegments(hexEdgesGeo, phaseOutlineMat);
+      outlineMesh.position.set(t.x, t.y, t.z);
+      outlineMesh.visible = false; // 라운드 시작은 ON(실체) — 윤곽선은 OFF일 때만 보인다
+      tileGroup.add(outlineMesh);
+    }
+
+    const isFasttrackTile = t.type === 'special' && t.specialType === fasttrackTileSpecial;
+    let dashArrow = null;
+    if (isFasttrackTile) {
+      dashArrow = new THREE.Mesh(dashArrowGeo, dashArrowMat);
+      dashArrow.position.set(t.x, t.y + G.hexThick / 2 + 0.14, t.z);
+      tileGroup.add(dashArrow);
+    }
+
     const rec = {
-      id: t.id, layer: t.layer, trap: !!t.trap,
+      id: t.id, layer: t.layer, type: t.type, specialType: t.specialType || null,
       x: t.x, y: t.y, z: t.z,
       top: t.y + G.hexThick / 2,
       minX: t.x - halfX, maxX: t.x + halfX,
       minZ: t.z - halfZ, maxZ: t.z + halfZ,
-      state: 'idle', warnStart: 0, fuse: 800, breakStart: 0,
+      state: 'idle', warnStart: 0, fuse: 800, breakStart: 0, crackStart: 0, lastStepPing: 0,
+      isPhaseTile, phaseOn: true, outlineMesh, dashArrow,
       mesh, mat, baseColor: new THREE.Color(base), baseY: t.y
     };
     G.tiles.set(t.id, rec);
     G.layerTiles[t.layer].push(rec);
   }
-  applyLayerTransparency(3);
+  applyLayerTransparency(G.layerIndices[0]);
 }
 
 /* Upper floors turn translucent once the runner drops below them, so the
- * camera never has an opaque ceiling between it and the player.            */
+ * camera never has an opaque ceiling between it and the player.
+ * Layer index grows going DOWN (1 = top layer), so "above current" means
+ * a smaller index.                                                         */
 let lastTransparencyLayer = -1;
 function applyLayerTransparency(currentLayer) {
   if (currentLayer === lastTransparencyLayer) return;
   lastTransparencyLayer = currentLayer;
-  for (const L of [1, 2, 3]) {
-    const target = L > currentLayer ? 0.16 : 1.0;
+  for (const L of G.layerIndices) {
+    const target = L < currentLayer ? 0.16 : 1.0;
     for (const rec of G.layerTiles[L]) {
       if (rec.state === 'gone') continue;
       rec.targetOpacity = target;
@@ -1014,7 +1106,7 @@ function makeShadowBlob() {
   return blob;
 }
 
-/* 공중에 뜨면 그림자를 작고 옅게 — 3층에서 낙하할 때 착지 지점을 읽는 단서 */
+/* 공중에 뜨면 그림자를 작고 옅게 — 위층에서 낙하할 때 착지 지점을 읽는 단서 */
 function updateGroundShadow(av, feetY, groundY, grounded) {
   if (!av || !av.blob) return;
   const gap = Math.max(0, feetY - groundY);
@@ -1318,12 +1410,12 @@ function animateAvatar(av, dt, speed01, state) {
 /* ============================ 6. local runner =========================== */
 
 const local = {
-  pos: new THREE.Vector3(0, 30.5, 0),
+  pos: new THREE.Vector3(0, 60.5, 0),
   vel: new THREE.Vector3(0, 0, 0),
   ry: 0,
   grounded: false,
   groundTile: null,
-  layer: 3,
+  layer: 1,
   anim: 'idle',
   avatar: null,
   coyote: 0,
@@ -1379,6 +1471,20 @@ function pointInXZ(px, pz, rec) {
   return px >= rec.minX && px <= rec.maxX && pz >= rec.minZ && pz <= rec.maxZ;
 }
 
+/** 밟고 설 수 있는 타일인가 — 붕괴됐거나(gone), 위상 타일이 지금 OFF면 지지력이 없다. */
+function tileSolid(rec) {
+  return rec.state !== 'gone' && (!rec.isPhaseTile || rec.phaseOn);
+}
+
+/** 위상 타일 전체에 서버가 보낸 ON/OFF 상태를 반영한다 (동기화 이벤트 + 늦은 입장 모두 사용). */
+function applyPhaseTileState(on) {
+  for (const rec of G.tiles.values()) {
+    if (!rec.isPhaseTile) continue;
+    rec.phaseOn = on;
+    if (rec.outlineMesh) rec.outlineMesh.visible = !on;
+  }
+}
+
 /**
  * Sweep the runner's feet from prevY to nextY and return the highest solid
  * surface crossed. Supports tiles (per layer) and spectator boosters.
@@ -1386,13 +1492,13 @@ function pointInXZ(px, pz, rec) {
 function findLanding(px, pz, prevY, nextY) {
   let best = null;
 
-  for (const L of [3, 2, 1]) {
+  for (const L of G.layerIndices) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (prevY < surf - 0.02) continue;      // already below this floor
     if (nextY > surf) continue;             // haven't reached it yet
     let owner = null, ownerD = Infinity;
     for (const rec of G.layerTiles[L]) {
-      if (rec.state === 'gone') continue;
+      if (!tileSolid(rec)) continue;
       if (!pointInXZ(px, pz, rec)) continue;
       const d = (px - rec.x) * (px - rec.x) + (pz - rec.z) * (pz - rec.z);
       if (d < ownerD) { ownerD = d; owner = rec; }
@@ -1412,12 +1518,12 @@ function findLanding(px, pz, prevY, nextY) {
 
 /** Is the runner still supported at its current feet height? */
 function supportAt(px, pz, feetY) {
-  for (const L of [3, 2, 1]) {
+  for (const L of G.layerIndices) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (Math.abs(feetY - surf) > 0.12) continue;
     let owner = null, ownerD = Infinity;
     for (const rec of G.layerTiles[L]) {
-      if (rec.state === 'gone') continue;
+      if (!tileSolid(rec)) continue;
       if (!pointInXZ(px, pz, rec)) continue;
       const d = (px - rec.x) * (px - rec.x) + (pz - rec.z) * (pz - rec.z);
       if (d < ownerD) { ownerD = d; owner = rec; }
@@ -1437,11 +1543,11 @@ function supportAt(px, pz, feetY) {
  * 2.5D 는 원근 단서가 약해서, 그림자로 높이를 읽게 하는 것이 매우 중요합니다. */
 function groundYUnder(px, pz, fromY) {
   let best = G.lavaY;
-  for (const L of [1, 2, 3]) {
+  for (const L of G.layerIndices) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (surf > fromY + 0.05) continue;
     for (const rec of G.layerTiles[L]) {
-      if (rec.state === 'gone') continue;
+      if (!tileSolid(rec)) continue;
       if (!pointInXZ(px, pz, rec)) continue;
       if (surf > best) best = surf;
       break;
@@ -1457,9 +1563,11 @@ function groundYUnder(px, pz, fromY) {
 }
 
 function currentLayerOf(y) {
-  if (y >= G.layerY[3] - 3) return 3;
-  if (y >= G.layerY[2] - 3) return 2;
-  return 1;
+  // G.layerIndices is top -> bottom (height descending); first match wins.
+  for (const L of G.layerIndices) {
+    if (y >= G.layerY[L] - 3) return L;
+  }
+  return G.layerIndices[G.layerIndices.length - 1];
 }
 
 function stepPhysics(dt) {
@@ -1550,18 +1658,37 @@ function stepPhysics(dt) {
   if (Math.abs(local.pos.x) > 170 || Math.abs(local.pos.z) > 170) eliminateSelf('void');
 }
 
-/** Fire tile_step exactly once per tile per round. */
+const TILE_FUSE_GUESS = { normal: 850, weak: 250, special: 850 }; // optimistic local guess; server re-syncs
+
+/**
+ * First touch: fires tile_step exactly once per tile per round (idle -> warn/crack).
+ * Reinforced tiles that are already 'cracked' also re-report on every fresh contact
+ * (throttled) so a second touch — by anyone — can trigger the real break; the
+ * server is the authority on whether it actually counts (see requestTileBreak).
+ */
 function onSteppedOn(rec) {
-  if (!rec || rec.state !== 'idle') return;
-  if (G.steppedTiles.has(rec.id)) return;
-  if (G.phase !== 'playing') return;
-  G.steppedTiles.add(rec.id);
-  // optimistic local warning so the feedback is instant; server re-syncs below
-  startWarn(rec, rec.trap ? 200 : 800);
-  G.socket.emit('tile_step', { tileId: rec.id });
+  if (!rec || G.phase !== 'playing') return;
+  if (rec.isPhaseTile) return; // 위상 타일: 밟아도 붕괴 퓨즈가 붙지 않는다 — ON/OFF 주기만 따른다
+
+  if (rec.state === 'idle') {
+    if (G.steppedTiles.has(rec.id)) return;
+    G.steppedTiles.add(rec.id);
+    if (rec.type === 'reinforced') startCrack(rec);
+    else startWarn(rec, TILE_FUSE_GUESS[rec.type] || 850);
+    G.socket.emit('tile_step', { tileId: rec.id });
+    return;
+  }
+
+  if (rec.state === 'cracked') {
+    const now = performance.now();
+    if (rec.lastStepPing && now - rec.lastStepPing < 400) return;
+    rec.lastStepPing = now;
+    G.socket.emit('tile_step', { tileId: rec.id });
+  }
 }
 
 function eliminateSelf(cause) {
+  if (G.cfg && G.cfg.DEV_MODE) return; // 개발용 테스트 모드: 떨어져도 탈락하지 않는다
   if (!local.alive) return;
   local.alive = false;
   G.selfAlive = false;
@@ -1574,6 +1701,27 @@ function eliminateSelf(cause) {
   toast('심사 탈락 — 이제 관전자로 개입할 수 있습니다', 'kill');
 }
 
+/** 개발용 테스트 모드 전용 — 왼쪽 레이어 안내문을 클릭하면 해당 층으로 순간이동한다. */
+function devTeleport(layerIndex) {
+  if (!G.cfg || !G.cfg.DEV_MODE) return;
+  if (G.role !== 'player') return;
+  const y = G.layerY[layerIndex];
+  if (y === undefined) return;
+  local.pos.set(0, y + G.hexThick / 2 + 0.5, 0);
+  local.vel.set(0, 0, 0);
+  local.grounded = false;
+  local.layer = layerIndex;
+  local.alive = true;
+  G.selfAlive = true;
+  toast('LAYER ' + String(layerIndex).padStart(2, '0') + ' 로 이동 (DEV)', 'cheer');
+}
+for (const d of dom.docs) {
+  d.addEventListener('click', () => {
+    const L = parseInt(d.dataset.l, 10);
+    if (!isNaN(L)) devTeleport(L);
+  });
+}
+
 /* ============================ 9. tile FX =============================== */
 
 function startWarn(rec, fuse) {
@@ -1581,6 +1729,13 @@ function startWarn(rec, fuse) {
   rec.state = 'warn';
   rec.warnStart = performance.now();
   rec.fuse = fuse;
+}
+
+/** 강화 타일 첫 타격 — 금이 가지만 아직 붕괴 카운트다운은 아니다. */
+function startCrack(rec) {
+  if (rec.state !== 'idle') return;
+  rec.state = 'cracked';
+  rec.crackStart = performance.now();
 }
 
 function breakTile(rec) {
@@ -1631,13 +1786,20 @@ function updateTiles(dt, now) {
   for (const rec of G.tiles.values()) {
     const mesh = rec.mesh;
 
+    if (rec.dashArrow) rec.dashArrow.rotation.y = now * 0.0022;
+
     if (rec.state === 'warn') {
       const p = Math.min(1, (now - rec.warnStart) / rec.fuse);
-      const blink = Math.sin(p * Math.PI * (rec.trap ? 16 : 10)) * 0.5 + 0.5;
+      const blink = Math.sin(p * Math.PI * (rec.type === 'weak' ? 16 : 10)) * 0.5 + 0.5;
       rec.mat.emissiveIntensity = 0.3 + blink * 2.6;
       rec.mat.color.copy(rec.baseColor).lerp(new THREE.Color(0xff2d2d), 0.35 + p * 0.55);
       mesh.position.y = rec.baseY + Math.sin(now * 0.05) * 0.09 * p;
       mesh.scale.setScalar(1 - p * 0.06);
+    } else if (rec.state === 'cracked') {
+      // 아직 붕괴 카운트다운은 아니다 — 은은하게 어두워지며 맥동만 한다.
+      rec.mat.emissiveIntensity = 0.45 + Math.sin(now * 0.006 + rec.x) * 0.25;
+      rec.mat.color.copy(rec.baseColor).lerp(new THREE.Color(0x1a0e04), 0.4);
+      mesh.scale.setScalar(1);
     } else if (rec.state === 'gone') {
       const t = (now - rec.breakStart) / 420;
       if (t < 1) {
@@ -1650,17 +1812,21 @@ function updateTiles(dt, now) {
       } else if (mesh.visible) {
         mesh.visible = false;
       }
+      if (rec.dashArrow) rec.dashArrow.visible = false;
       continue;
     } else {
       // idle — breathe the emissive very gently so the grid feels alive
-      rec.mat.emissiveIntensity = rec.trap
+      rec.mat.emissiveIntensity = rec.type === 'weak'
         ? 0.45 + Math.sin(now * 0.004 + rec.x) * 0.2
         : 0.2 + Math.sin(now * 0.0016 + rec.x * 0.2 + rec.z * 0.2) * 0.07;
       rec.mat.color.copy(rec.baseColor);
     }
 
     if (rec.targetOpacity !== undefined) {
-      rec.mat.opacity += (rec.targetOpacity - rec.mat.opacity) * Math.min(1, dt * 6);
+      const target = rec.isPhaseTile && !rec.phaseOn
+        ? Math.min(rec.targetOpacity, PHASE_OFF_OPACITY)
+        : rec.targetOpacity;
+      rec.mat.opacity += (target - rec.mat.opacity) * Math.min(1, dt * 6);
     }
   }
 }
@@ -1790,7 +1956,7 @@ class RemoteRunner {
     this.name = meta.name;
     this.color = meta.color;
     this.alive = meta.alive !== false;
-    this.layer = meta.layer || 3;
+    this.layer = meta.layer || 1;
     this.anim = 'idle';
     this.buffer = [];
     this.render = new THREE.Vector3(meta.pos ? meta.pos.x : 0, meta.pos ? meta.pos.y : 30.5, meta.pos ? meta.pos.z : 0);
@@ -1919,7 +2085,7 @@ function spectateFocus() {
     if (r && r.alive) return r.render;
   }
   for (const r of G.players.values()) if (r.alive) return r.render;
-  return new THREE.Vector3(0, G.layerY[2], 0);
+  return new THREE.Vector3(0, G.layerY[G.midLayerIndex], 0);
 }
 
 /* ============================ 13. HUD ================================= */
@@ -1939,7 +2105,7 @@ function updateRoster() {
       '<div class="rrow' + (r.alive ? '' : ' dead') + '" style="border-left-color:' + (r.color || '#888') + '">' +
       '<span>' + escapeHtml(safeName(r.name)) + '</span>' +
       (isSelf ? '<span class="you">YOU</span>' : '') +
-      '<span class="lay">' + (r.alive ? 'L' + (r.layer || 3) : 'OUT') + '</span>' +
+      '<span class="lay">' + (r.alive ? 'L' + (r.layer || 1) : 'OUT') + '</span>' +
       '</div>'
     );
   }
@@ -2081,7 +2247,11 @@ function connect(name, mode) {
     dom.vPing.classList.toggle('bad', G.rtt > 160);
   });
 
-  socket.on('server_hello', (d) => { G.cfg = d.config; });
+  socket.on('server_hello', (d) => {
+    G.cfg = d.config;
+    if (dom.layerStack) dom.layerStack.classList.toggle('devmode', !!G.cfg.DEV_MODE);
+    if (G.cfg.DEV_MODE) toast('개발용 테스트 모드 — 레이어 안내문을 클릭하면 순간이동합니다', 'cheer');
+  });
 
   socket.on('init', (d) => {
     G.selfId = d.selfId;
@@ -2092,11 +2262,13 @@ function connect(name, mode) {
     dom.vRoom.textContent = d.roomId;
 
     buildMap(d.map, mapCfg());
+    applyPhaseTileState(d.phaseTileOn !== false);
 
     for (const b of d.brokenTiles || []) {
       const rec = G.tiles.get(b.id);
       if (!rec) continue;
       if (b.st === 'broken') { rec.state = 'gone'; rec.mesh.visible = false; }
+      else if (b.st === 'cracked') startCrack(rec);
       else startWarn(rec, 800);
     }
 
@@ -2132,7 +2304,7 @@ function connect(name, mode) {
       local.pos.set(me.pos.x, me.pos.y, me.pos.z);
       local.vel.set(0, 0, 0);
       local.alive = true;
-      local.layer = 3;
+      local.layer = G.layerIndices[0];
       local.anim = 'idle';
       G.selfAlive = true;
       if (local.avatar) {
@@ -2152,6 +2324,7 @@ function connect(name, mode) {
     G.steppedTiles.clear();
     G.map = d.map;
     buildMap(d.map, mapCfg());
+    applyPhaseTileState(d.phaseTileOn !== false);
     syncPlayers(d.players);
     applyMeta(d.meta);
     const mine = d.players.find((p) => p.id === G.selfId);
@@ -2163,7 +2336,7 @@ function connect(name, mode) {
       local.color = mine.color;
       local.pos.set(mine.pos.x, mine.pos.y, mine.pos.z);
       local.vel.set(0, 0, 0);
-      local.layer = 3;
+      local.layer = G.layerIndices[0];
       local.anim = 'idle';
       if (!local.avatar) {
         local.avatar = buildAvatar(local.color, safeName(mine.name, G.name));
@@ -2207,6 +2380,23 @@ function connect(name, mode) {
       r.alive = !!s.al;
       r.layer = s.l;
     }
+  });
+
+  socket.on('phase_tile', (d) => applyPhaseTileState(!!d.on));
+
+  socket.on('fasttrack_dash', (d) => {
+    if (d.playerId !== G.selfId) return; // 원격 플레이어는 다음 state 스냅샷으로 자연히 반영된다
+    local.pos.x = d.x;
+    local.pos.z = d.z;
+    local.vel.x = 0;
+    local.vel.z = 0;
+    local.grounded = false;
+    toast('신속심사 대시!', 'cheer');
+  });
+
+  socket.on('tile_crack', (d) => {
+    const rec = G.tiles.get(d.tileId);
+    if (rec) startCrack(rec);
   });
 
   socket.on('tile_warn', (d) => {
