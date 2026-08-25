@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>[스토리텔링 기획서] 지식재산(IP) 여정 기반 하향식 액션 메커니즘</title>
+    <style>
+        :root {
+            --bg-main: #0f172a;
+            --bg-card: #1e293b;
+            --border-color: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --color-5f: #ef4444;
+            --color-4f: #f59e0b;
+            --color-3f: #3b82f6;
+            --color-2f: #8b5cf6;
+            --color-1f: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.7;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1050px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 35px;
+            padding-bottom: 25px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(168, 85, 247, 0.15);
+            border: 1px solid #a855f7;
+            color: #c084fc;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .synopsis-box {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid var(--border-color);
+            border-left: 5px solid #a855f7;
+            padding: 22px;
+            border-radius: 10px;
+            margin-bottom: 35px;
+        }
+
+        .synopsis-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 10px;
+        }
+
+        .timeline-flow {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            position: relative;
+        }
+
+        .timeline-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .l-5 { border-top: 4px solid var(--color-5f); }
+        .l-4 { border-top: 4px solid var(--color-4f); }
+        .l-3 { border-top: 4px solid var(--color-3f); }
+        .l-2 { border-top: 4px solid var(--color-2f); }
+        .l-1 { border-top: 4px solid var(--color-1f); }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 10px;
+        }
+
+        .card-rank {
+            font-size: 0.85rem;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.06);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .story-narrative {
+            font-size: 0.98rem;
+            color: #f1f5f9;
+            margin-bottom: 14px;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 14px 16px;
+            border-radius: 8px;
+            line-height: 1.7;
+        }
+
+        .gimmick-link {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            font-size: 0.88rem;
+        }
+
+        @media (max-width: 768px) {
+            .gimmick-link { grid-template-columns: 1fr; }
+        }
+
+        .link-item {
+            background: rgba(15, 23, 42, 0.6);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .link-label {
+            font-weight: 700;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .drop-indicator {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.85rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin: -8px 0;
+        }
+
+        .quote-tag {
+            display: inline-block;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #e2e8f0;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header class="header">
+        <span class="badge">NARRATIVE & SYSTEM STORYTELLING</span>
+        <h1>지식재산(IP) 검증 프로세스 기반 하향식(Drop) 스토리텔링</h1>
+        <p>최상위 패스트트랙 출원에서부터 본질적인 원천 아이디어로 수렴·재도약하는 지식재산 서사 구조</p>
+    </header>
+
+    <div class="synopsis-box">
+        <div class="synopsis-title">💡 핵심 시놉시스 : "완전한 특허 권리를 향한 실체적 검증의 하강선"</div>
+        <p style="color: var(--text-secondary); font-size: 0.95rem;">
+            플레이어는 가장 높은 기대치와 속도전을 요구하는 <strong>'최상위 심사 단계'</strong>에서 게임을 시작합니다.<br>
+            심사의 거친 검증과 압박을 견디지 못하고 발판이 무너지면, 권리는 점차 형태가 축소되며 하위 단계로 <strong>'환원(Reduction)'</strong>됩니다. 
+            거절이유의 격랑을 지나, 실체 조사의 안개, 권리범위의 불확실성을 거쳐 마침내 도달하는 최하층은 실패의 끝이 아닌 모든 기술의 태초인 <strong>'순수 원천 아이디어(Idea Matrix)'</strong>입니다. 
+            플레이어는 이 바닥에서 발상의 원동력을 얻어 다시 상위 심사 영역으로 힘차게 <strong>점프(재도약)</strong>하게 됩니다.
+        </p>
+    </div>
+
+    <div class="timeline-flow">
+
+        <!-- 5F -->
+        <div class="timeline-card l-5">
+            <div class="card-header">
+                <div>
+                    <span class="card-rank" style="color: #f87171;">5F (START)</span>
+                    <span class="card-title" style="margin-left: 8px; color: #f87171;">우선심사 패스트트랙 레이어</span>
+                </div>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">[출원 및 가속 심사]</span>
+            </div>
+            <div class="story-narrative">
+                <strong>"시간과의 사투, 가장 빠르고 냉혹한 최전선"</strong><br>
+                시장의 선점을 위해 가장 먼저 진입하는 급행 트랙입니다. 신속한 권리화를 위해 심사 속도가 극도로 빨라지며, 타일이 순식간에 붕괴되는 극한의 긴장감 속에서 살아남아야 합니다.
+            </div>
+            <div class="gimmick-link">
+                <div class="link-item">
+                    <div class="link-label">스토리와 연계된 기믹</div>
+                    <div><strong>신속심사 타일:</strong> 급행 심사의 속도감을 살려 전방 2칸 순간 도약</div>
+                </div>
+                <div class="link-item">
+                    <div class="link-label">환경 연출 서사</div>
+                    <div><span class="quote-tag">"심사 가속"</span> 적색 경보와 함께 플랫폼 붕괴 주기 급단축</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="drop-indicator">▼ 심사 허들을 넘지 못하고 1차 붕괴/하강 (의견제출 발생)</div>
+
+        <!-- 4F -->
+        <div class="timeline-card l-4">
+            <div class="card-header">
+                <div>
+                    <span class="card-rank" style="color: #fbbf24;">4F</span>
+                    <span class="card-title" style="margin-left: 8px; color: #fbbf24;">의견제출통지 레이어</span>
+                </div>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">[거절이유 극복과 보정]</span>
+            </div>
+            <div class="story-narrative">
+                <strong>"심사관의 날카로운 지적과 치열한 방어전"</strong><br>
+                첫 관문을 통과하지 못하면 심사관의 거절이유 통지서가 날아듭니다. 지뢰처럼 숨겨진 결격 사유들이 연쇄 폭발을 일으키며, 심사관의 관점에 따라 판 자체가 요동치고 회전합니다. 정확한 보정서(보정 타일)를 통해서만 무너진 발판을 메울 수 있습니다.
+            </div>
+            <div class="gimmick-link">
+                <div class="link-item">
+                    <div class="link-label">스토리와 연계된 기믹</div>
+                    <div><strong>거절이유 타일(15%):</strong> 3단계 변색 후 폭발 / <strong>보정 타일(5%):</strong> 무너진 타일 1개 복구</div>
+                </div>
+                <div class="link-item">
+                    <div class="link-label">환경 연출 서사</div>
+                    <div><span class="quote-tag">"⚠️ 거절이유 발생, 심사관 검토 방향 변경"</span> 문구와 함께 회전 반전</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="drop-indicator">▼ 방어 실패로 인한 권리 구조의 본질적 심층 검증 단계로 하강</div>
+
+        <!-- 3F -->
+        <div class="timeline-card l-3">
+            <div class="card-header">
+                <div>
+                    <span class="card-rank" style="color: #60a5fa;">3F</span>
+                    <span class="card-title" style="margin-left: 8px; color: #60a5fa;">실체심사 / 선행기술조사 레이어</span>
+                </div>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">[신규성·진보성 탐색의 안개]</span>
+            </div>
+            <div class="story-narrative">
+                <strong>"칠흑 같은 선행기술의 바다, 보이지 않는 벽을 뚫어라"</strong><br>
+                이미 세상에 공개된 무수한 기술들의 어둠 속에서 내 기술의 '신규성'과 '진보성'을 입증해야 하는 심층 단계입니다. 시야가 차단된 암전 속에서 검색 레이더를 가동해 길을 밝혀나가야 합니다.
+            </div>
+            <div class="gimmick-link">
+                <div class="link-item">
+                    <div class="link-label">스토리와 연계된 기믹</div>
+                    <div><strong>선행기술 검색 타일:</strong> 스캔 연출과 함께 2초간 8칸 시야 대폭 확장</div>
+                </div>
+                <div class="link-item">
+                    <div class="link-label">환경 연출 서사</div>
+                    <div><span class="quote-tag">"선행기술이 있는지 알 수 없다..."</span> 안내와 함께 2~3칸 외곽 완전 암전</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="drop-indicator">▼ 선행문헌과의 충돌로 권리범위 조정 단계로 하강</div>
+
+        <!-- 2F -->
+        <div class="timeline-card l-2">
+            <div class="card-header">
+                <div>
+                    <span class="card-rank" style="color: #c084fc;">2F</span>
+                    <span class="card-title" style="margin-left: 8px; color: #c084fc;">청구항 레이어 (Claim Scope)</span>
+                </div>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">[독점 권리의 경계선 설정]</span>
+            </div>
+            <div class="story-narrative">
+                <strong>"넓히면 무너지고, 좁히면 사라지는 권리의 줄타기"</strong><br>
+                특허의 핵심인 '독점 배타권의 범위'를 확정 짓는 단계입니다. 청구항의 범위는 고정되지 않고 끊임없이 확장과 축소를 반복(위상 변화)하므로, 실체가 잡히는 찰나의 타이밍을 포착해 딛고 나아가야 합니다.
+            </div>
+            <div class="gimmick-link">
+                <div class="link-item">
+                    <div class="link-label">스토리와 연계된 기믹</div>
+                    <div><strong>위상 타일:</strong> 2s ON(실체) ↔ 1s OFF(반투명 윤곽선) 물리 판정 변동</div>
+                </div>
+                <div class="link-item">
+                    <div class="link-label">환경 연출 서사</div>
+                    <div><span class="quote-tag">"권리범위가 변동합니다."</span> 상시 텍스트 노출</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="drop-indicator">▼ 서류상의 한계를 벗어나 기술의 태초인 '원천 발상'으로 귀환</div>
+
+        <!-- 1F -->
+        <div class="timeline-card l-1">
+            <div class="card-header">
+                <div>
+                    <span class="card-rank" style="color: #34d399;">1F (BASE / RE-LAUNCH)</span>
+                    <span class="card-title" style="margin-left: 8px; color: #34d399;">아이디어 레이어 (Idea Matrix)</span>
+                </div>
+                <span style="font-size: 0.85rem; color: var(--text-muted);">[발상의 태동 & 상위 도약대]</span>
+            </div>
+            <div class="story-narrative">
+                <strong>"모든 권리의 근원이자 다시 타오르는 불씨"</strong><br>
+                모든 복잡한 법률적·절차적 외피가 벗겨진 순수한 '창작과 아이디어의 기저 영역'입니다. 이곳에 떨어진 것은 실패가 아니라 혁신의 원동력을 충전하는 기회이며, 강력한 아이디어의 탄성(점프)을 통해 언제든 다시 상위 심사 단계로 솟구쳐 오를 수 있습니다.
+            </div>
+            <div class="gimmick-link">
+                <div class="link-item">
+                    <div class="link-label">스토리와 연계된 기믹</div>
+                    <div><strong>점프 타일 2종:</strong> 발상의 폭발력으로 +1층 도약 또는 +2층 관통 수직 발사</div>
+                </div>
+                <div class="link-item">
+                    <div class="link-label">환경 연출 서사</div>
+                    <div>상위 층에서의 낙하를 받아주는 기초 발판이자 재도약의 베이스캠프</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

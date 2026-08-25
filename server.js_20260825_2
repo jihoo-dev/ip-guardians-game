@@ -25,12 +25,7 @@ const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const STATIC_DIR = process.env.STATIC_DIR || 'public';
 
-/* ── 인원 설정 ────────────────────────────────────────────────────────
- * 이 값 하나만 바꾸면 좌석 수, 플레이어 색상, 대기 발판 개수,
- * 맵 크기까지 전부 따라옵니다. 환경변수로도 바꿀 수 있습니다.
- *   MAX_PLAYERS=16 node server.js
- * ------------------------------------------------------------------ */
-const MAX_PLAYERS = Math.max(1, parseInt(process.env.MAX_PLAYERS, 10) || 4);
+const MAX_PLAYERS = 4;          // active runners per room
 const TICK_HZ = 20;             // 20Hz => 50ms snapshot interval
 const TICK_MS = 1000 / TICK_HZ;
 
@@ -56,18 +51,8 @@ const OBSTACLE_FALL_MS = 1400;
 
 const HEX_SIZE = 3.2;           // circumradius of one hex tile
 const HEX_THICKNESS = 1.0;
-/* 맵 반경도 인원에 맞춰 늘어납니다.
- * 반경 R 의 육각 그리드 타일 수 = 3R^2 + 3R + 1
- * 1인당 22타일 정도를 확보하도록 잡습니다 (4인 -> 반경 5 = 91타일).   */
-const GRID_RADIUS = parseInt(process.env.GRID_RADIUS, 10) ||
-  Math.max(5, Math.round(Math.sqrt(22 * MAX_PLAYERS / 3)));
+const GRID_RADIUS = 5;          // 5 rings => 91 tiles per layer
 const TRAP_CHANCE = 0.11;
-
-/* ── 대기 발판 ────────────────────────────────────────────────────────
- * 게임 시작 전 각 플레이어가 자기 발판 위에서 대기합니다.
- * 정원이 차면 발판이 사라지고, 플레이어들이 최상층으로 떨어지며 시작됩니다. */
-const PEDESTAL_RISE  = 9.0;   // 최상층 위로 띄우는 높이
-const PEDESTAL_SCALE = 1.45;  // 일반 타일 대비 크기 (서 있기 편하게)
 const SEA_Y = -20;              // 구름바다 높이. 여기 아래로 떨어지면 탈락
 const THEME_COUNT = 3;          // 배경 맵 개수 (public/assets/bg)
 
@@ -106,33 +91,7 @@ function clampName(raw) {
   return (s.slice(0, 14) || '심사관' + Math.floor(Math.random() * 900 + 100));
 }
 
-/* 인원수에 맞춰 색을 만듭니다.
- * 앞 4개는 기존 색을 그대로 쓰고, 그 이상은 색상환을 균등 분할해
- * 서로 최대한 구분되는 색을 생성합니다.                                */
-const BASE_COLORS = ['#ffcc00', '#ff5599', '#66ff66', '#66ccff'];
-
-function hslToHex(h, s, l) {
-  const a = s * Math.min(l, 1 - l);
-  const f = (n) => {
-    const k = (n + h / 30) % 12;
-    const c = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
-    return Math.round(255 * c).toString(16).padStart(2, '0');
-  };
-  return '#' + f(0) + f(8) + f(4);
-}
-
-function buildPlayerColors(n) {
-  const out = BASE_COLORS.slice(0, Math.min(n, BASE_COLORS.length));
-  for (let i = out.length; i < n; i++) {
-    // 황금각으로 색상환을 돌면 인접 좌석끼리 색이 겹치지 않습니다
-    const hue = (i * 137.508) % 360;
-    const light = 0.58 + ((i % 3) - 1) * 0.09;
-    out.push(hslToHex(hue, 0.82, light));
-  }
-  return out;
-}
-
-const PLAYER_COLORS = buildPlayerColors(MAX_PLAYERS);
+const PLAYER_COLORS = ['#ffcc00', '#ff5599', '#66ff66', '#66ccff'];
 
 /* --------------------------------------------------------- map generation */
 
@@ -167,58 +126,19 @@ function buildMap(seed) {
     }
   }
 
-  /* 대기 발판을 최상층 위 공중에 흩뿌립니다.
-   * 서로 충분히 떨어지도록 배치하되, 인원이 많아 자리가 모자라면
-   * 간격을 조금씩 좁혀 가며 재시도합니다.                              */
-  const cells = [];
-  for (let q = -GRID_RADIUS; q <= GRID_RADIUS; q++) {
-    const rMin = Math.max(-GRID_RADIUS, -q - GRID_RADIUS);
-    const rMax = Math.min(GRID_RADIUS, -q + GRID_RADIUS);
-    for (let r = rMin; r <= rMax; r++) {
-      const { x, z } = axialToWorld(q, r);
-      cells.push({ q, r, x, z });
-    }
-  }
-  for (let i = cells.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    const t = cells[i]; cells[i] = cells[j]; cells[j] = t;
+  // Four spawn points spread around the outer ring of the top layer.
+  const spawnAxials = [
+    { q: GRID_RADIUS - 1, r: 0 },
+    { q: -(GRID_RADIUS - 1), r: 0 },
+    { q: 0, r: GRID_RADIUS - 1 },
+    { q: 0, r: -(GRID_RADIUS - 1) }
+  ];
+  for (const a of spawnAxials) {
+    const { x, z } = axialToWorld(a.q, a.r);
+    spawns.push({ x: +x.toFixed(4), y: LAYERS[0].y + HEX_THICKNESS / 2, z: +z.toFixed(4) });
   }
 
-  const pedestals = [];
-  let minGap = HEX_SIZE * 4.6;
-  for (let attempt = 0; attempt < 14 && pedestals.length < MAX_PLAYERS; attempt++) {
-    pedestals.length = 0;
-    for (const c of cells) {
-      if (pedestals.length >= MAX_PLAYERS) break;
-      let ok = true;
-      for (const p of pedestals) {
-        if (Math.hypot(p.x - c.x, p.z - c.z) < minGap) { ok = false; break; }
-      }
-      if (ok) pedestals.push({ x: c.x, z: c.z });
-    }
-    if (pedestals.length < MAX_PLAYERS) minGap *= 0.82;
-  }
-  // 그래도 모자라면 남은 칸을 순서대로 채웁니다 (아주 많은 인원일 때)
-  for (let i = 0; pedestals.length < MAX_PLAYERS && i < cells.length; i++) {
-    const c = cells[i];
-    if (!pedestals.some((p) => p.x === c.x && p.z === c.z)) pedestals.push({ x: c.x, z: c.z });
-  }
-
-  const pedY = LAYERS[0].y + PEDESTAL_RISE;
-  const out = pedestals.slice(0, MAX_PLAYERS).map((p, i) => ({
-    id: 'PED' + i,
-    seat: i,
-    x: +p.x.toFixed(4),
-    y: pedY,
-    z: +p.z.toFixed(4)
-  }));
-
-  // 스폰 = 자기 발판 위
-  for (const p of out) {
-    spawns.push({ x: p.x, y: pedY + HEX_THICKNESS / 2, z: p.z });
-  }
-
-  return { seed, tiles, spawns, pedestals: out, pedestalScale: PEDESTAL_SCALE };
+  return { seed, tiles, spawns };
 }
 
 /* ------------------------------------------------------------- room model */
@@ -240,7 +160,6 @@ function createRoom() {
     roundStartedAt: 0,
     winnerId: null,
     timers: new Set(),
-    pedestalsActive: true,   // 대기 발판이 아직 떠 있는지
     nextEntityId: 1,
     seatColors: [...PLAYER_COLORS]
   };
@@ -333,7 +252,6 @@ function roomSnapshotMeta(room) {
     phaseEndsAt: room.phaseEndsAt,
     alive: aliveCount(room),
     total: room.players.size,
-    seats: MAX_PLAYERS,
     spectators: room.spectators.size,
     winnerId: room.winnerId
   };
@@ -383,18 +301,20 @@ function startRound(room) {
   room.phaseEndsAt = room.roundStartedAt + ROUND_MAX_MS;
   room.winnerId = null;
 
-  /* 플레이어를 옮기지 않습니다. 이미 각자 대기 발판 위에 서 있으므로,
-   * 발판만 치우면 그 자리에서 최상층으로 떨어지며 게임이 시작됩니다. */
+  let seatIdx = 0;
   for (const p of room.players.values()) {
+    const spawn = room.map.spawns[seatIdx % room.map.spawns.length];
     p.alive = true;
     p.placement = 0;
     p.layer = 3;
-    p.anim = 'fall';
+    p.pos = { x: spawn.x, y: spawn.y, z: spawn.z };
+    p.vel = { x: 0, y: 0, z: 0 };
+    p.ry = 0;
+    p.anim = 'idle';
+    seatIdx++;
   }
-  room.pedestalsActive = false;
 
   broadcastPhase(room);
-  io.to(room.id).emit('pedestals_clear', { at: Date.now() });
   io.to(room.id).emit('round_start', {
     startedAt: room.roundStartedAt,
     players: [...room.players.values()].map(publicPlayer)
@@ -475,7 +395,6 @@ function resetRoom(room) {
   room.tileState = new Map();
   for (const t of room.map.tiles) room.tileState.set(t.id, 'idle');
   room.phase = 'waiting';
-  room.pedestalsActive = true;
   room.phaseEndsAt = 0;
   room.winnerId = null;
   room.lobbyDeadline = null;
@@ -515,7 +434,6 @@ function resetRoom(room) {
     seed: room.seed,
     theme: room.theme,
     map: room.map,
-    pedestalsActive: true,
     players: [...room.players.values()].map(publicPlayer),
     meta: roomSnapshotMeta(room)
   });
@@ -611,7 +529,7 @@ io.on('connection', (socket) => {
     now: Date.now(),
     config: {
       MAX_PLAYERS, TICK_HZ, HEX_SIZE, HEX_THICKNESS, GRID_RADIUS,
-      SEA_Y, LAYERS, FUSE_NORMAL_MS, FUSE_TRAP_MS, PEDESTAL_RISE, PEDESTAL_SCALE,
+      SEA_Y, LAYERS, FUSE_NORMAL_MS, FUSE_TRAP_MS,
       BOOSTER_TTL_MS, OBSTACLE_FALL_MS,
       BOOSTER_COOLDOWN_MS, OBSTACLE_COOLDOWN_MS
     }
@@ -658,7 +576,6 @@ io.on('connection', (socket) => {
       seed: room.seed,
       theme: room.theme,
       map: room.map,
-      pedestalsActive: room.pedestalsActive,
       brokenTiles: brokenTileIds(room),
       players: [...room.players.values()].map(publicPlayer),
       meta: roomSnapshotMeta(room),
