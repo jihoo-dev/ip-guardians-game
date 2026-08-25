@@ -334,18 +334,6 @@ const PHYS = {
   STEP: 1 / 60
 };
 
-/* fall 액션 판정 기준.
- * 점프해서 같은 층 타일로 되돌아오는 것은 낙하가 아닙니다.
- * "출발한 바닥보다 이만큼 아래로 내려갔을 때" 만 진짜 낙하로 봅니다.
- *
- * 참고: 점프 최고 높이는 JUMP_V^2 / (2*GRAVITY) = 21.5^2 / 124 = 3.73
- *       즉 정상적인 점프는 출발 높이보다 아래로 내려가지 않으므로,
- *       같은 층 착지에서는 fall 이 절대 나오지 않습니다.               */
-const FALL_DROP = {
-  JUMPED: 2.2,   // 점프해서 떠 있을 때 (아래 층으로 떨어져야 fall)
-  WALKED: 0.35   // 그냥 발을 헛디뎠을 때 (거의 즉시 fall)
-};
-
 const PLAYER = {
   HALF_X: 0.78,
   HALF_Z: 0.78,
@@ -2051,8 +2039,6 @@ const local = {
   ry: 0,
   grounded: false,
   groundTile: null,
-  lastGroundY: 30.5,   // 마지막으로 서 있던 바닥 높이
-  jumped: false,       // 점프로 떠올랐는지 (발을 헛디딘 것과 구분)
   layer: 3,
   anim: 'idle',
   avatar: null,
@@ -2232,8 +2218,6 @@ function stepPhysics(dt) {
     local.vel.y = PHYS.JUMP_V;
     Sound.sfx('jump', { rate: 0.96 + Math.random() * 0.08 });
     local.grounded = false;
-    local.jumped = true;
-    local.lastGroundY = local.pos.y;
     local.coyote = 0;
     local.jumpBuffer = 0;
     local.groundTile = null;
@@ -2279,39 +2263,16 @@ function stepPhysics(dt) {
     }
   }
 
-  // ---- 애니메이션 상태 ----
-  if (local.grounded) {
-    local.lastGroundY = local.pos.y;
-    local.jumped = false;
-    local.anim = hs > 1.2 ? 'run' : 'idle';
-  } else if (local.vel.y > 1.5) {
-    // 위로 솟는 중 = 점프
-    local.anim = 'jump';
-  } else {
-    // 내려오는 중. 아래 두 조건을 모두 만족할 때만 fall 입니다.
-    //   1) 출발한 바닥보다 충분히 아래로 내려갔을 것
-    //   2) 출발한 "층"의 바닥면보다 아래로 내려갔을 것
-    //
-    // 2번이 핵심입니다. 부스터 발판처럼 층 바닥보다 높은 곳에서 내려와도,
-    // 같은 층 타일에 착지하는 한 낙하가 아니라 점프로 봅니다.
-    // 결과적으로 fall 은 아래 세 경우에만 나옵니다.
-    //   · 다른(아래) 층으로 떨어질 때
-    //   · 장외로 떨어질 때
-    //   · 맨 아래 층에서 구름바다로 떨어질 때
-    const drop = local.jumped ? FALL_DROP.JUMPED : FALL_DROP.WALKED;
-    const launchLayer = currentLayerOf(local.lastGroundY);
-    const layerFloor = G.layerY[launchLayer] + G.hexThick / 2;
-    const leftLayer = local.pos.y < layerFloor - drop;
-    const droppedEnough = local.pos.y < local.lastGroundY - drop;
-    local.anim = (leftLayer && droppedEnough) ? 'fall' : 'jump';
-  }
+  // ---- animation state ----
+  if (!local.grounded) local.anim = local.vel.y > 1.5 ? 'jump' : 'fall';
+  else local.anim = hs > 1.2 ? 'run' : 'idle';
 
   // ---- 구름바다 / 장외 ----
   // 구름 표면에 닿는 순간 바로 탈락시키지 않고, 구름을 뚫고 들어가는
   // 연출을 0.75초 보여준 뒤 처리합니다.
   if (!local.dying && local.pos.y <= G.seaY + 6) beginFallOut();
   if (local.pos.y < G.seaY - 26) local.pos.y = G.seaY - 26;   // 무한 낙하 방지
-  if (Math.abs(local.pos.x) > 170 || Math.abs(local.pos.z) > 170) beginFallOut();
+  if (Math.abs(local.pos.x) > 170 || Math.abs(local.pos.z) > 170) eliminateSelf('void');
 }
 
 /** Fire tile_step exactly once per tile per round. */
@@ -2564,10 +2525,6 @@ function updateObstacles(dt, now) {
         local.vel.z += (dz / (d || 1)) * k;
         local.vel.y = Math.max(local.vel.y, 9);
         local.grounded = false;
-        // 맞아서 뜬 것도 점프와 같게 취급합니다.
-        // 제자리에 다시 떨어지는 것은 낙하가 아니기 때문입니다.
-        local.jumped = true;
-        local.lastGroundY = local.pos.y;
       }
       setTimeout(() => removeObstacle(o.id), 520);
     }
@@ -2958,8 +2915,6 @@ function connect(name, mode) {
       local.layer = 3;
       local.anim = 'idle';
       local.dying = 0;
-      local.jumped = false;
-      local.lastGroundY = local.pos.y;
       G.selfAlive = true;
       if (local.avatar) {
         local.avatar.group.rotation.set(0, 0, 0);
@@ -2996,8 +2951,6 @@ function connect(name, mode) {
       local.vel.set(0, 0, 0);
       local.layer = 3;
       local.anim = 'idle';
-      local.jumped = false;
-      local.lastGroundY = local.pos.y;
       if (!local.avatar) {
         local.avatar = buildAvatar(local.color, safeName(mine.name, G.name));
         actorGroup.add(local.avatar.group);

@@ -21,7 +21,7 @@
   --l3:#00ffcc;   /* 우선심사 패스트트랙 */
   --l2:#0088ff;   /* 의견제출통지 */
   --l1:#aa00ff;   /* 아이디어 구상 */
-  --fall:#ff6b8a;
+  --lava:#ff3a12;
   --gold:#ffcc00;
   --rule:rgba(236,231,216,.18);
   --mono:'Chakra Petch',ui-monospace,Menlo,monospace;
@@ -131,7 +131,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
   border-left:3px solid var(--paper);animation:tin .3s cubic-bezier(.2,.9,.3,1)
 }
 .toast.cheer{border-left-color:var(--gold)} .toast.obstacle{border-left-color:var(--stamp)}
-.toast.kill{border-left-color:var(--fall)}
+.toast.kill{border-left-color:var(--lava)}
 @keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 
 /* ------------------------------------------------------------- overlays -- */
@@ -274,7 +274,7 @@ input[type=text]{
   <div class="card">
     <div class="eyebrow">KIPO SURVIVAL PROTOCOL · 3-LAYER</div>
     <h1>바닥이 무너지기 전에<br><em>등록결정</em>까지 살아남으세요.</h1>
-    <p class="sub">밟은 특허 심사 타일은 0.8초 뒤 붕괴합니다. 무단 카피캣 함정 블록은 0.2초. 1층 아래로 떨어지면 구름바다에 빠져 탈락합니다. 마지막 한 명이 등록결정을 받습니다.</p>
+    <p class="sub">밟은 특허 심사 타일은 0.8초 뒤 붕괴합니다. 무단 카피캣 함정 블록은 0.2초. 3층에서 1층까지 떨어지면 그 아래는 용암입니다. 마지막 한 명이 등록결정을 받습니다.</p>
     <div class="field">
       <label for="nameInput">출원인 이름</label>
       <input type="text" id="nameInput" maxlength="14" placeholder="예: 김심사" autocomplete="off" />
@@ -334,18 +334,6 @@ const PHYS = {
   STEP: 1 / 60
 };
 
-/* fall 액션 판정 기준.
- * 점프해서 같은 층 타일로 되돌아오는 것은 낙하가 아닙니다.
- * "출발한 바닥보다 이만큼 아래로 내려갔을 때" 만 진짜 낙하로 봅니다.
- *
- * 참고: 점프 최고 높이는 JUMP_V^2 / (2*GRAVITY) = 21.5^2 / 124 = 3.73
- *       즉 정상적인 점프는 출발 높이보다 아래로 내려가지 않으므로,
- *       같은 층 착지에서는 fall 이 절대 나오지 않습니다.               */
-const FALL_DROP = {
-  JUMPED: 2.2,   // 점프해서 떠 있을 때 (아래 층으로 떨어져야 fall)
-  WALKED: 0.35   // 그냥 발을 헛디뎠을 때 (거의 즉시 fall)
-};
-
 const PLAYER = {
   HALF_X: 0.78,
   HALF_Z: 0.78,
@@ -400,7 +388,7 @@ const G = {
   tiles: new Map(),        // tileId -> tileRecord
   layerTiles: { 1: [], 2: [], 3: [] },
   layerY: { 1: 0, 2: 15, 3: 30 },
-  seaY: -20,
+  lavaY: -20,
   hexSize: 3.2,
   hexThick: 1.0,
   players: new Map(),      // id -> remote record (includes self meta)
@@ -437,8 +425,6 @@ camera.position.set(0, 46, 34);
 const hemiLight = new THREE.HemisphereLight(0x9fd8ff, 0x180a24, 0.75);
 scene.add(hemiLight);
 
-/* 주광 방향. 맵을 바꾸면 하늘의 해 위치에 맞춰 갱신됩니다. */
-const keyLightDir = new THREE.Vector3(0.42, 0.82, 0.29).normalize();
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.15);
 keyLight.position.set(38, 78, 26);
 keyLight.castShadow = true;
@@ -457,10 +443,9 @@ const rimLight = new THREE.DirectionalLight(0x00ffcc, 0.5);
 rimLight.position.set(-30, 20, -34);
 scene.add(rimLight);
 
-/* 구름바다에서 위로 올라오는 반사광. 캐릭터 아랫면이 새까맣게 죽는 것을 막습니다. */
-const bounceLight = new THREE.PointLight(0xffffff, 1.1, 150, 2);
-bounceLight.position.set(0, -14, 0);
-scene.add(bounceLight);
+const lavaLight = new THREE.PointLight(0xff3a12, 2.4, 130, 2);
+lavaLight.position.set(0, -14, 0);
+scene.add(lavaLight);
 
 /* --- world groups ------------------------------------------------------- */
 const worldGroup = new THREE.Group(); scene.add(worldGroup);
@@ -498,307 +483,105 @@ function loadOptionalTexture(url, key, repeat) {
 }
 loadOptionalTexture('assets/road_texture.png', 'road', 1);
 
-/* --- 절차적 배경 (폴가이즈 헥사곤 방식) --------------------------------- *
- * 사진 배경을 쓰지 않습니다. 사진은 화면에서 확대되면 반드시 흐려지지만,
- * 아래 방식은 전부 실시간으로 계산되므로 4K 든 8K 든 항상 선명합니다.
+/* --- 배경 스카이돔 (3개 맵) --------------------------------------------- *
+ * 업로드한 배경은 파노라마가 아니라 일반 16:9 그림입니다. 그래서
+ * scene.background 에 그냥 넣으면 회전할 때 크게 왜곡되고 이음매가 보입니다.
  *
- *   1) 하늘   : 프래그먼트 셰이더로 그리는 그라데이션. 텍스처가 없어 무한 해상도
- *   2) 구름   : 구를 뭉쳐 만든 3D 덩어리. 실제 입체라 회전해도 자연스럽게 돕니다
- *   3) 소품   : 맵별로 떠다니는 링/큐브/섬. 원근감과 회전감을 만들어 줍니다
- *
- * 이미지 파일이 전혀 필요 없습니다.
+ * 해결:
+ *   · 큰 구(BackSide)에 매핑하고 가로는 MirroredRepeatWrapping 으로 2회 반복.
+ *     미러 반복이라 360도를 돌아도 이음매가 생기지 않습니다.
+ *   · 세로는 ClampToEdgeWrapping. 이미지가 덮지 않는 아래쪽은 가장자리
+ *     픽셀 색이 그대로 이어져 끊기지 않습니다.
+ *   · MeshBasicMaterial + fog:false + toneMapped:false → 조명/안개 영향 0.
+ *   · 매 프레임 카메라 위치를 따라가므로 어디로 이동해도 잘리지 않습니다.
  * ---------------------------------------------------------------------- */
-const SKY_RADIUS = 620;
+const SKY_RADIUS = 600;
+const SKY_THETA  = 1.86;   // 이미지가 덮는 세로 각도(rad). 약 107도
+const SKY_TURNS  = 2;      // 가로 반복 횟수. 미러 반복이라 짝수여야 이음매가 없습니다
 
 const THEMES = [
   {
     key: 'candy',
     name: '캔디 스카이',
-    zenith:  0x1f7fd4, mid: 0x4aa8e8, horizon: 0xa8dcf5, ground: 0x7fc4e6,
-    sunColor: 0xfff3c4, sunDir: [0.35, 0.42, -0.84], sunSharp: 220, sunInt: 0.55,
-    stars: 0.0,
-    cloudBase: 0xdfeffb, cloudTop: 0xffffff, cloudCount: 26, cloudEmissive: 0.55,
-    seaBase: 0xdcefff, seaTop: 0xffffff, seaEmissive: 0.5, seaHaze: 0xa8dcf5, flash: 0xdff2ff,
-    prop: { kind: 'cube', colors: [0xff9ec4, 0xffe08a, 0x9ce8ff, 0xc4f5a8], count: 46 },
-    fog: 0xa8dcf5, fogDensity: 0.0030,
-    hemiSky: 0xcfeaff, hemiGround: 0x7fa8c8, hemiInt: 1.0,
-    keyColor: 0xffffff, keyInt: 1.05, rimColor: 0x8fe8ff, rimInt: 0.35
+    bg: 'assets/bg/map1_candy.jpg',
+    fog: 0x8fcdf0, fogDensity: 0.0035,
+    hemiSky: 0xbfe6ff, hemiGround: 0x6f8fb8, hemiInt: 0.95,
+    keyColor: 0xffffff, keyInt: 1.05,
+    rimColor: 0x66ffe0, rimInt: 0.35
   },
   {
     key: 'neon',
     name: '네온 아레나',
-    zenith:  0x1668c8, mid: 0x3f9ce0, horizon: 0xbde9f0, ground: 0x8fd0dc,
-    sunColor: 0xd8fff6, sunDir: [-0.42, 0.36, -0.83], sunSharp: 160, sunInt: 0.6,
-    stars: 0.0,
-    cloudBase: 0xe4f4fa, cloudTop: 0xffffff, cloudCount: 20, cloudEmissive: 0.6,
-    seaBase: 0xd6f2f6, seaTop: 0xeafffd, seaEmissive: 0.55, seaHaze: 0x9fdce6, flash: 0xc9fff4,
-    prop: { kind: 'ring', colors: [0x00ffcc, 0x54ffb0, 0xff7fc4, 0x7fd8ff], count: 38 },
-    fog: 0xbde9f0, fogDensity: 0.0034,
-    hemiSky: 0xc4f0ff, hemiGround: 0x39708c, hemiInt: 0.92,
-    keyColor: 0xf2fbff, keyInt: 1.12, rimColor: 0x00ffcc, rimInt: 0.55
+    bg: 'assets/bg/map2_neon.jpg',
+    fog: 0x7fb6cf, fogDensity: 0.0040,
+    hemiSky: 0xa8e8ff, hemiGround: 0x2d4a63, hemiInt: 0.85,
+    keyColor: 0xf2fbff, keyInt: 1.15,
+    rimColor: 0x00ffcc, rimInt: 0.55
   },
   {
     key: 'dawn',
     name: '새벽 구름',
-    zenith:  0x4a4a9e, mid: 0x9a86d4, horizon: 0xf4c2a8, ground: 0xd9aec4,
-    sunColor: 0xffd9a0, sunDir: [0.72, 0.16, -0.68], sunSharp: 90, sunInt: 0.9,
-    stars: 0.85,
-    cloudBase: 0xe7c8dc, cloudTop: 0xffe4c0, cloudCount: 24, cloudEmissive: 0.5,
-    seaBase: 0xecc9d8, seaTop: 0xffd9b0, seaEmissive: 0.5, seaHaze: 0xd9aec4, flash: 0xffdcc4,
-    prop: { kind: 'island', colors: [0xb9a2dd, 0xf0b8c8, 0xc9b0e8], count: 22 },
-    fog: 0xe0b6bc, fogDensity: 0.0028,
-    hemiSky: 0xf5d2e4, hemiGround: 0x6a5a94, hemiInt: 0.95,
-    keyColor: 0xffdcb0, keyInt: 1.0, rimColor: 0xb98cff, rimInt: 0.5
+    bg: 'assets/bg/map3_dawn.jpg',
+    fog: 0xb9a2dd, fogDensity: 0.0032,
+    hemiSky: 0xffd9ec, hemiGround: 0x6a5a94, hemiInt: 0.9,
+    keyColor: 0xffe3c4, keyInt: 1.0,
+    rimColor: 0xb98cff, rimInt: 0.45
   }
 ];
 
-/* ── 하늘 셰이더 ───────────────────────────────────────────────────────
- * 방향 벡터의 높이(y)로 색을 섞습니다. 텍스처가 없으니 확대 개념이 없고,
- * 화면 해상도가 아무리 높아도 픽셀 단위로 계산되어 항상 매끄럽습니다.  */
-const SKY_VERT = `
-varying vec3 vDir;
-void main() {
-  vDir = normalize(position);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}
-`;
-
-const SKY_FRAG = `
-precision highp float;
-uniform vec3  uZenith;
-uniform vec3  uMid;
-uniform vec3  uHorizon;
-uniform vec3  uGround;
-uniform vec3  uSunColor;
-uniform vec3  uSunDir;
-uniform float uSunSharp;
-uniform float uSunInt;
-uniform float uStars;
-uniform float uTime;
-varying vec3 vDir;
-
-float hash13(vec3 p) {
-  p = fract(p * 0.1031);
-  p += dot(p, p.yzx + 33.33);
-  return fract((p.x + p.y) * p.z);
-}
-
-void main() {
-  vec3 d = normalize(vDir);
-  float h = d.y;
-  vec3 col;
-
-  if (h >= 0.0) {
-    float t = pow(clamp(h, 0.0, 1.0), 0.62);
-    col = mix(uHorizon, uMid, smoothstep(0.0, 0.42, t));
-    col = mix(col, uZenith, smoothstep(0.34, 1.0, t));
-  } else {
-    col = mix(uHorizon, uGround, smoothstep(0.0, 0.40, -h));
-  }
-
-  // 태양 주변 광훈. 원반 없이 부드러운 빛무리만 넣어 자연스럽게 만듭니다.
-  float sd = max(dot(d, normalize(uSunDir)), 0.0);
-  col += uSunColor * uSunInt * pow(sd, uSunSharp) * 1.2;
-  col += uSunColor * uSunInt * pow(sd, 6.0) * 0.16;
-
-  // 별 (새벽 맵 전용). 위쪽 하늘에만, 태양 반대편일수록 진하게.
-  if (uStars > 0.001 && h > 0.02) {
-    vec3 g = floor(d * 260.0);
-    float n = hash13(g);
-    float star = smoothstep(0.9975, 1.0, n);
-    float tw = 0.65 + 0.35 * sin(uTime * 1.7 + n * 100.0);
-    float mask = smoothstep(0.02, 0.5, h) * (1.0 - smoothstep(0.0, 0.55, sd));
-    col += vec3(1.0, 0.97, 0.92) * star * tw * mask * uStars;
-  }
-
-  // 미세 디더링 — 완만한 그라데이션에서 생기는 띠(밴딩)를 없앱니다
-  float dither = (hash13(vec3(gl_FragCoord.xy, 1.0)) - 0.5) / 255.0;
-  gl_FragColor = vec4(col + dither, 1.0);
-}
-`;
-
 let skyMesh = null;
-let skyUniforms = null;
-let cloudGroup = null;
-let propGroup = null;
+let skyTex = {};          // 경로별 캐시 (맵이 바뀌어도 재다운로드하지 않음)
 let currentTheme = -1;
 
 function buildSkyDome() {
-  skyUniforms = {
-    uZenith:   { value: new THREE.Color(0x1f7fd4) },
-    uMid:      { value: new THREE.Color(0x4aa8e8) },
-    uHorizon:  { value: new THREE.Color(0xa8dcf5) },
-    uGround:   { value: new THREE.Color(0x7fc4e6) },
-    uSunColor: { value: new THREE.Color(0xfff3c4) },
-    uSunDir:   { value: new THREE.Vector3(0.35, 0.42, -0.84) },
-    uSunSharp: { value: 220 },
-    uSunInt:   { value: 0.55 },
-    uStars:    { value: 0.0 },
-    uTime:     { value: 0 }
-  };
-  const mat = new THREE.ShaderMaterial({
-    uniforms: skyUniforms,
-    vertexShader: SKY_VERT,
-    fragmentShader: SKY_FRAG,
+  const geo = new THREE.SphereGeometry(SKY_RADIUS, 64, 40);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
     side: THREE.BackSide,
-    depthWrite: false,   // 항상 가장 뒤에 그려집니다
-    fog: false,          // 안개 영향 없음
-    toneMapped: false    // 노출/톤매핑 영향 없음
+    depthWrite: false,      // 항상 뒤에 그려지도록
+    fog: false,             // 안개 영향 없음
+    toneMapped: false       // 톤매핑/노출 영향 없음
   });
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS, 32, 24), mat);
+  const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = -1;
   mesh.frustumCulled = false;
+  mesh.matrixAutoUpdate = true;
   scene.add(mesh);
   return mesh;
 }
 
-/* ── 구름 ──────────────────────────────────────────────────────────────
- * 구 여러 개를 뭉쳐 하나의 덩어리로 만듭니다. 전부 InstancedMesh 한 개로
- * 그리므로 드로우콜은 1회입니다.                                        */
-function buildClouds(t) {
-  const puffGeo = new THREE.IcosahedronGeometry(1, 2);
-  const mat = new THREE.MeshStandardMaterial({
-    color: t.cloudBase,
-    emissive: new THREE.Color(t.cloudTop).multiplyScalar(t.cloudEmissive),
-    emissiveIntensity: 1.0,
-    roughness: 1.0,
-    metalness: 0.0,
-    flatShading: false
-  });
+/* 이미지가 세로로 SKY_THETA 만큼만 덮도록 UV 를 보정합니다.
+ * theta=0(천정) → 이미지 위쪽, theta=SKY_THETA → 이미지 아래쪽,
+ * 그보다 아래는 ClampToEdge 로 아래쪽 가장자리 색이 계속 이어집니다.   */
+function fitSkyTexture(tex) {
+  tex.wrapS = THREE.MirroredRepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.encoding = THREE.sRGBEncoding;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
 
-  const puffsPer = 7;
-  const total = t.cloudCount * puffsPer;
-  const inst = new THREE.InstancedMesh(puffGeo, mat, total);
-  inst.castShadow = false;
-  inst.receiveShadow = false;
-  inst.frustumCulled = false;
-
-  const m = new THREE.Matrix4();
-  const q = new THREE.Quaternion();
-  const pos = new THREE.Vector3();
-  const scl = new THREE.Vector3();
-  let i = 0;
-
-  for (let c = 0; c < t.cloudCount; c++) {
-    const ang = (c / t.cloudCount) * Math.PI * 2 + Math.random() * 0.5;
-    const dist = 130 + Math.random() * 250;
-    const cy = -18 + Math.random() * 96;
-    const cx = Math.cos(ang) * dist;
-    const cz = Math.sin(ang) * dist;
-    const big = 12 + Math.random() * 22;
-
-    for (let p = 0; p < puffsPer; p++) {
-      const s = big * (0.45 + Math.random() * 0.7);
-      pos.set(
-        cx + (Math.random() - 0.5) * big * 2.6,
-        cy + (Math.random() - 0.5) * big * 0.5,
-        cz + (Math.random() - 0.5) * big * 2.0
-      );
-      scl.set(s, s * (0.55 + Math.random() * 0.25), s);
-      q.setFromEuler(new THREE.Euler(Math.random() * 3, Math.random() * 3, Math.random() * 3));
-      m.compose(pos, q, scl);
-      inst.setMatrixAt(i++, m);
-    }
-  }
-  inst.instanceMatrix.needsUpdate = true;
-
-  const group = new THREE.Group();
-  group.add(inst);
-  scene.add(group);
-  return group;
-}
-
-/* ── 떠다니는 소품 ─────────────────────────────────────────────────────
- * 맵마다 다른 오브젝트를 멀리 띄웁니다. 카메라를 돌릴 때 이것들이
- * 시차를 만들어 "배경이 진짜 3D 공간"처럼 느껴지게 합니다.             */
-function buildProps(t) {
-  const group = new THREE.Group();
-  const cfg = t.prop;
-
-  let geo;
-  if (cfg.kind === 'ring')        geo = new THREE.TorusGeometry(1, 0.30, 10, 28);
-  else if (cfg.kind === 'island') geo = new THREE.CylinderGeometry(1, 0.62, 0.42, 7);
-  else                            geo = new THREE.BoxGeometry(1.4, 1.4, 1.4);
-
-  for (const hex of cfg.colors) {
-    const col = new THREE.Color(hex);
-    const mat = new THREE.MeshStandardMaterial({
-      color: col,
-      emissive: col.clone().multiplyScalar(cfg.kind === 'ring' ? 0.85 : 0.30),
-      emissiveIntensity: 1.0,
-      roughness: cfg.kind === 'ring' ? 0.25 : 0.65,
-      metalness: cfg.kind === 'ring' ? 0.35 : 0.05
-    });
-    const n = Math.round(cfg.count / cfg.colors.length);
-    const inst = new THREE.InstancedMesh(geo, mat, n);
-    inst.frustumCulled = false;
-
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion();
-    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
-    for (let i = 0; i < n; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const dist = 100 + Math.random() * 240;
-      const s = (cfg.kind === 'island' ? 9 : 3) * (0.6 + Math.random() * 1.5);
-      pos.set(Math.cos(ang) * dist, -30 + Math.random() * 120, Math.sin(ang) * dist);
-      scl.set(s, s, s);
-      q.setFromEuler(new THREE.Euler(Math.random() * 3, Math.random() * 3, Math.random() * 3));
-      m.compose(pos, q, scl);
-      inst.setMatrixAt(i, m);
-    }
-    inst.instanceMatrix.needsUpdate = true;
-    group.add(inst);
-  }
-  scene.add(group);
-  return group;
-}
-
-function disposeGroup(g) {
-  if (!g) return;
-  g.traverse((o) => {
-    if (o.geometry) o.geometry.dispose();
-    if (o.material) {
-      const ms = Array.isArray(o.material) ? o.material : [o.material];
-      ms.forEach((mm) => mm.dispose());
-    }
-  });
-  scene.remove(g);
+  const a = 1 - SKY_THETA / Math.PI;      // theta=SKY_THETA 지점의 기본 v
+  const ry = 1 / (1 - a);
+  tex.repeat.set(SKY_TURNS, ry);
+  tex.offset.set(0, -a * ry);
+  tex.needsUpdate = true;
+  return tex;
 }
 
 function applyTheme(index) {
-  const i = ((index | 0) % THEMES.length + THEMES.length) % THEMES.length;
-  if (currentTheme === i && skyMesh) return;
-  currentTheme = i;
-  const t = THEMES[i];
+  const t = THEMES[(index | 0) % THEMES.length] || THEMES[0];
+  if (currentTheme === index && skyMesh && skyMesh.material.map) return;
+  currentTheme = index;
 
   if (!skyMesh) skyMesh = buildSkyDome();
 
-  skyUniforms.uZenith.value.setHex(t.zenith);
-  skyUniforms.uMid.value.setHex(t.mid);
-  skyUniforms.uHorizon.value.setHex(t.horizon);
-  skyUniforms.uGround.value.setHex(t.ground);
-  skyUniforms.uSunColor.value.setHex(t.sunColor);
-  skyUniforms.uSunDir.value.set(t.sunDir[0], t.sunDir[1], t.sunDir[2]).normalize();
-  skyUniforms.uSunSharp.value = t.sunSharp;
-  skyUniforms.uSunInt.value = t.sunInt;
-  skyUniforms.uStars.value = t.stars;
-
-  disposeGroup(cloudGroup);
-  disposeGroup(propGroup);
-  cloudGroup = buildClouds(t);
-  propGroup = buildProps(t);
-  buildCloudSea(t);
-
-  // 탈락 화면 섬광도 맵 색에 맞춥니다 (빨간 섬광은 하늘 배경과 안 어울립니다)
-  dom.deadFlash.style.background =
-    'radial-gradient(circle at 50% 60%, transparent 18%, #' +
-    new THREE.Color(t.flash).getHexString() + ')';
-  bounceLight.color.setHex(t.seaTop);
-
-  /* 안개와 조명을 하늘 색에 맞춰 함께 바꿉니다.
-   * 배경만 바꾸면 타일과 캐릭터가 배경에서 붕 떠 보입니다.              */
+  /* 조명·안개를 배경 톤에 맞춰 갈아끼웁니다.
+   * 배경만 바꾸면 캐릭터와 타일이 배경에서 붕 떠 보입니다.              */
   scene.fog.color.setHex(t.fog);
   scene.fog.density = t.fogDensity;
-  scene.background = new THREE.Color(t.horizon);
+  scene.background = new THREE.Color(t.fog);
   hemiLight.color.setHex(t.hemiSky);
   hemiLight.groundColor.setHex(t.hemiGround);
   hemiLight.intensity = t.hemiInt;
@@ -806,174 +589,54 @@ function applyTheme(index) {
   keyLight.intensity = t.keyInt;
   rimLight.color.setHex(t.rimColor);
   rimLight.intensity = t.rimInt;
-  // 주광 방향을 하늘의 해 위치와 맞춰 그림자 방향이 어긋나지 않게 합니다
-  keyLightDir.set(t.sunDir[0], Math.max(0.35, t.sunDir[1]), t.sunDir[2]).normalize();
 
   const el = document.getElementById('vMap');
   if (el) el.textContent = t.name;
 
-  console.log('[IPG] 배경 적용: ' + t.name +
-    ' · 구름 ' + t.cloudCount + '덩어리 · 소품 ' + t.prop.count + '개 (이미지 파일 불필요)');
-}
-
-/* 하늘의 별 반짝임과 구름/소품의 느린 흐름 */
-function updateSky(dt, now) {
-  if (skyUniforms) skyUniforms.uTime.value = now * 0.001;
-  if (cloudGroup) cloudGroup.rotation.y += dt * 0.0045;
-  if (propGroup) {
-    propGroup.rotation.y += dt * 0.0075;
-    propGroup.children.forEach((c, i) => { c.rotation.x += dt * 0.05 * (i % 2 ? 1 : -1); });
+  if (skyTex[t.bg]) {
+    skyMesh.material.map = skyTex[t.bg];
+    skyMesh.material.needsUpdate = true;
+    return;
   }
-}
 
-/* --- 구름바다 (탈락 구역) ---------------------------------------------- *
- * 배경이 하늘이므로 바닥도 용암이 아니라 구름바다입니다.
- * 1층 아래로 떨어지면 구름을 뚫고 사라지면서 탈락합니다.
- *
- *   · 표면  : 구를 뭉쳐 만든 두꺼운 구름층 (InstancedMesh 1개)
- *   · 안개막: 그 아래를 덮는 반투명 원판. 끝없이 이어지는 느낌을 줍니다
- *   · 색    : 맵 테마에 맞춰 바뀝니다
- * ---------------------------------------------------------------------- */
-let seaGroup = null;
-let seaPuffs = null;
-let seaHaze = null;
-let seaBase = [];       // 각 퍼프의 기준 위치 (물결 애니메이션용)
-
-function buildCloudSea(t) {
-  disposeGroup(seaGroup);
-  seaBase = [];
-
-  const group = new THREE.Group();
-  const y = G.seaY;
-
-  /* 구름 표면 */
-  const puffGeo = new THREE.IcosahedronGeometry(1, 2);
-  const mat = new THREE.MeshStandardMaterial({
-    color: t.seaBase,
-    emissive: new THREE.Color(t.seaTop).multiplyScalar(t.seaEmissive),
-    emissiveIntensity: 1.0,
-    roughness: 1.0,
-    metalness: 0.0
-  });
-
-  const RINGS = [
-    { r: 0,   n: 1  }, { r: 12,  n: 8  }, { r: 24, n: 14 },
-    { r: 36,  n: 20 }, { r: 50,  n: 26 }, { r: 66, n: 30 },
-    { r: 84,  n: 34 }, { r: 104, n: 36 }
-  ];
-  let total = 0;
-  for (const ring of RINGS) total += ring.n;
-
-  const inst = new THREE.InstancedMesh(puffGeo, mat, total);
-  inst.frustumCulled = false;
-  inst.receiveShadow = true;
-
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion();
-  const pos = new THREE.Vector3(), scl = new THREE.Vector3();
-  let i = 0;
-  for (const ring of RINGS) {
-    for (let k = 0; k < ring.n; k++) {
-      const a = (k / ring.n) * Math.PI * 2 + (ring.r * 0.13);
-      const rr = ring.r + (Math.random() - 0.5) * 9;
-      const px = Math.cos(a) * rr;
-      const pz = Math.sin(a) * rr;
-      const py = y + (Math.random() - 0.5) * 3.2;
-      const s = 9 + Math.random() * 9;
-      pos.set(px, py, pz);
-      scl.set(s, s * (0.5 + Math.random() * 0.22), s);
-      q.setFromEuler(new THREE.Euler(Math.random() * 3, Math.random() * 3, Math.random() * 3));
-      m.compose(pos, q, scl);
-      inst.setMatrixAt(i, m);
-      seaBase.push({ x: px, y: py, z: pz, sx: scl.x, sy: scl.y, sz: scl.z,
-                     q: q.clone(), phase: Math.random() * 6.28 });
-      i++;
+  texLoader.load(
+    t.bg,
+    (tex) => {
+      skyTex[t.bg] = fitSkyTexture(tex);
+      if (currentTheme === index) {
+        skyMesh.material.map = skyTex[t.bg];
+        skyMesh.material.needsUpdate = true;
+      }
+    },
+    undefined,
+    () => {
+      // 배경 이미지가 없으면 단색 하늘로 대체합니다 (게임은 그대로 진행)
+      console.warn('[IPG] 배경 이미지를 불러오지 못했습니다: ' + t.bg);
+      skyMesh.material.map = null;
+      skyMesh.material.color.setHex(t.fog);
+      skyMesh.material.needsUpdate = true;
     }
-  }
-  inst.instanceMatrix.needsUpdate = true;
-  group.add(inst);
-  seaPuffs = inst;
-
-  /* 아래를 덮는 안개막 — 구름 사이로 바닥이 비치지 않게 합니다 */
-  const haze = new THREE.Mesh(
-    new THREE.CircleGeometry(300, 48),
-    new THREE.MeshBasicMaterial({
-      color: t.seaHaze, transparent: true, opacity: 0.92,
-      depthWrite: false, toneMapped: false, side: THREE.DoubleSide
-    })
   );
-  haze.rotation.x = -Math.PI / 2;
-  haze.position.y = y - 7;
-  group.add(haze);
-  seaHaze = haze;
-
-  scene.add(group);
-  seaGroup = group;
-  return group;
 }
 
-/* 구름바다가 아주 천천히 일렁입니다 */
-function updateCloudSea(dt, now) {
-  if (!seaPuffs) return;
-  const m = new THREE.Matrix4(), p = new THREE.Vector3(), s = new THREE.Vector3();
-  const t = now * 0.00035;
-  for (let i = 0; i < seaBase.length; i++) {
-    const b = seaBase[i];
-    p.set(b.x, b.y + Math.sin(t + b.phase) * 1.15, b.z);
-    s.set(b.sx, b.sy, b.sz);
-    m.compose(p, b.q, s);
-    seaPuffs.setMatrixAt(i, m);
-  }
-  seaPuffs.instanceMatrix.needsUpdate = true;
-  seaGroup.rotation.y += dt * 0.006;
-}
+/* --- lava plane + void grid -------------------------------------------- */
+const lavaMat = new THREE.MeshStandardMaterial({
+  color: 0xff0000, emissive: 0xff2200, emissiveIntensity: 1.5,
+  roughness: 0.42, metalness: 0.0, transparent: true, opacity: 0.94
+});
+const lavaMesh = new THREE.Mesh(new THREE.PlaneGeometry(340, 340, 48, 48), lavaMat);
+lavaMesh.rotation.x = -Math.PI / 2;
+lavaMesh.position.y = -20;
+scene.add(lavaMesh);
+const lavaBase = lavaMesh.geometry.attributes.position.array.slice();
 
-/* ── 낙하 연출 ─────────────────────────────────────────────────────────
- * 구름을 뚫고 들어가는 순간 퍼프가 사방으로 터집니다.
- * 탈락한 본인뿐 아니라 다른 사람이 떨어질 때도 보입니다.              */
-const splashPuffs = [];
-const splashGeo = new THREE.IcosahedronGeometry(1, 1);
-
-function spawnSeaSplash(x, z, colorHex) {
-  const col = new THREE.Color(colorHex);
-  for (let i = 0; i < 14; i++) {
-    const mat = new THREE.MeshBasicMaterial({
-      color: col, transparent: true, opacity: 0.95, toneMapped: false, depthWrite: false
-    });
-    const mesh = new THREE.Mesh(splashGeo, mat);
-    const a = Math.random() * Math.PI * 2;
-    const r = Math.random() * 3;
-    mesh.position.set(x + Math.cos(a) * r, G.seaY + 1 + Math.random() * 2, z + Math.sin(a) * r);
-    const s = 1.6 + Math.random() * 2.6;
-    mesh.scale.setScalar(s);
-    fxGroup.add(mesh);
-    splashPuffs.push({
-      mesh, mat,
-      vel: new THREE.Vector3(Math.cos(a) * (5 + Math.random() * 9),
-                             5 + Math.random() * 9,
-                             Math.sin(a) * (5 + Math.random() * 9)),
-      life: 1.5, max: 1.5, grow: 1 + Math.random() * 1.6
-    });
-  }
-  if (splashPuffs.length > 90) {
-    const old = splashPuffs.splice(0, splashPuffs.length - 90);
-    old.forEach((d) => { fxGroup.remove(d.mesh); d.mat.dispose(); });
-  }
-}
-
-function updateSplash(dt) {
-  for (let i = splashPuffs.length - 1; i >= 0; i--) {
-    const d = splashPuffs[i];
-    d.life -= dt;
-    if (d.life <= 0) {
-      fxGroup.remove(d.mesh); d.mat.dispose(); splashPuffs.splice(i, 1); continue;
-    }
-    const k = 1 - d.life / d.max;
-    d.vel.y -= 14 * dt;
-    d.mesh.position.addScaledVector(d.vel, dt);
-    d.mesh.scale.setScalar((1.6 + k * d.grow * 3.2));
-    d.mat.opacity = 0.95 * (1 - k) * (1 - k);
-  }
-}
+const lavaGlow = new THREE.Mesh(
+  new THREE.PlaneGeometry(340, 340),
+  new THREE.MeshBasicMaterial({ color: 0xff5522, transparent: true, opacity: 0.25, depthWrite: false })
+);
+lavaGlow.rotation.x = -Math.PI / 2;
+lavaGlow.position.y = -19.2;
+scene.add(lavaGlow);
 
 /* ============================ 4. map building ========================== */
 
@@ -987,7 +650,7 @@ function mapCfg() {
   return {
     HEX_SIZE: c.HEX_SIZE || 3.2,
     HEX_THICKNESS: c.HEX_THICKNESS || 1.0,
-    SEA_Y: (c.SEA_Y !== undefined ? c.SEA_Y : -20),
+    LAVA_Y: (c.LAVA_Y !== undefined ? c.LAVA_Y : -20),
     LAYERS: c.LAYERS || [{ index: 3, y: 30 }, { index: 2, y: 15 }, { index: 1, y: 0 }]
   };
 }
@@ -1005,9 +668,10 @@ function buildMap(map, cfg) {
 
   G.hexSize = cfg.HEX_SIZE;
   G.hexThick = cfg.HEX_THICKNESS;
-  G.seaY = cfg.SEA_Y;
-  bounceLight.position.y = cfg.SEA_Y + 6;
-  if (currentTheme >= 0) buildCloudSea(THEMES[currentTheme]);
+  G.lavaY = cfg.LAVA_Y;
+  lavaMesh.position.y = cfg.LAVA_Y;
+  lavaGlow.position.y = cfg.LAVA_Y + 0.8;
+  lavaLight.position.y = cfg.LAVA_Y + 6;
   for (const L of cfg.LAYERS) G.layerY[L.index] = L.y;
 
   if (!hexGeo) {
@@ -2051,15 +1715,12 @@ const local = {
   ry: 0,
   grounded: false,
   groundTile: null,
-  lastGroundY: 30.5,   // 마지막으로 서 있던 바닥 높이
-  jumped: false,       // 점프로 떠올랐는지 (발을 헛디딘 것과 구분)
   layer: 3,
   anim: 'idle',
   avatar: null,
   coyote: 0,
   jumpBuffer: 0,
   alive: true,
-  dying: 0,          // >0 이면 구름바다로 잠기는 연출 진행 중
   color: '#ffcc00'
 };
 
@@ -2167,7 +1828,7 @@ function supportAt(px, pz, feetY) {
 /* 주어진 위치 아래에 있는 가장 가까운 바닥의 y.
  * 2.5D 는 원근 단서가 약해서, 그림자로 높이를 읽게 하는 것이 매우 중요합니다. */
 function groundYUnder(px, pz, fromY) {
-  let best = G.seaY;
+  let best = G.lavaY;
   for (const L of [1, 2, 3]) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (surf > fromY + 0.05) continue;
@@ -2232,8 +1893,6 @@ function stepPhysics(dt) {
     local.vel.y = PHYS.JUMP_V;
     Sound.sfx('jump', { rate: 0.96 + Math.random() * 0.08 });
     local.grounded = false;
-    local.jumped = true;
-    local.lastGroundY = local.pos.y;
     local.coyote = 0;
     local.jumpBuffer = 0;
     local.groundTile = null;
@@ -2279,39 +1938,13 @@ function stepPhysics(dt) {
     }
   }
 
-  // ---- 애니메이션 상태 ----
-  if (local.grounded) {
-    local.lastGroundY = local.pos.y;
-    local.jumped = false;
-    local.anim = hs > 1.2 ? 'run' : 'idle';
-  } else if (local.vel.y > 1.5) {
-    // 위로 솟는 중 = 점프
-    local.anim = 'jump';
-  } else {
-    // 내려오는 중. 아래 두 조건을 모두 만족할 때만 fall 입니다.
-    //   1) 출발한 바닥보다 충분히 아래로 내려갔을 것
-    //   2) 출발한 "층"의 바닥면보다 아래로 내려갔을 것
-    //
-    // 2번이 핵심입니다. 부스터 발판처럼 층 바닥보다 높은 곳에서 내려와도,
-    // 같은 층 타일에 착지하는 한 낙하가 아니라 점프로 봅니다.
-    // 결과적으로 fall 은 아래 세 경우에만 나옵니다.
-    //   · 다른(아래) 층으로 떨어질 때
-    //   · 장외로 떨어질 때
-    //   · 맨 아래 층에서 구름바다로 떨어질 때
-    const drop = local.jumped ? FALL_DROP.JUMPED : FALL_DROP.WALKED;
-    const launchLayer = currentLayerOf(local.lastGroundY);
-    const layerFloor = G.layerY[launchLayer] + G.hexThick / 2;
-    const leftLayer = local.pos.y < layerFloor - drop;
-    const droppedEnough = local.pos.y < local.lastGroundY - drop;
-    local.anim = (leftLayer && droppedEnough) ? 'fall' : 'jump';
-  }
+  // ---- animation state ----
+  if (!local.grounded) local.anim = local.vel.y > 1.5 ? 'jump' : 'fall';
+  else local.anim = hs > 1.2 ? 'run' : 'idle';
 
-  // ---- 구름바다 / 장외 ----
-  // 구름 표면에 닿는 순간 바로 탈락시키지 않고, 구름을 뚫고 들어가는
-  // 연출을 0.75초 보여준 뒤 처리합니다.
-  if (!local.dying && local.pos.y <= G.seaY + 6) beginFallOut();
-  if (local.pos.y < G.seaY - 26) local.pos.y = G.seaY - 26;   // 무한 낙하 방지
-  if (Math.abs(local.pos.x) > 170 || Math.abs(local.pos.z) > 170) beginFallOut();
+  // ---- lava / out-of-bounds ----
+  if (local.pos.y <= G.lavaY + 1.2) eliminateSelf('lava');
+  if (Math.abs(local.pos.x) > 170 || Math.abs(local.pos.z) > 170) eliminateSelf('void');
 }
 
 /** Fire tile_step exactly once per tile per round. */
@@ -2325,51 +1958,14 @@ function onSteppedOn(rec) {
   G.socket.emit('tile_step', { tileId: rec.id });
 }
 
-/* 구름을 뚫고 들어가는 연출을 시작합니다. 실제 탈락 처리는 끝난 뒤에. */
-function beginFallOut() {
-  if (local.dying || !local.alive) return;
-  local.dying = 0.75;
-  local.anim = 'fall';
-  spawnSeaSplash(local.pos.x, local.pos.z, (THEMES[currentTheme] || THEMES[0]).seaTop);
-  Sound.sfx('death');
-  dom.deadFlash.classList.add('on');
-}
-
-/* 연출 진행 — 캐릭터가 구름 속으로 가라앉고, 끝나면 탈락 처리 */
-function updateFallOut(dt) {
-  if (!local.dying) return;
-  local.dying -= dt;
-
-  // 구름 속으로 천천히 잠깁니다 (그냥 뚝 떨어지면 어색합니다)
-  local.vel.y = Math.max(local.vel.y, -9);
-  local.vel.x *= 0.90;
-  local.vel.z *= 0.90;
-  local.pos.y += local.vel.y * dt;
-  local.pos.x += local.vel.x * dt;
-  local.pos.z += local.vel.z * dt;
-
-  if (local.avatar) {
-    // 잠기면서 서서히 사라집니다
-    const k = THREE.MathUtils.clamp(1 - local.dying / 0.75, 0, 1);
-    local.avatar.group.scale.setScalar(Math.max(0.02, 1 - k * 0.55));
-    local.avatar.group.rotation.y += dt * 5;
-    if (local.avatar.plate) local.avatar.plate.visible = false;
-  }
-
-  if (local.dying <= 0) {
-    local.dying = 0;
-    eliminateSelf('fall');
-  }
-}
-
 function eliminateSelf(cause) {
   if (!local.alive) return;
   local.alive = false;
   G.selfAlive = false;
   local.anim = 'dead';
   dom.deadFlash.classList.add('on');
-  setTimeout(() => dom.deadFlash.classList.remove('on'), 900);
-  if (local.avatar) local.avatar.group.visible = false;
+  Sound.sfx('death');
+  setTimeout(() => dom.deadFlash.classList.remove('on'), 700);
   G.socket.emit('player_death', { cause });
   G.role = 'spectator';
   updateSpectatorUI();
@@ -2564,10 +2160,6 @@ function updateObstacles(dt, now) {
         local.vel.z += (dz / (d || 1)) * k;
         local.vel.y = Math.max(local.vel.y, 9);
         local.grounded = false;
-        // 맞아서 뜬 것도 점프와 같게 취급합니다.
-        // 제자리에 다시 떨어지는 것은 낙하가 아니기 때문입니다.
-        local.jumped = true;
-        local.lastGroundY = local.pos.y;
       }
       setTimeout(() => removeObstacle(o.id), 520);
     }
@@ -2686,9 +2278,7 @@ const camTarget = new THREE.Vector3();
 const camDesired = new THREE.Vector3();
 
 function updateCamera(dt) {
-  // 탈락 연출 중에는 카메라를 캐릭터에 붙여 둡니다.
-  // 곧바로 관전 시점으로 튀면 무슨 일이 일어났는지 알 수 없습니다.
-  const focus = (local.alive || local.dying > 0) ? local.pos : spectateFocus();
+  const focus = local.alive ? local.pos : spectateFocus();
 
   camTarget.lerp(
     new THREE.Vector3(focus.x, focus.y + cam.height, focus.z),
@@ -2717,14 +2307,8 @@ function updateCamera(dt) {
   // 스카이돔은 항상 카메라를 중심에 둡니다. 어디로 이동하든 잘리지 않고,
   // 회전할 때만 배경이 움직여 실제 하늘처럼 보입니다.
   if (skyMesh) skyMesh.position.copy(camera.position);
-  // 구름과 소품은 월드에 고정합니다. 카메라가 움직이면 시차가 생겨
-  // 배경이 진짜 3D 공간처럼 느껴집니다.
 
-  keyLight.position.set(
-    focus.x + keyLightDir.x * 80,
-    focus.y + keyLightDir.y * 80,
-    focus.z + keyLightDir.z * 80
-  );
+  keyLight.position.set(focus.x + 38, focus.y + 70, focus.z + 26);
   keyLight.target.position.set(focus.x, focus.y, focus.z);
   keyLight.target.updateMatrixWorld();
 
@@ -2957,16 +2541,11 @@ function connect(name, mode) {
       local.alive = true;
       local.layer = 3;
       local.anim = 'idle';
-      local.dying = 0;
-      local.jumped = false;
-      local.lastGroundY = local.pos.y;
       G.selfAlive = true;
       if (local.avatar) {
         local.avatar.group.rotation.set(0, 0, 0);
         local.avatar.group.scale.set(1, 1, 1);
-        local.avatar.group.visible = true;
         local.avatar.landSquash = 0;
-        if (local.avatar.plate) local.avatar.plate.visible = true;
       }
     }
     updateSpectatorUI();
@@ -2989,24 +2568,19 @@ function connect(name, mode) {
       // 관전자였다가 이번 회차에 주자로 승격된 경우도 여기서 처리됩니다.
       G.role = 'player';
       local.alive = true;
-      local.dying = 0;
       G.selfAlive = true;
       local.color = mine.color;
       local.pos.set(mine.pos.x, mine.pos.y, mine.pos.z);
       local.vel.set(0, 0, 0);
       local.layer = 3;
       local.anim = 'idle';
-      local.jumped = false;
-      local.lastGroundY = local.pos.y;
       if (!local.avatar) {
         local.avatar = buildAvatar(local.color, safeName(mine.name, G.name));
         actorGroup.add(local.avatar.group);
       }
       local.avatar.group.rotation.set(0, 0, 0);
       local.avatar.group.scale.set(1, 1, 1);
-      local.avatar.group.visible = true;
       local.avatar.landSquash = 0;
-      if (local.avatar.plate) local.avatar.plate.visible = true;
     } else {
       G.role = 'spectator';
     }
@@ -3080,13 +2654,7 @@ function connect(name, mode) {
 
   socket.on('eliminated', (d) => {
     const r = G.players.get(d.id);
-    if (r) {
-      r.alive = false;
-      // 관전자에게도 누가 어디로 떨어졌는지 보이게 합니다
-      if (d.id !== G.selfId && r.render) {
-        spawnSeaSplash(r.render.x, r.render.z, (THEMES[currentTheme] || THEMES[0]).seaTop);
-      }
-    }
+    if (r) r.alive = false;
     if (d.id !== G.selfId) {
       toast(safeName(d.name) + ' 님 탈락 · ' + d.placement + '위', 'kill');
       Sound.sfx('eliminate');
@@ -3189,10 +2757,7 @@ function frame() {
   if (dt > 0.25) dt = 0.25;
 
   /* --- fixed-step physics for the local runner --- */
-  if (local.dying) {
-    updateFallOut(dt);
-    accumulator = 0;
-  } else if (G.started && G.role === 'player' && local.alive && G.phase === 'playing') {
+  if (G.started && G.role === 'player' && local.alive && G.phase === 'playing') {
     accumulator += dt;
     let guard = 0;
     while (accumulator >= PHYS.STEP && guard++ < 8) {
@@ -3222,10 +2787,15 @@ function frame() {
   updateBoosters(dt, now);
   updateObstacles(dt, now);
   updateCamera(dt);
-  updateSky(dt, now);
 
-  updateCloudSea(dt, now);
-  updateSplash(dt);
+  // lava surface ripple
+  const pos = lavaMesh.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const bx = lavaBase[i * 3], by = lavaBase[i * 3 + 1];
+    pos.array[i * 3 + 2] = Math.sin(bx * 0.06 + now * 0.0011) * 1.1 + Math.cos(by * 0.07 + now * 0.0014) * 1.1;
+  }
+  pos.needsUpdate = true;
+  lavaMat.emissiveIntensity = 1.25 + Math.sin(now * 0.002) * 0.35;
 
   /* --- 20Hz uplink --- */
   if (G.started && G.socket && G.role === 'player' && local.alive) {

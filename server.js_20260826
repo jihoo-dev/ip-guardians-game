@@ -53,8 +53,7 @@ const HEX_SIZE = 3.2;           // circumradius of one hex tile
 const HEX_THICKNESS = 1.0;
 const GRID_RADIUS = 5;          // 5 rings => 91 tiles per layer
 const TRAP_CHANCE = 0.11;
-const SEA_Y = -20;              // 구름바다 높이. 여기 아래로 떨어지면 탈락
-const THEME_COUNT = 3;          // 배경 맵 개수 (public/assets/bg)
+const LAVA_Y = -20;
 
 const LAYERS = [
   { index: 3, y: 30, color: '#00ffcc', name: '우선심사 패스트트랙 레이어', short: 'FAST-TRACK' },
@@ -150,7 +149,6 @@ function createRoom() {
   const room = {
     id,
     seed: (Math.random() * 0xffffffff) >>> 0,
-    theme: Math.floor(Math.random() * THEME_COUNT),   // 배경 맵. 회차마다 새로 뽑습니다
     map: null,
     tileState: new Map(),   // tileId -> 'idle' | 'warning' | 'broken'
     players: new Map(),     // socketId -> player
@@ -166,7 +164,7 @@ function createRoom() {
   room.map = buildMap(room.seed);
   for (const t of room.map.tiles) room.tileState.set(t.id, 'idle');
   rooms.set(id, room);
-  console.log('[room] created ' + id + ' seed=' + room.seed + ' theme=' + room.theme);
+  console.log('[room] created ' + id + ' seed=' + room.seed);
   return room;
 }
 
@@ -247,7 +245,6 @@ function publicPlayer(p) {
 function roomSnapshotMeta(room) {
   return {
     roomId: room.id,
-    theme: room.theme,
     phase: room.phase,
     phaseEndsAt: room.phaseEndsAt,
     alive: aliveCount(room),
@@ -385,12 +382,6 @@ function resetRoom(room) {
   }
 
   room.seed = (Math.random() * 0xffffffff) >>> 0;
-  // 같은 배경이 연달아 나오지 않게 직전 테마는 제외하고 뽑습니다
-  if (THEME_COUNT > 1) {
-    let t = Math.floor(Math.random() * (THEME_COUNT - 1));
-    if (t >= room.theme) t++;
-    room.theme = t;
-  }
   room.map = buildMap(room.seed);
   room.tileState = new Map();
   for (const t of room.map.tiles) room.tileState.set(t.id, 'idle');
@@ -432,7 +423,6 @@ function resetRoom(room) {
 
   io.to(room.id).emit('map_reset', {
     seed: room.seed,
-    theme: room.theme,
     map: room.map,
     players: [...room.players.values()].map(publicPlayer),
     meta: roomSnapshotMeta(room)
@@ -529,7 +519,7 @@ io.on('connection', (socket) => {
     now: Date.now(),
     config: {
       MAX_PLAYERS, TICK_HZ, HEX_SIZE, HEX_THICKNESS, GRID_RADIUS,
-      SEA_Y, LAYERS, FUSE_NORMAL_MS, FUSE_TRAP_MS,
+      LAVA_Y, LAYERS, FUSE_NORMAL_MS, FUSE_TRAP_MS,
       BOOSTER_TTL_MS, OBSTACLE_FALL_MS,
       BOOSTER_COOLDOWN_MS, OBSTACLE_COOLDOWN_MS
     }
@@ -574,7 +564,6 @@ io.on('connection', (socket) => {
       name,
       roomId: room.id,
       seed: room.seed,
-      theme: room.theme,
       map: room.map,
       brokenTiles: brokenTileIds(room),
       players: [...room.players.values()].map(publicPlayer),
@@ -632,7 +621,7 @@ io.on('connection', (socket) => {
       name: p.name,
       color: p.color,
       placement: p.placement,
-      cause: typeof data.cause === 'string' ? data.cause.slice(0, 24) : 'fall',
+      cause: typeof data.cause === 'string' ? data.cause.slice(0, 24) : 'lava',
       alive: aliveCount(room)
     });
 
