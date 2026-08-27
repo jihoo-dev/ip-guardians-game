@@ -79,33 +79,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
 @keyframes stamp{from{transform:rotate(-7deg) scale(2.1);opacity:0}to{transform:rotate(-7deg) scale(1);opacity:1}}
 .doc[data-l="3"]{--layer-c:var(--l3)} .doc[data-l="2"]{--layer-c:var(--l2)} .doc[data-l="1"]{--layer-c:var(--l1)}
 
-/* ── 개발용 테스트 모드 (body.dev) ────────────────────────────────────
- * 레이어 안내문은 평소 거의 투명한 배경(6% 흰색)이라, 밝은 배경 테마에서는
- * 흰 글씨가 하늘에 묻혀 읽기 어렵습니다. 개발 모드에서는 뒤에 검정 60%
- * 박스를 깔아 배경이 밝든 어둡든 항상 읽히게 합니다.
- * 클릭하면 그 층으로 이동하므로 커서도 손가락으로 바꿉니다.            */
-/* #hud 전체가 pointer-events:none 이라 그대로는 클릭이 통과해 버립니다.
- * 개발 모드에서만 레이어 안내문이 클릭을 받도록 되살립니다.            */
-body.dev #layerStack{pointer-events:auto}
-body.dev .doc{
-  background:rgba(0,0,0,.6);
-  border-color:rgba(236,231,216,.34);
-  cursor:pointer;
-  /* 글자 자체에도 옅은 그림자를 줘서 밝은 배경에서 윤곽이 살아납니다 */
-  text-shadow:0 1px 3px rgba(0,0,0,.85);
-}
-body.dev .doc:hover{background:rgba(0,0,0,.78);border-color:rgba(236,231,216,.6)}
-body.dev .doc.on{background:rgba(0,0,0,.72)}
-/* 배경이 어두워진 만큼 보조 텍스트 대비도 올립니다 */
-body.dev .doc .no{color:rgba(236,231,216,.62)}
-body.dev .doc .alt{color:rgba(236,231,216,.55)}
-/* 개발 모드임을 화면에서도 알 수 있게 배지를 답니다 */
-body.dev #layerStack::before{
-  content:'DEV MODE · 클릭하면 이동';
-  font-family:var(--mono);font-size:9px;letter-spacing:.14em;
-  color:var(--ink);background:var(--gold);padding:3px 7px;align-self:flex-start;
-}
-
 /* ------------------------------------------------------- roster (right) -- */
 #roster{position:absolute;right:18px;top:96px;width:212px;display:flex;flex-direction:column;gap:6px;
   max-height:calc(100vh - 190px)}
@@ -290,7 +263,7 @@ input[type=text]{
   </div>
 
   <div id="diag" class="panel"><b>진단 F2</b><div id="diagBody">대기</div></div>
-  <div id="hint">WASD 이동 · SPACE 점프 · SHIFT 질주 · 마우스 드래그로 시점 회전<br><b>일반 타일 3회</b> · 함정 블록 1회에 붕괴</div>
+  <div id="hint">WASD 이동 · SPACE 점프 · SHIFT 질주 · 마우스 드래그로 시점 회전</div>
 </div>
 
 <div id="mixer" class="panel">
@@ -306,7 +279,7 @@ input[type=text]{
   <div class="card">
     <div class="eyebrow">KIPO SURVIVAL PROTOCOL · 3-LAYER</div>
     <h1>바닥이 무너지기 전에<br><em>등록결정</em>까지 살아남으세요.</h1>
-    <p class="sub">일반 특허 심사 타일은 <b>3번 밟으면</b> 무너집니다. 밟을수록 색이 옅어지고 균열이 갑니다. 무단 카피캣 함정 블록은 <b>한 번에</b> 붕괴합니다. 정원이 차면 대기 발판이 사라지며 시작됩니다. 1층 아래로 떨어지면 구름바다에 빠져 탈락합니다. 마지막 한 명이 등록결정을 받습니다.</p>
+    <p class="sub">밟은 특허 심사 타일은 0.8초 뒤 붕괴합니다. 무단 카피캣 함정 블록은 0.2초. 정원이 차면 대기 발판이 사라지며 시작됩니다. 1층 아래로 떨어지면 구름바다에 빠져 탈락합니다. 마지막 한 명이 등록결정을 받습니다.</p>
     <div class="field">
       <label for="nameInput">출원인 이름</label>
       <input type="text" id="nameInput" maxlength="14" placeholder="예: 김심사" autocomplete="off" />
@@ -387,25 +360,8 @@ const PLAYER = {
 const NET = {
   SEND_HZ: 20,
   INTERP_DELAY_MS: 110,   // render remotes this far in the past
-  EXTRAPOLATE_CAP_MS: 260, // never dead-reckon further than this
-
-  /* 추측 항법(dead reckoning) 튜닝값.
-   *
-   * SNAP_DIST 가 이 알고리즘의 안전장치입니다. 렌더 위치와 서버가 말하는
-   * 위치가 이만큼 벌어지면 보간을 포기하고 그 자리로 텔레포트시킵니다.
-   * 벌어지는 경우는 대개 셋입니다 — 패킷이 길게 끊겼다 몰아서 도착,
-   * 탭이 백그라운드로 갔다 복귀, 서버가 위치를 강제 보정. 이때 계속
-   * 부드럽게 따라가면 상대가 허공을 길게 미끄러지며 날아갑니다.
-   *
-   * 2.0 은 캐릭터 폭(1.56)보다 조금 큰 값입니다. 이보다 작게 잡으면
-   * 평상시 지터에도 스냅이 걸려 오히려 뚝뚝 끊겨 보입니다.              */
-  SNAP_DIST: 2.0,          // 이 이상 어긋나면 보간 포기하고 강제 스냅
-  SMOOTH_HALFLIFE: 0.055,  // 잔여 오차를 절반으로 줄이는 데 걸리는 시간(초)
-  GROUND_EPS: 0.05         // 착지 예측 시 바닥에 이만큼 띄워 둡니다
+  EXTRAPOLATE_CAP_MS: 260 // never dead-reckon further than this
 };
-/* 매 프레임 제곱근을 피하려고 미리 제곱해 둡니다.
- * SNAP_DIST 에서 파생시켜야 둘이 어긋날 일이 없습니다.                  */
-NET.SNAP_DIST_SQ = NET.SNAP_DIST * NET.SNAP_DIST;
 
 /* ============================ 1. DOM helpers ============================ */
 
@@ -451,16 +407,16 @@ const G = {
   pedestalsActive: true,
   seats: 4,
   layerTiles: { 1: [], 2: [], 3: [] },
-  // 서버 config 를 받기 전에도 어긋나지 않도록 새 규격과 같은 값으로 둡니다
-  layerY: { 1: 0, 2: 12, 3: 24 },
-  seaY: -16,
-  hexSize: 3.2 / 1.5,
-  hexThick: 0.7,
+  layerY: { 1: 0, 2: 15, 3: 30 },
+  seaY: -20,
+  hexSize: 3.2,
+  hexThick: 1.0,
   players: new Map(),      // id -> remote record (includes self meta)
   boosters: new Map(),
   obstacles: new Map(),
   selfAlive: true,
   selfLayer: 3,
+  steppedTiles: new Set(),
   serverOffset: 0,
   rtt: 0,
   specTarget: null,
@@ -484,7 +440,7 @@ scene.background = new THREE.Color(0x05060a);
 scene.fog = new THREE.FogExp2(0x05060a, 0.0075);
 
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 800);
-camera.position.set(0, 40, 30);   // 층 높이가 낮아진 만큼 초기 위치도 내림
+camera.position.set(0, 46, 34);
 
 const hemiLight = new THREE.HemisphereLight(0x9fd8ff, 0x180a24, 0.75);
 scene.add(hemiLight);
@@ -1033,89 +989,21 @@ const LAYER_COLORS = { 3: 0x00ffcc, 2: 0x0088ff, 1: 0xaa00ff };
 const TRAP_COLOR = 0x6b0d12;
 
 let hexGeo = null, trapGeo = null;
-let geoHexSize = 0;   // 공유 지오메트리를 만든 시점의 타일 크기 (달라지면 재생성)
-
-/* pointy-top → flat-top 교정각. 타일·대기 발판 모두 이 값을 써서 방향을 맞춥니다.
- * 이 값을 빼면 육각형이 30도 돌아간 채로 놓여 이웃과 반드시 겹칩니다.   */
-const HEX_THETA = Math.PI / 6;
-
-/* 육각형 판정에 쓰는 상수 (매 프레임 호출되므로 미리 계산해 둡니다) */
-const SQRT3 = Math.sqrt(3);          // 1.7320508
-const SQRT3_2 = SQRT3 / 2;           // 0.8660254
-
-/* ── 타일 크기에 연동되는 이펙트 치수 ─────────────────────────────────
- * 예전에는 3.6 / 4.6 / 0.55 처럼 옛 타일 크기(3.2)를 전제한 숫자가 여기저기
- * 박혀 있었습니다. 타일이 작아지면 부스터가 타일 두 칸을 덮어버리는 식으로
- * 어긋나므로, 전부 G.hexSize 기준 배율로 바꿉니다.                    */
-const FX = {
-  BOOSTER_R: 1.15,     // 부스터 반경 = hexSize × 1.15
-  BOOSTER_RING_IN: 1.18, BOOSTER_RING_OUT: 1.62,
-  OBS_W: 1.5, OBS_D: 1.1,          // 장애물 가로/세로
-  OBS_RING_IN: 0.9, OBS_RING_OUT: 1.4,
-  DEBRIS_SPREAD: 1.1               // 파편이 흩어지는 반경
-};
-
-/** 부스터 충돌 반경의 제곱. 매 프레임 3곳에서 쓰이므로 함수로 뽑았습니다. */
-function boosterR2() {
-  const r = (G.hexSize || 3.2 / 1.5) * FX.BOOSTER_R;
-  return r * r;
-}
 
 function mapCfg() {
   const c = G.cfg || {};
   return {
-    HEX_SIZE: c.HEX_SIZE || (3.2 / 1.5),
-    HEX_THICKNESS: c.HEX_THICKNESS || 0.7,
-    SEA_Y: (c.SEA_Y !== undefined ? c.SEA_Y : -16),
-    LAYERS: c.LAYERS || [{ index: 3, y: 24 }, { index: 2, y: 12 }, { index: 1, y: 0 }]
+    HEX_SIZE: c.HEX_SIZE || 3.2,
+    HEX_THICKNESS: c.HEX_THICKNESS || 1.0,
+    SEA_Y: (c.SEA_Y !== undefined ? c.SEA_Y : -20),
+    LAYERS: c.LAYERS || [{ index: 3, y: 30 }, { index: 2, y: 15 }, { index: 1, y: 0 }]
   };
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
- * 개발용 테스트 모드 (클라이언트 측)
- * ───────────────────────────────────────────────────────────────────────
- * 켜고 끄는 곳은 server.js 의 DEV_MODE 상수 하나뿐입니다. 여기서는 서버가
- * server_hello 로 알려준 값을 그대로 받아 적용만 합니다.                */
-const DEV = { on: false };
-
-function applyDevMode(on) {
-  if (DEV.on === on) return;
-  DEV.on = on;
-  document.body.classList.toggle('dev', on);   // CSS(배경 박스)를 켜는 스위치
-  if (on) {
-    toast('개발용 테스트 모드 — 타일이 무너지지 않고 탈락도 없습니다', 'cheer');
-    toast('왼쪽 레이어 안내문을 클릭하면 그 층으로 이동합니다', 'cheer');
-  }
-}
-
-/* 타일이 커지면 카메라도 그만큼 물러나야 시야가 종전과 비슷해집니다.
- * HEX_SIZE 기준값(3.2) 대비 비율로 계산하므로, 나중에 타일 크기를 또 바꿔도
- * 카메라가 알아서 따라옵니다. 곱셈 누적을 피하려고 항상 기준값에서 새로
- * 계산합니다 (buildMap 은 맵이 새로 깔릴 때마다 다시 호출됩니다).      */
-/* 카메라 기준값. 타일이 작아지고 아레나가 넓어진 만큼 조금 물러서고,
- * 줌 범위도 넓혔습니다 (종전 20 / 10~46 / 높이 3.2).
- * 캐릭터 크기는 그대로이므로 높이는 오히려 살짝 낮춥니다.              */
-const CAM = { DIST: 24, MIN: 12, MAX: 58, HEIGHT: 3.0 };
-/* 이 기준값이 어떤 타일 크기를 전제로 잡힌 값인지. 서버가 다른 크기를
- * 내려주면 그 비율만큼 카메라가 따라 움직입니다 (지금은 1.0).          */
-const HEX_SIZE_BASE = 3.2 / 1.5;
-const CAM_BASE = { dist: CAM.DIST, min: CAM.MIN, max: CAM.MAX, height: CAM.HEIGHT };
-
-function applyWorldScale(hexSize) {
-  const s = (hexSize || HEX_SIZE_BASE) / HEX_SIZE_BASE;
-  cam.scale = s;
-  cam.minDist = CAM_BASE.min * s;
-  cam.maxDist = CAM_BASE.max * s;
-  cam.height = CAM_BASE.height * s;
-  cam.targetDist = THREE.MathUtils.clamp(CAM_BASE.dist * s, cam.minDist, cam.maxDist);
-  if (!cam.userZoomed) cam.dist = cam.targetDist;
 }
 
 function buildMap(map, cfg) {
   lastTransparencyLayer = -1;
   // clear previous map
   for (const rec of G.tiles.values()) {
-    releaseCrack(rec);            // 균열 오버레이도 같이 떼어냅니다 (안 하면 tileGroup 에 그대로 남습니다)
     tileGroup.remove(rec.mesh);
     rec.mesh.geometry = null;
     rec.mesh.material.dispose();
@@ -1130,33 +1018,9 @@ function buildMap(map, cfg) {
   if (currentTheme >= 0) buildCloudSea(THEMES[currentTheme]);
   for (const L of cfg.LAYERS) G.layerY[L.index] = L.y;
 
-  // 타일 크기가 바뀌면(DEV_MODE 전환 등) 카메라 거리도 같이 맞춥니다
-  applyWorldScale(G.hexSize);
-  // 균열 오버레이 지오메트리도 새 타일 크기에 맞춰 둡니다.
-  // 위에서 오버레이를 전부 떼어낸 뒤라 여기가 재생성하기 안전한 유일한 지점입니다.
-  ensureCrackGeo();
-
-  /* 지오메트리는 한 번 만들어 모든 타일이 공유합니다. 다만 타일 크기가
-   * 달라졌다면 (서버 DEV_MODE 를 켜고 재접속한 경우) 반드시 다시 만들어야
-   * 합니다 — 안 그러면 옛 크기 그대로 남아 물리 AABB 와 어긋납니다.    */
-  if (hexGeo && geoHexSize !== G.hexSize) {
-    hexGeo.dispose(); trapGeo.dispose();
-    hexGeo = trapGeo = null;
-    if (pedGeo) { pedGeo.dispose(); pedRingGeo.dispose(); pedGeo = pedRingGeo = null; }
-  }
   if (!hexGeo) {
-    geoHexSize = G.hexSize;
-    /* thetaStart = π/6 이 핵심입니다.
-     * CylinderGeometry(…, 6) 은 꼭짓점이 ±Z 를 향하는 pointy-top 육각형을
-     * 만드는데, 우리 좌표계(axialToWorld)는 flat-top 을 전제합니다.
-     * 30도를 돌려주지 않으면 메시가 이웃 간격보다 커져 반드시 겹칩니다.
-     *   교정 전: 가로 2·S/cos30 = 2.309·S  vs  이웃 X 간격 1.5·S
-     *   교정 후: 가로 2·S                   vs  이웃 X 간격 1.5·S  (정상)
-     * 0.985 는 타일 사이에 머리카락 굵기의 이음선을 남기기 위한 값입니다. */
-    hexGeo = new THREE.CylinderGeometry(
-      G.hexSize * 0.985, G.hexSize * 0.94, G.hexThick, 6, 1, false, HEX_THETA, Math.PI * 2);
-    trapGeo = new THREE.CylinderGeometry(
-      G.hexSize * 0.985, G.hexSize * 0.94, G.hexThick * 1.15, 6, 1, false, HEX_THETA, Math.PI * 2);
+    hexGeo = new THREE.CylinderGeometry(G.hexSize * 0.965, G.hexSize * 0.9, G.hexThick, 6, 1);
+    trapGeo = new THREE.CylinderGeometry(G.hexSize * 0.965, G.hexSize * 0.9, G.hexThick * 1.12, 6, 1);
   }
 
   // AABB half-extents of a flat-top hexagon: adjacent boxes overlap in X and
@@ -1187,20 +1051,9 @@ function buildMap(map, cfg) {
       id: t.id, layer: t.layer, trap: !!t.trap,
       x: t.x, y: t.y, z: t.z,
       top: t.y + G.hexThick / 2,
-      hexR: G.hexSize,   // 육각형 판정용 외접원 반지름
-      // AABB 는 빠른 배제용으로 남겨 둡니다 (findLanding 등에서 먼저 걸러냄)
       minX: t.x - halfX, maxX: t.x + halfX,
       minZ: t.z - halfZ, maxZ: t.z + halfZ,
       state: 'idle', warnStart: 0, fuse: 800, breakStart: 0,
-      /* 3회 밟기 규칙용.
-       *   hits        : 서버가 확정한 히트 수 (낙관적으로 올리지 않습니다)
-       *   maxHits     : 이 타일이 버티는 횟수 (함정은 1)
-       *   wear        : hits/maxHits 를 0~1 로 정규화한 마모도
-       *   myLastHitAt : 내가 마지막으로 이 타일을 때린 시각 (연타 방지)  */
-      hits: 0, maxHits: t.trap ? 1 : 3, wear: 0, myLastHitAt: -Infinity,
-      /* crack : 2회차부터 얹는 균열 오버레이 { mesh, mat, born } (없으면 null)
-       * crackShake : 금이 간 직후 타일이 흔들리는 남은 시간(초)          */
-      crack: null, crackShake: 0,
       mesh, mat, baseColor: new THREE.Color(base), baseY: t.y
     };
     G.tiles.set(t.id, rec);
@@ -1230,11 +1083,8 @@ function buildPedestals(map, cfg) {
   const scale = map.pedestalScale || 1.45;
   const R = G.hexSize * scale;
   if (!pedGeo) {
-    // 발판도 타일과 같은 flat-top 방향으로 맞춥니다 (30도 교정)
-    pedGeo = new THREE.CylinderGeometry(
-      R * 0.97, R * 0.86, G.hexThick * 1.3, 6, 1, false, HEX_THETA, Math.PI * 2);
-    // RingGeometry 는 thetaStart 가 7번째 인자입니다 (phiSegments 다음)
-    pedRingGeo = new THREE.RingGeometry(R * 1.02, R * 1.16, 6, 1, HEX_THETA, Math.PI * 2);
+    pedGeo = new THREE.CylinderGeometry(R * 0.97, R * 0.86, G.hexThick * 1.3, 6, 1);
+    pedRingGeo = new THREE.RingGeometry(R * 1.02, R * 1.16, 6);
   }
 
   // AABB. 일반 타일과 같은 방식이라 물리 코드를 그대로 씁니다.
@@ -1270,7 +1120,6 @@ function buildPedestals(map, cfg) {
       id: p.id, seat: p.seat,
       x: p.x, y: p.y, z: p.z,
       top: p.y + G.hexThick * 1.3 / 2,
-      hexR: R,           // 발판은 자기 반지름으로 판정 (타일보다 큼)
       minX: p.x - halfX, maxX: p.x + halfX,
       minZ: p.z - halfZ, maxZ: p.z + halfZ,
       mesh, mat, ring, baseY: p.y,
@@ -2347,12 +2196,12 @@ function animateAvatar(av, dt, speed01, state) {
 /* ============================ 6. local runner =========================== */
 
 const local = {
-  pos: new THREE.Vector3(0, 24.35, 0),
+  pos: new THREE.Vector3(0, 30.5, 0),
   vel: new THREE.Vector3(0, 0, 0),
   ry: 0,
   grounded: false,
   groundTile: null,
-  lastGroundY: 24.35,   // 마지막으로 서 있던 바닥 높이
+  lastGroundY: 30.5,   // 마지막으로 서 있던 바닥 높이
   jumped: false,       // 점프로 떠올랐는지 (발을 헛디딘 것과 구분)
   layer: 3,
   anim: 'idle',
@@ -2376,14 +2225,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
-/* minDist/maxDist/height 는 타일 크기에 따라 applyWorldScale 이 다시 채웁니다.
- * userZoomed 는 사용자가 휠을 돌린 적이 있는지 — 있으면 맵이 새로 깔려도
- * 사용자가 맞춰 둔 줌을 존중해 강제로 되돌리지 않습니다.               */
-const cam = {
-  yaw: 0, pitch: 0.62, dist: CAM.DIST, targetDist: CAM.DIST, height: CAM.HEIGHT,
-  minDist: CAM.MIN, maxDist: CAM.MAX, scale: 1, userZoomed: false,
-  dragging: false, lx: 0, ly: 0
-};
+const cam = { yaw: 0, pitch: 0.62, dist: 20, targetDist: 20, height: 3.2, dragging: false, lx: 0, ly: 0 };
 
 renderer.domElement.addEventListener('mousedown', (e) => {
   cam.dragging = true; cam.lx = e.clientX; cam.ly = e.clientY;
@@ -2397,10 +2239,7 @@ window.addEventListener('mousemove', (e) => {
 });
 renderer.domElement.addEventListener('wheel', (e) => {
   e.preventDefault();
-  cam.userZoomed = true;
-  // 줌 감도와 한계도 월드 스케일을 따릅니다 (타일이 크면 같은 휠에 더 멀리)
-  cam.targetDist = THREE.MathUtils.clamp(
-    cam.targetDist + e.deltaY * 0.02 * cam.scale, cam.minDist, cam.maxDist);
+  cam.targetDist = THREE.MathUtils.clamp(cam.targetDist + e.deltaY * 0.02, 10, 46);
 }, { passive: false });
 
 window.addEventListener('resize', () => {
@@ -2417,40 +2256,9 @@ function aabbOverlapXZ(px, pz, rec) {
          (pz + PLAYER.HALF_Z > rec.minZ) && (pz - PLAYER.HALF_Z < rec.maxZ);
 }
 
-/**
- * 정확한 flat-top 육각형 판정 — 이 점을 이 타일이 '소유'하는가.
- *
- * 예전에는 AABB(min/max 사각형)로 판정했는데, 육각형의 바운딩 박스는 실제
- * 모양보다 네 모서리의 삼각형만큼 큽니다. 그래서 이웃 영역까지 자기 것이라
- * 주장했고, 밟지도 않은 타일이 무너지거나 이미 무너진 타일 위에 서 있는
- * 것처럼 보이는 문제가 났습니다.
- *
- * flat-top 육각형은 세 구간으로 나눠 보면 간단합니다.
- *   · |dx| > S            → 무조건 바깥
- *   · |dz| > √3/2·S       → 무조건 바깥
- *   · |dx| <= S/2         → 가운데 직사각형 구간이라 무조건 안
- *   · 그 바깥             → 좌우 빗변 아래인지 검사: |dz| <= √3·(S - |dx|)
- *
- * EPS 가 필요한 이유:
- * 공유 변 위의 점은 수학적으로 두 타일 모두에 속하지만, 부동소수점으로
- * 계산하면 양쪽에서 아슬아슬하게 탈락해 '주인 없는 점'이 생깁니다.
- * (두 중심의 정확한 중점에서 dz 가 우변보다 1e-16 만큼 커지는 식)
- * 그러면 그 자리에 선 주자가 한 프레임 발밑을 잃고 떨어집니다.
- * 경계를 아주 살짝 넉넉하게 잡아 양쪽이 모두 소유를 주장하게 두고,
- * 최종 확정은 findLanding 의 '가장 가까운 중심' 타이브레이크에 맡깁니다.
- * 겹치는 폭이 S의 10억분의 1이라 면적상 겹침은 없습니다.
- */
-const HEX_EPS = 1e-9;
-
+/** Point-in-box test — decides which hex actually *owns* the runner. */
 function pointInXZ(px, pz, rec) {
-  const S = rec.hexR || G.hexSize;
-  const eps = S * HEX_EPS;
-  const dx = Math.abs(px - rec.x);
-  if (dx > S + eps) return false;
-  const dz = Math.abs(pz - rec.z);
-  if (dz > S * SQRT3_2 + eps) return false;
-  if (dx <= S * 0.5) return true;
-  return dz <= SQRT3 * (S - dx) + eps;
+  return px >= rec.minX && px <= rec.maxX && pz >= rec.minZ && pz <= rec.maxZ;
 }
 
 /**
@@ -2478,7 +2286,7 @@ function findLanding(px, pz, prevY, nextY) {
     const surf = b.y + 0.5;
     if (prevY < surf - 0.02 || nextY > surf) continue;
     const dx = px - b.x, dz = pz - b.z;
-    if (dx * dx + dz * dz > boosterR2()) continue;
+    if (dx * dx + dz * dz > 3.6 * 3.6) continue;
     if (!best || surf > best.surf) best = { surf, tile: null, layer: b.layer || currentLayerOf(surf), booster: b };
   }
 
@@ -2515,7 +2323,7 @@ function supportAt(px, pz, feetY) {
     const surf = b.y + 0.5;
     if (Math.abs(feetY - surf) > 0.12) continue;
     const dx = px - b.x, dz = pz - b.z;
-    if (dx * dx + dz * dz <= boosterR2()) return { tile: null, layer: currentLayerOf(surf), surf, booster: b };
+    if (dx * dx + dz * dz <= 3.6 * 3.6) return { tile: null, layer: currentLayerOf(surf), surf, booster: b };
   }
   if (G.pedestalsActive) {
     for (const rec of G.pedestals.values()) {
@@ -2545,7 +2353,7 @@ function groundYUnder(px, pz, fromY) {
     const surf = b.y + 0.5;
     if (surf > fromY + 0.05) continue;
     const dx = px - b.x, dz = pz - b.z;
-    if (dx * dx + dz * dz <= boosterR2() && surf > best) best = surf;
+    if (dx * dx + dz * dz <= 3.6 * 3.6 && surf > best) best = surf;
   }
   if (G.pedestalsActive) {
     for (const rec of G.pedestals.values()) {
@@ -2681,10 +2489,7 @@ function stepPhysics(dt) {
   // ---- 대기 중 이탈 방지 ----
   // 게임 시작 전에는 발판에서 떨어져도 탈락시키지 않고 제자리로 돌립니다.
   // 먼저 내려간 사람이 유리해지는 것을 막기 위해서입니다.
-  //
-  // 단, 개발 모드에서는 이 복귀를 끕니다. 대기 중에 레이어를 클릭해 내려가도
-  // 곧바로 발판으로 튕겨 올라와 버려서 층 확인이 불가능하기 때문입니다.
-  if (G.phase !== 'playing' && !DEV.on) {
+  if (G.phase !== 'playing') {
     const myPed = pedestalForSeat(local.seat);
     if (myPed && local.pos.y < myPed.top - 3) {
       local.pos.set(myPed.x, myPed.top, myPed.z);
@@ -2706,46 +2511,19 @@ function stepPhysics(dt) {
   if (Math.abs(local.pos.x) > 170 || Math.abs(local.pos.z) > 170) beginFallOut();
 }
 
-/* 같은 타일에 연속으로 히트를 주지 않기 위한 최소 간격.
- * onSteppedOn 은 매 물리 프레임(60Hz) 호출되므로 이 쿨다운이 없으면
- * 가만히 서 있기만 해도 몇 프레임 만에 3히트가 쌓여 즉시 무너집니다.   */
-const TILE_HIT_COOLDOWN_MS = 400;
-
-/**
- * 타일을 밟았다고 서버에 보고합니다.
- *
- * 예전에는 "라운드당 타일별 1회"만 보냈지만(steppedTiles Set), 이제는
- * 여러 사람이 나눠 밟아 3회를 채우는 규칙이라 그 가드를 쓸 수 없습니다.
- * 대신 '내가 이 타일을 마지막으로 때린 시각'만 기억해 연타를 막습니다.
- * 다른 사람이 밟는 것, 내가 떠났다 다시 밟는 것은 그대로 허용됩니다.
- *
- * 낙관적 렌더링(예전의 startWarn 즉시 호출)은 하지 않습니다. 3회 규칙에서
- * 첫 밟기에 경고 점멸을 띄우면 곧 무너질 것처럼 보여 거짓 정보가 됩니다.
- * 마모 표현은 서버의 tile_hit / tile_warn 을 받아서 반영합니다.
- */
+/** Fire tile_step exactly once per tile per round. */
 function onSteppedOn(rec) {
-  if (!rec || rec.state === 'gone' || rec.state === 'warn') return;
+  if (!rec || rec.state !== 'idle') return;
+  if (G.steppedTiles.has(rec.id)) return;
   if (G.phase !== 'playing') return;
-
-  const now = performance.now();
-  if (now - rec.myLastHitAt < TILE_HIT_COOLDOWN_MS) return;
-  rec.myLastHitAt = now;
-
+  G.steppedTiles.add(rec.id);
+  // optimistic local warning so the feedback is instant; server re-syncs below
+  startWarn(rec, rec.trap ? 200 : 800);
   G.socket.emit('tile_step', { tileId: rec.id });
-}
-
-/* 개발 모드에서 구름바다까지 떨어졌을 때 — 탈락시키지 않고 최상층 위로
- * 되돌려 계속 테스트할 수 있게 합니다.                                  */
-function reviveForDev() {
-  const topLayer = G.cfg && G.cfg.LAYERS ? G.cfg.LAYERS[0].index : 3;
-  devTeleport(topLayer);
-  toast('개발 모드 — 최상층으로 되돌렸습니다', 'cheer');
 }
 
 /* 구름을 뚫고 들어가는 연출을 시작합니다. 실제 탈락 처리는 끝난 뒤에. */
 function beginFallOut() {
-  // 개발 모드: 가라앉는 연출 없이 곧바로 최상층으로 되돌립니다
-  if (DEV.on) { reviveForDev(); return; }
   if (local.dying || !local.alive) return;
   local.dying = 0.75;
   local.anim = 'fall';
@@ -2782,9 +2560,6 @@ function updateFallOut(dt) {
 }
 
 function eliminateSelf(cause) {
-  /* 개발 모드: 떨어져도 탈락시키지 않습니다. 서버도 player_death 를 무시하지만,
-   * 여기서 먼저 막아야 화면이 붉게 번쩍이거나 아바타가 사라지지 않습니다.  */
-  if (DEV.on) { reviveForDev(); return; }
   if (!local.alive) return;
   local.alive = false;
   G.selfAlive = false;
@@ -2798,375 +2573,7 @@ function eliminateSelf(cause) {
   toast('심사 탈락 — 이제 관전자로 개입할 수 있습니다', 'kill');
 }
 
-/* --- 개발 모드: 레이어 안내문 클릭 → 그 층으로 순간이동 ---------------
- * 층별 기능을 확인할 때 매번 떨어져서 내려갈 필요가 없게 합니다.
- * 서버가 DEV_MODE=false 를 내려주면 클릭해도 아무 일이 없습니다.       */
-function devTeleport(layerIndex) {
-  if (!DEV.on) return;
-  if (G.role !== 'player') { toast('관전 중에는 이동할 수 없습니다', 'kill'); return; }
-
-  const y = G.layerY[layerIndex];
-  if (y === undefined) return;
-
-  /* 그 층에서 실제로 살아 있는 타일 위에 내려놓습니다. 맵 한가운데가
-   * 이미 무너져 있을 수도 있으니, 중심에서 가장 가까운 성한 타일을 고릅니다.
-   * (개발 모드에선 타일이 안 무너지지만, 모드를 끈 채 켜 둔 탭에서도
-   *  안전하게 동작하도록 이렇게 둡니다.)                                */
-  let best = null, bestD = Infinity;
-  for (const rec of (G.layerTiles[layerIndex] || [])) {
-    if (rec.state === 'gone') continue;
-    const d = rec.x * rec.x + rec.z * rec.z;
-    if (d < bestD) { bestD = d; best = rec; }
-  }
-
-  const px = best ? best.x : 0;
-  const pz = best ? best.z : 0;
-  const py = (best ? best.top : y + G.hexThick / 2) + 0.6;
-
-  local.pos.set(px, py, pz);
-  local.vel.set(0, 0, 0);
-  local.grounded = false;
-  local.jumped = false;
-  local.dying = 0;
-  local.stagger = 0;
-  local.layer = layerIndex;
-  local.lastGroundY = py;
-
-  // 떨어져 있던 상태에서 눌렀다면 되살립니다
-  if (!local.alive) {
-    local.alive = true;
-    G.selfAlive = true;
-    local.anim = 'idle';
-    if (local.avatar) {
-      local.avatar.group.visible = true;
-      local.avatar.group.rotation.set(0, 0, 0);
-      local.avatar.group.scale.set(1, 1, 1);
-    }
-    dom.deadFlash.classList.remove('on');
-  }
-
-  applyLayerTransparency(layerIndex);
-  toast('LAYER 0' + layerIndex + ' 로 이동했습니다', 'cheer');
-}
-
-for (const d of dom.docs) {
-  d.addEventListener('click', () => {
-    const L = parseInt(d.dataset.l, 10);
-    if (!isNaN(L)) devTeleport(L);
-  });
-}
-
 /* ============================ 9. tile FX =============================== */
-
-/* ── 타일 마모 표현 ───────────────────────────────────────────────────
- * 일반 타일은 3번 밟아야 무너집니다. 남은 내구도를 한눈에 읽을 수 있어야
- * 하므로 단계마다 다르게 보이게 합니다.
- *   1회차: 색이 옅어지고 살짝 가라앉음
- *   2회차: 더 옅어지고 회색조 + 균열 오버레이 + 미세한 떨림
- *   3회차: 기존 경고 점멸 → 붕괴 (startWarn 이 담당)
- *
- * ── 균열을 왜 "별도 메시"로 얹는가 ────────────────────────────────
- * 예전에는 rec.mat.map 에 균열 텍스처를 끼워 넣었습니다. 그런데 타일은
- * CylinderGeometry(…, 6) 이라 옆면/윗면/아랫면 세 그룹이 단일 머티리얼을
- * 공유합니다. map 을 넣으면 옆면에도 균열이 늘어붙어 "금이 간 표면"이
- * 아니라 "무늬가 감긴 기둥"으로 보였습니다. 머티리얼 배열로 쪼개면
- * rec.mat.color / emissiveIntensity / opacity 를 참조하는 코드가 전부
- * 깨지므로, 타일 위에 얇은 육각 평면을 한 장 얹는 쪽을 택했습니다.
- * (덤: road_texture.png 가 늦게 로드돼 mat.map 을 덮어써도 안전해졌습니다)
- * ------------------------------------------------------------------ */
-
-/* 오버레이 지오메트리 — 균열 타일 전부가 공유합니다.
- * CircleGeometry(R, 6) 을 rotation.x = -π/2 로 눕히면 꼭짓점이 (±R,0,0) 에
- * 오는 flat-top 육각형이 되어 타일 본체와 방향이 정확히 맞습니다.
- * thetaStart 는 넣지 마세요 — 타일 본체(CylinderGeometry)는 π/6 교정이
- * 필요하지만 CircleGeometry 는 기준축이 달라 기본값 0 이 정답입니다.
- * 0.94 는 타일 상판(0.985)보다 살짝 안쪽입니다. 상판과 같은 크기로 두면
- * 안티에일리어싱 때문에 가장자리에서 균열이 잘린 것처럼 보입니다.      */
-let crackGeo = null;
-let crackGeoSize = 0;            // 이 지오메트리를 만든 시점의 hexSize
-function ensureCrackGeo() {
-  const s = G.hexSize || HEX_SIZE_BASE;
-  if (crackGeo && crackGeoSize === s) return crackGeo;
-  // 타일 크기가 바뀌는 건 buildMap 뿐이고, 그때 오버레이는 이미 전부
-  // 떼어낸 뒤이므로 여기서 dispose 해도 살아 있는 참조가 남지 않습니다.
-  if (crackGeo) crackGeo.dispose();
-  crackGeoSize = s;
-  crackGeo = new THREE.CircleGeometry(s * 0.94, 6);
-  return crackGeo;
-}
-
-/* ── 균열 텍스처 ─────────────────────────────────────────────────────
- * 타일마다 새로 그리면 비싸고, 한 장만 돌려 쓰면 아레나 전체가 똑같은
- * 무늬로 도배됩니다. 변형 5종을 한 번 만들어 두고 타일 id 해시로 골라
- * 씁니다 (같은 타일은 언제 봐도 같은 균열 모양).                      */
-const CRACK_VARIANTS = 5;
-const CRACK_TEX_N = 512;
-const CRACK_LIMIT_R = 235;                  // 0.46 × 512. 이 밖으로 나가면 육각형에 잘립니다
-const CRACK_GROW_R = CRACK_LIMIT_R - 6;     // 선 두께(최대 반폭 ~2.5px)만큼 여유를 둡니다
-const CRACK_GROW_MS = 220;                  // 균열이 퍼지는 시간
-const CRACK_SHAKE_S = 0.18;                 // 금 갈 때 타일이 흔들리는 시간(초)
-const CRACK_WARN_TINT = 0xffb0b0;           // 3회차(경고)에서 흰 텍스처를 붉게 물들입니다
-let crackTextures = null;
-
-/* 시드 난수(mulberry32). Math.random() 을 쓰면 변형 5종이 새로고침마다
- * 달라져 "3번 변형이 이상하다" 같은 지적을 재현할 수가 없습니다.      */
-function mulberry32(a) {
-  return function () {
-    a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/* 균열 경로 계산. 그리기(캔버스)와 일부러 분리했습니다.
- *   1) 같은 경로를 그림자·하이라이트 2패스로 두 번 그려야 하고
- *   2) 캔버스 없이도 "반경 235px 안에 들어오는지"를 검증할 수 있습니다
- *
- * 모양을 잡을 때 실제로 보고 고친 것들:
- *   · 세그먼트마다 각도를 ±22° 흔들었더니 선이 부드럽게 휘어 "나뭇가지"로
- *     보였습니다. 유리·콘크리트 균열은 한동안 직진하다 한 번 꺾입니다.
- *     → 지터를 ±12° 로 줄이고 세그먼트를 길게(반경의 10~16%) 잡았습니다.
- *   · 방사 균열만 있으면 "별표"로 보입니다. 인접한 두 갈래를 잇는 연결
- *     균열(concentric)이 있어야 조각으로 나뉜 판으로 읽힙니다. 이게 가장
- *     결정적이었습니다.
- *   · 3~4갈래는 위에서 내려다보는 카메라 거리에서 너무 성깁니다. 5~6갈래로
- *     늘리고 2단계까지 갈라지게 했습니다.                                */
-function crackStrokes(seed) {
-  const rnd = mulberry32(seed * 9176 + 1013);
-  const c = CRACK_TEX_N / 2;
-  const strokes = [];            // { ax, ay, bx, by, w }
-  const rFrom = (x, y) => Math.hypot(x - c, y - c);
-
-  /** 한 줄기를 바깥으로 전진시킵니다. 반경 한계에 닿으면 거기서 멈춥니다. */
-  function grow(sx, sy, ang, segs, lenLo, lenHi, w0, w1) {
-    let x = sx, y = sy, a = ang;
-    const path = [[x, y]];
-    for (let s = 0; s < segs; s++) {
-      a += (rnd() - 0.5) * 0.42;                                  // 매 세그먼트 ±12°
-      const len = CRACK_GROW_R * (lenLo + rnd() * (lenHi - lenLo));
-      const nx = x + Math.cos(a) * len, ny = y + Math.sin(a) * len;
-      if (rFrom(nx, ny) > CRACK_GROW_R) break;                    // 육각형 밖으로는 안 나갑니다
-      const t = segs > 1 ? s / (segs - 1) : 1;
-      strokes.push({ ax: x, ay: y, bx: nx, by: ny, w: w0 + (w1 - w0) * t });
-      x = nx; y = ny;
-      path.push([x, y]);
-    }
-    return path;
-  }
-
-  /** 두 점을 지그재그로 잇습니다 (연결 균열 전용 — 바깥으로 뻗지 않습니다) */
-  function link(p, q, w) {
-    const n = 3;
-    let px = p[0], py = p[1];
-    // 직선으로 이으면 자로 그은 티가 납니다. 수직 방향으로 조금씩 밀어줍니다.
-    const nx = -(q[1] - p[1]), ny = q[0] - p[0];
-    const nl = Math.hypot(nx, ny) || 1;
-    for (let i = 1; i <= n; i++) {
-      const t = i / n;
-      const off = (i === n ? 0 : (rnd() - 0.5) * 26);
-      const qx = p[0] + (q[0] - p[0]) * t + (nx / nl) * off;
-      const qy = p[1] + (q[1] - p[1]) * t + (ny / nl) * off;
-      if (rFrom(qx, qy) > CRACK_GROW_R) return;
-      strokes.push({ ax: px, ay: py, bx: qx, by: qy, w });
-      px = qx; py = qy;
-    }
-  }
-
-  // 충격점 — 정중앙에 못을 박은 듯 보이지 않게 반경 30px 안에서 흔듭니다
-  const sa = rnd() * Math.PI * 2, sr = rnd() * 30;
-  const ox = c + Math.cos(sa) * sr, oy = c + Math.sin(sa) * sr;
-
-  // 주 균열 5~6개 — 시작 각도를 균등 분할한 뒤 ±25° 지터
-  const armCount = 5 + ((rnd() * 2) | 0);
-  const arms = [];
-  for (let i = 0; i < armCount; i++) {
-    const a0 = (i / armCount) * Math.PI * 2 + (rnd() - 0.5) * 0.87;
-    const segs = 6 + ((rnd() * 4) | 0);
-    const main = grow(ox, oy, a0, segs, 0.10, 0.16, 4.4, 1.1);
-    if (main.length < 3) continue;
-    arms.push(main);
-
-    // 부 균열 — 주 균열의 30~65% 지점에서 1~2개 갈라져 나옵니다
-    const branches = 1 + ((rnd() * 2) | 0);
-    for (let b = 0; b < branches; b++) {
-      const bi = Math.max(1, Math.min(main.length - 1,
-        Math.round(main.length * (0.30 + rnd() * 0.35))));
-      const prev = main[bi - 1], at = main[bi];
-      const baseAng = Math.atan2(at[1] - prev[1], at[0] - prev[0]);
-      const side = rnd() < 0.5 ? -1 : 1;
-      // 길이는 주 균열의 40%, 두께는 60%
-      const sub = grow(at[0], at[1], baseAng + side * (0.55 + rnd() * 0.5),
-        Math.max(2, Math.round(segs * 0.4)), 0.08, 0.13, 4.4 * 0.6, 1.1 * 0.6);
-      // 2단계 — 잔가지에서 한 번 더. 있으면 훨씬 부서진 느낌이 납니다.
-      if (sub.length >= 3 && rnd() < 0.6) {
-        const si = 1 + ((rnd() * (sub.length - 2)) | 0);
-        const sp = sub[si - 1], st = sub[si];
-        const sAng = Math.atan2(st[1] - sp[1], st[0] - sp[0]);
-        grow(st[0], st[1], sAng + (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 0.5),
-          2, 0.07, 0.11, 4.4 * 0.36, 1.1 * 0.36);
-      }
-    }
-  }
-
-  /* 연결 균열 — 이웃한 두 갈래를 이어 판을 조각으로 나눕니다.
-   * 이게 없으면 아무리 갈래를 늘려도 "별표"로만 보입니다.            */
-  for (let i = 0; i < arms.length; i++) {
-    if (rnd() < 0.35) continue;                     // 전부 이으면 거미줄이 됩니다
-    const A = arms[i], B = arms[(i + 1) % arms.length];
-    if (A.length < 3 || B.length < 3) continue;
-    const ai = Math.max(1, Math.round(A.length * (0.45 + rnd() * 0.3)));
-    const bi = Math.max(1, Math.round(B.length * (0.45 + rnd() * 0.3)));
-    link(A[Math.min(ai, A.length - 1)], B[Math.min(bi, B.length - 1)], 1.6 + rnd() * 0.9);
-  }
-
-  /* 파편 자국 — 충격점 주변이 실제로도 가장 잘게 부서집니다 */
-  const shards = [];
-  const shardCount = 3 + ((rnd() * 3) | 0);
-  for (let i = 0; i < shardCount; i++) {
-    const a = rnd() * Math.PI * 2, d = 8 + rnd() * 46;
-    const jx = ox + Math.cos(a) * d, jy = oy + Math.sin(a) * d;
-    const verts = 3 + ((rnd() * 2) | 0);
-    const poly = [];
-    let ok = true;
-    for (let v = 0; v < verts; v++) {
-      const va = (v / verts) * Math.PI * 2 + rnd() * 0.8;
-      const r = 7 + rnd() * 14;
-      const px = jx + Math.cos(va) * r, py = jy + Math.sin(va) * r;
-      if (rFrom(px, py) > CRACK_GROW_R) { ok = false; break; }
-      poly.push([px, py]);
-    }
-    if (ok) shards.push(poly);
-  }
-
-  return { strokes, shards };
-}
-
-function makeCrackTexture(seed) {
-  const N = CRACK_TEX_N;
-  const cv = document.createElement('canvas');
-  cv.width = cv.height = N;
-  const g = cv.getContext('2d');
-  g.clearRect(0, 0, N, N);              // 배경은 완전 투명 — 균열 자국만 남깁니다
-  const paths = crackStrokes(seed);
-
-  // 파편 자국은 균열선 아래에 아주 옅게 깔립니다
-  g.fillStyle = 'rgba(0,0,0,0.18)';
-  for (const poly of paths.shards) {
-    g.beginPath();
-    g.moveTo(poly[0][0], poly[0][1]);
-    for (let i = 1; i < poly.length; i++) g.lineTo(poly[i][0], poly[i][1]);
-    g.closePath();
-    g.fill();
-  }
-
-  /* 2패스 드로잉이 이 표현의 핵심입니다. 한 겹만 그리면 그냥 낙서로
-   * 보입니다. 어두운 홈(1패스) 위에 좌상단으로 살짝 어긋난 밝은 모서리
-   * (2패스)를 얹어야 빛을 받아 "패인 균열"로 읽힙니다.               */
-  g.lineCap = 'round';
-  g.lineJoin = 'round';
-  g.strokeStyle = 'rgba(8,10,16,0.88)';
-  for (const s of paths.strokes) {
-    g.lineWidth = s.w + 1.5;
-    g.beginPath(); g.moveTo(s.ax, s.ay); g.lineTo(s.bx, s.by); g.stroke();
-  }
-  /* 하이라이트는 홈보다 가늘게, 그리고 확실히 어긋나게 그립니다.
-   * 홈과 같은 폭으로 겹쳐 그리면 선 한가운데가 하얗게 떠서 "패인 홈"이
-   * 아니라 "빛나는 선"이 됩니다. 한쪽 모서리만 물려야 입체로 읽힙니다. */
-  g.save();
-  g.translate(-1.3, -1.3);
-  g.strokeStyle = 'rgba(255,255,255,0.5)';
-  for (const s of paths.strokes) {
-    g.lineWidth = Math.max(0.6, s.w * 0.6);
-    g.beginPath(); g.moveTo(s.ax, s.ay); g.lineTo(s.bx, s.by); g.stroke();
-  }
-  g.restore();
-
-  const tex = new THREE.CanvasTexture(cv);
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.needsUpdate = true;
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  tex.encoding = THREE.sRGBEncoding;
-  return tex;
-}
-
-/** 타일 id 해시로 변형을 고릅니다 — 같은 타일은 항상 같은 균열 모양. */
-function getCrackTexture(tileId) {
-  if (!crackTextures) {
-    crackTextures = [];
-    for (let i = 0; i < CRACK_VARIANTS; i++) crackTextures.push(makeCrackTexture(i));
-  }
-  let h = 0;
-  for (let i = 0; i < tileId.length; i++) h = (h * 31 + tileId.charCodeAt(i)) | 0;
-  return crackTextures[((h % CRACK_VARIANTS) + CRACK_VARIANTS) % CRACK_VARIANTS];
-}
-
-/* 동시 균열 수 계측. F2 진단 패널에 뿌립니다 — 오버레이가 드로우콜을
- * 몇 개까지 늘리는지 실제 라운드에서 재보려고 넣었습니다.             */
-const crackStats = { live: 0, peak: 0 };
-
-/** 균열 오버레이를 타일 위에 얹습니다. */
-function attachCrack(rec) {
-  if (rec.crack) return;
-  const mat = new THREE.MeshBasicMaterial({
-    map: getCrackTexture(rec.id),
-    transparent: true,
-    opacity: 0,              // updateTiles 의 등장 애니메이션이 올립니다
-    depthWrite: false,       // 타일 상판과 0.02 차이라 안 끄면 z-fighting 이 납니다
-    toneMapped: false,
-    side: THREE.FrontSide
-  });
-  const mesh = new THREE.Mesh(ensureCrackGeo(), mat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.renderOrder = 2;
-  mesh.position.set(rec.x, rec.mesh.position.y + G.hexThick / 2 + 0.02, rec.z);
-  mesh.scale.setScalar(rec.mesh.scale.x * 0.55);
-  tileGroup.add(mesh);
-  rec.crack = { mesh, mat, born: performance.now() };
-  crackStats.live++;
-  if (crackStats.live > crackStats.peak) crackStats.peak = crackStats.live;
-}
-
-/** 오버레이를 떼어냅니다. crackGeo·텍스처는 공유 자원이라 dispose 하지 않습니다. */
-function releaseCrack(rec) {
-  if (!rec.crack) return;
-  tileGroup.remove(rec.crack.mesh);
-  rec.crack.mat.dispose();
-  rec.crack = null;
-  crackStats.live = Math.max(0, crackStats.live - 1);
-}
-
-const WEAR_WHITE = new THREE.Color(0xffffff);
-const WEAR_GREY = new THREE.Color(0x9aa0aa);
-
-/** 서버가 알려준 hits 를 재질에 반영합니다. */
-function applyTileWear(rec) {
-  const maxH = rec.maxHits || 1;
-  rec.wear = Math.min(1, rec.hits / maxH);
-
-  /* 2회차부터 균열 오버레이를 답니다. 함정 타일은 maxHits 가 1 이라
-   * 2회차 자체가 없으므로 자연히 제외됩니다 (1회 붕괴 규칙 유지).
-   * 1회차 표현(옅은 색)은 updateTiles 쪽 그대로 두고 손대지 않습니다. */
-  if (rec.hits >= 2 && maxH > 1) {
-    if (!rec.crack) {
-      attachCrack(rec);
-      rec.crackShake = CRACK_SHAKE_S;   // 금이 갈 때 짧게 흔들려야 타격감이 납니다
-    }
-  } else if (rec.crack) {
-    releaseCrack(rec);
-  }
-}
-
-/** 라운드가 새로 시작될 때 모든 타일의 마모를 지웁니다. */
-function resetTileWear() {
-  for (const rec of G.tiles.values()) {
-    rec.hits = 0;
-    rec.wear = 0;
-    rec.crackShake = 0;
-    rec.myLastHitAt = -Infinity;
-    releaseCrack(rec);
-  }
-}
 
 function startWarn(rec, fuse) {
   if (rec.state === 'gone' || rec.state === 'warn') return;
@@ -3183,14 +2590,13 @@ function breakTile(rec) {
 }
 
 const debris = [];
-const debrisGeo = new THREE.TetrahedronGeometry(0.38);   // 타일 축소에 맞춰 작게
+const debrisGeo = new THREE.TetrahedronGeometry(0.55);
 function spawnDebris(rec) {
   for (let i = 0; i < 6; i++) {
     const m = new THREE.Mesh(debrisGeo, new THREE.MeshStandardMaterial({
       color: rec.baseColor, emissive: rec.baseColor, emissiveIntensity: 0.6, transparent: true
     }));
-    const spread = (G.hexSize || 3.2 / 1.5) * FX.DEBRIS_SPREAD;
-    m.position.set(rec.x + (Math.random() - 0.5) * spread, rec.y, rec.z + (Math.random() - 0.5) * spread);
+    m.position.set(rec.x + (Math.random() - 0.5) * 3.4, rec.y, rec.z + (Math.random() - 0.5) * 3.4);
     fxGroup.add(m);
     debris.push({
       mesh: m,
@@ -3232,10 +2638,6 @@ function updateTiles(dt, now) {
       mesh.position.y = rec.baseY + Math.sin(now * 0.05) * 0.09 * p;
       mesh.scale.setScalar(1 - p * 0.06);
     } else if (rec.state === 'gone') {
-      /* 붕괴 중에는 타일이 회전하며 떨어집니다. 평면 오버레이는 회전을
-       * 따라갈 수 없어(따라가면 종잇장이 접힌 것처럼 보입니다) 곧바로
-       * 떼어냅니다. 어차피 파편이 튀는 순간이라 눈에 띄지 않습니다.   */
-      if (rec.crack) releaseCrack(rec);
       const t = (now - rec.breakStart) / 420;
       if (t < 1) {
         mesh.visible = true;
@@ -3250,99 +2652,33 @@ function updateTiles(dt, now) {
       continue;
     } else {
       // idle — breathe the emissive very gently so the grid feels alive
-      const glow = rec.trap
+      rec.mat.emissiveIntensity = rec.trap
         ? 0.45 + Math.sin(now * 0.004 + rec.x) * 0.2
         : 0.2 + Math.sin(now * 0.0016 + rec.x * 0.2 + rec.z * 0.2) * 0.07;
       rec.mat.color.copy(rec.baseColor);
-
-      /* 마모 단계를 여기서 덧입힙니다.
-       * 위에서 baseColor 로 되돌린 뒤에 적용해야 합니다 — 순서가 바뀌면
-       * 매 프레임 원래 색이 마모 표현을 덮어써서 아무 변화도 안 보입니다. */
-      if (rec.hits > 0) {
-        if (rec.hits === 1) {
-          // 1회차 — 색이 옅어지고 발광이 죽으며 살짝 가라앉습니다
-          rec.mat.color.lerp(WEAR_WHITE, 0.45);
-          rec.mat.emissiveIntensity = glow * 0.4;
-          mesh.position.y = rec.baseY - 0.06;
-        } else {
-          // 2회차 이상 — 더 옅게 + 회색조 + 균열 오버레이 + 미세한 떨림
-          rec.mat.color.lerp(WEAR_WHITE, 0.65).lerp(WEAR_GREY, 0.5);
-          rec.mat.emissiveIntensity = glow * 0.25;
-          mesh.position.y = rec.baseY - 0.12 + Math.sin(now * 0.02 + rec.x) * 0.03;
-          mesh.scale.setScalar(0.985);
-        }
-      } else {
-        rec.mat.emissiveIntensity = glow;
-        mesh.position.y = rec.baseY;
-        mesh.scale.setScalar(1);
-      }
-
-      /* 금이 간 직후 아주 짧게 흔듭니다. 균열이 소리 없이 슬며시 나타나면
-       * "밟혔다"가 아니라 "원래 그랬다"로 읽혀서 타격감이 죽습니다.
-       * 남은 시간에 비례해 진폭을 줄여야 끝에서 뚝 끊기지 않습니다.    */
-      if (rec.crackShake > 0) {
-        rec.crackShake = Math.max(0, rec.crackShake - dt);
-        mesh.position.y += Math.sin(now * 0.09) * 0.05 * (rec.crackShake / CRACK_SHAKE_S);
-      }
     }
 
     if (rec.targetOpacity !== undefined) {
       rec.mat.opacity += (rec.targetOpacity - rec.mat.opacity) * Math.min(1, dt * 6);
-    }
-
-    /* ── 균열 오버레이 추종 ────────────────────────────────────────
-     * 타일은 마모되면 가라앉고, 경고 중엔 진동하고, 스케일도 줄어듭니다.
-     * 이걸 전부 따라가지 않으면 균열만 원래 높이에 떠서 남습니다.
-     * 회전만은 따라가지 않습니다 (붕괴 회전은 위 gone 분기에서 해제).  */
-    if (rec.crack) {
-      const c = rec.crack;
-      const t = Math.min(1, (now - c.born) / CRACK_GROW_MS);
-      // 위층이 반투명해지면 균열도 같이 흐려져야 합니다
-      const baseAlpha = (rec.targetOpacity !== undefined ? rec.targetOpacity : 1) * 0.9;
-      c.mesh.position.set(rec.x, mesh.position.y + G.hexThick / 2 + 0.02, rec.z);
-      c.mesh.scale.setScalar(mesh.scale.x * (0.55 + 0.45 * t));   // 툭 튀어나오지 않게 퍼짐
-      c.mesh.rotation.x = -Math.PI / 2;
-      if (rec.state === 'warn') {
-        // 3회차 — 마지막 단계이므로 가장 진하게, 붉은 틴트로 경고와 맞춥니다
-        c.mat.opacity = baseAlpha;
-        c.mat.color.setHex(CRACK_WARN_TINT);
-      } else {
-        c.mat.opacity = baseAlpha * t;
-        c.mat.color.setHex(0xffffff);
-      }
     }
   }
 }
 
 /* ============================ 10. boosters & obstacles ================= */
 
-/* 지오메트리를 모듈 로드 시점에 만들면 G.hexSize 가 아직 없습니다
- * (서버 config 를 받기 전). 그래서 처음 쓸 때 만들고, 타일 크기가 바뀌면
- * 다시 만듭니다.                                                       */
-let boosterGeo = null, boosterGeoSize = 0;
-function getBoosterGeo() {
-  const S = G.hexSize || 3.2 / 1.5;
-  if (boosterGeo && boosterGeoSize === S) return boosterGeo;
-  if (boosterGeo) boosterGeo.dispose();
-  boosterGeoSize = S;
-  const r = S * FX.BOOSTER_R;
-  boosterGeo = new THREE.CylinderGeometry(r, r * 0.92, 0.6, 24);
-  return boosterGeo;
-}
-
+const boosterGeo = new THREE.CylinderGeometry(3.5, 3.2, 0.9, 24);
 function spawnBooster(e) {
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffcc00, emissive: 0xffaa00, emissiveIntensity: 1.5,
     metalness: 0.7, roughness: 0.25, transparent: true, opacity: 0.95
   });
-  const mesh = new THREE.Mesh(getBoosterGeo(), mat);
+  const mesh = new THREE.Mesh(boosterGeo, mat);
   mesh.position.set(e.x, e.y, e.z);
   mesh.castShadow = true;
   fxGroup.add(mesh);
 
-  const S = G.hexSize || 3.2 / 1.5;
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(S * FX.BOOSTER_RING_IN, S * FX.BOOSTER_RING_OUT, 32),
+    new THREE.RingGeometry(3.6, 5.0, 32),
     new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false })
   );
   ring.rotation.x = -Math.PI / 2;
@@ -3380,29 +2716,19 @@ function updateBoosters(dt, now) {
   }
 }
 
-let obsGeo = null, obsGeoSize = 0;
-function getObsGeo() {
-  const S = G.hexSize || 3.2 / 1.5;
-  if (obsGeo && obsGeoSize === S) return obsGeo;
-  if (obsGeo) obsGeo.dispose();
-  obsGeoSize = S;
-  obsGeo = new THREE.BoxGeometry(S * FX.OBS_W, 0.3, S * FX.OBS_D);
-  return obsGeo;
-}
-
+const obsGeo = new THREE.BoxGeometry(4.6, 0.45, 3.4);
 function spawnObstacle(e) {
   const mat = new THREE.MeshStandardMaterial({
     color: 0xece7d8, emissive: 0xff2d2d, emissiveIntensity: 0.35, roughness: 0.85
   });
-  const mesh = new THREE.Mesh(getObsGeo(), mat);
+  const mesh = new THREE.Mesh(obsGeo, mat);
   mesh.position.set(e.x, e.fromY, e.z);
   mesh.rotation.y = Math.random() * 3.14;
   mesh.castShadow = true;
   fxGroup.add(mesh);
 
-  const S = G.hexSize || 3.2 / 1.5;
   const marker = new THREE.Mesh(
-    new THREE.RingGeometry(S * FX.OBS_RING_IN, S * FX.OBS_RING_OUT, 24),
+    new THREE.RingGeometry(2.6, 4.0, 24),
     new THREE.MeshBasicMaterial({ color: 0xff2d2d, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false })
   );
   marker.rotation.x = -Math.PI / 2;
@@ -3454,14 +2780,6 @@ function removeObstacle(id) {
 }
 
 /* ============================ 11. dead reckoning ====================== */
-
-/* 원격 주자 동기화 상태 — F2 진단 패널에 표시합니다.
- * lastErr 이 평상시 0.3 을 넘나들면 SMOOTH_HALFLIFE 를, snaps 가 계속
- * 늘어나면 네트워크나 SNAP_DIST 를 의심하면 됩니다.                     */
-const netStats = { snaps: 0, lastErr: 0 };
-
-const UP_AXIS = new THREE.Vector3(0, 1, 0);   // slerp 회전축 (공용 상수)
-
 /**
  * Remote runners are rendered INTERP_DELAY_MS in the past and interpolated
  * between the two snapshots that bracket that render time. When the newest
@@ -3479,12 +2797,9 @@ class RemoteRunner {
     this.layer = meta.layer || 3;
     this.anim = 'idle';
     this.buffer = [];
-    this.render = new THREE.Vector3(meta.pos ? meta.pos.x : 0, meta.pos ? meta.pos.y : 24.35, meta.pos ? meta.pos.z : 0);
+    this.render = new THREE.Vector3(meta.pos ? meta.pos.x : 0, meta.pos ? meta.pos.y : 30.5, meta.pos ? meta.pos.z : 0);
     this.renderRy = 0;
     this.speed01 = 0;
-    this.snaps = 0;                        // 이 주자에게 걸린 강제 스냅 횟수 (진단용)
-    this._qCur = new THREE.Quaternion();    // slerp 작업용 — 프레임마다 새로 만들지 않습니다
-    this._qTarget = new THREE.Quaternion();
     this.avatar = buildAvatar(meta.color, meta.name);
     this.avatar.group.position.copy(this.render);
     actorGroup.add(this.avatar.group);
@@ -3495,52 +2810,9 @@ class RemoteRunner {
       t: localNow,
       p: new THREE.Vector3(s.p[0], s.p[1], s.p[2]),
       v: new THREE.Vector3(s.v[0], s.v[1], s.v[2]),
-      ry: s.ry, anim: s.a, layer: s.l, alive: !!s.al,
-      // 서버가 g 를 안 보내면(구버전) 애니메이션으로 접지를 추정합니다
-      grounded: s.g === undefined ? (s.a !== 'jump' && s.a !== 'fall') : !!s.g
+      ry: s.ry, anim: s.a, layer: s.l, alive: !!s.al
     });
     if (this.buffer.length > 24) this.buffer.shift();
-  }
-
-  /**
-   * 추측 항법 — 마지막 스냅샷에서 ahead 초만큼 물리를 전진시킨다.
-   *
-   * 공중이면 등가속도 운동을 그대로 적분합니다.
-   *     p = p0 + v0*t + ½*g*t²
-   *     v = v0 + g*t
-   * 접지 상태면 중력을 적용하지 않고 수평 등속으로만 밀어야 합니다.
-   * (접지한 상대에게 중력을 더하면 바닥을 뚫고 가라앉아 보입니다.)
-   *
-   * 공중 예측은 바닥을 뚫을 수 있으므로, 예측 지점 아래 지면을 찾아
-   * 그 위에서 멈춥니다. 서버 스냅샷이 도착하면 어차피 교정됩니다.
-   */
-  static predict(snap, ahead, outVel) {
-    const t = Math.max(0, ahead);
-    const p = snap.p.clone();
-
-    if (snap.grounded) {
-      // 접지: 수평만 전진, 높이는 유지
-      p.x += snap.v.x * t;
-      p.z += snap.v.z * t;
-      if (outVel) outVel.set(snap.v.x, 0, snap.v.z);
-      return p;
-    }
-
-    // 공중: 중력 가속도까지 반영
-    p.x += snap.v.x * t;
-    p.z += snap.v.z * t;
-    p.y += snap.v.y * t + 0.5 * PHYS.GRAVITY * t * t;
-
-    let vy = snap.v.y + PHYS.GRAVITY * t;
-    if (vy < PHYS.MAX_FALL) vy = PHYS.MAX_FALL;   // 종단속도는 로컬 물리와 동일하게 제한
-    if (outVel) outVel.set(snap.v.x, vy, snap.v.z);
-
-    // 예측이 바닥을 관통하지 않도록 지면에서 멈춥니다
-    if (snap.v.y <= 0) {
-      const floor = groundYUnder(p.x, p.z, snap.p.y) + NET.GROUND_EPS;
-      if (p.y < floor) p.y = floor;
-    }
-    return p;
   }
 
   update(dt, localNow) {
@@ -3569,51 +2841,24 @@ class RemoteRunner {
         this.layer = b.layer; this.alive = b.alive;
         vel = b.v;
       } else {
-        /* --- dead reckoning (extrapolation) path ---
-         * 다음 스냅샷이 아직 안 왔습니다. 마지막 상태에서 물리를 굴려
-         * 상대가 멈칫하지 않고 계속 움직이게 합니다.                     */
+        // --- dead reckoning (extrapolation) path ---
         const last = buf[buf.length - 1];
         const ahead = Math.min(renderTime - last.t, NET.EXTRAPOLATE_CAP_MS) / 1000;
-        vel = new THREE.Vector3();
-        target = RemoteRunner.predict(last, ahead, vel);
+        target = last.p.clone().addScaledVector(last.v, Math.max(0, ahead));
         this.renderRy = last.ry;
         this.anim = last.anim; this.layer = last.layer; this.alive = last.alive;
+        vel = last.v;
       }
     }
 
-    /* --- 예외 안전: 예측이 크게 빗나가면 강제 스냅 ---
-     * 오차가 SNAP_DIST 를 넘으면 보간을 포기합니다. 이 경우 부드럽게
-     * 따라가면 상대가 몇 초에 걸쳐 허공을 가로지르며 미끄러집니다.
-     * 순간이동이 보기 흉해도, 틀린 위치에 오래 머무는 것보다 낫습니다.  */
-    const errSq = this.render.distanceToSquared(target);
-    if (errSq > NET.SNAP_DIST_SQ) {
-      this.render.copy(target);
-      this.snaps = (this.snaps || 0) + 1;
-      netStats.snaps++;
-    } else {
-      /* 지수 감쇠 보간. 프레임레이트가 흔들려도 수렴 속도가 일정하도록
-       * halflife 기반으로 계수를 만듭니다 (dt 에 독립적).               */
-      const k = 1 - Math.pow(0.5, dt / NET.SMOOTH_HALFLIFE);
-      this.render.lerp(target, k);
-    }
-    netStats.lastErr = Math.sqrt(errSq);
+    // Critically-damped smoothing removes the residual snap on the seams.
+    const smooth = 1 - Math.pow(0.0009, dt);
+    this.render.lerp(target, smooth);
 
     const av = this.avatar;
     av.group.position.copy(this.render);
 
-    /* --- 회전: 쿼터니언 구면 보간(slerp) ---
-     * Y축 yaw 를 쿼터니언으로 올려 slerp 로 돌립니다. 각도 wrap(+π/−π 경계)에서
-     * 한 바퀴 되감기는 현상이 생기지 않습니다.
-     *
-     * 주의: 결과를 quaternion 에 통째로 대입하면 안 됩니다. animateAvatar 가
-     * rotation.x(사망 시 쓰러짐)와 rotation.z(흔들림)를 프레임마다 '누적'하는데,
-     * 통째로 덮으면 그 값이 매 프레임 0으로 리셋돼 연출이 멈춥니다.
-     * 그래서 slerp 결과에서 yaw 만 뽑아 rotation.y 에 넣습니다.          */
-    this._qCur.setFromAxisAngle(UP_AXIS, av.group.rotation.y);
-    this._qTarget.setFromAxisAngle(UP_AXIS, this.renderRy);
-    this._qCur.slerp(this._qTarget, Math.min(1, dt * 14));
-    // Y축 회전 쿼터니언 (0, sin(θ/2), 0, cos(θ/2)) 에서 θ 복원
-    av.group.rotation.y = 2 * Math.atan2(this._qCur.y, this._qCur.w);
+    av.group.rotation.y = lerpAngle(av.group.rotation.y, this.renderRy, Math.min(1, dt * 14));
     this.speed01 = vel ? THREE.MathUtils.clamp(Math.hypot(vel.x, vel.z) / PHYS.SPRINT, 0, 1) : 0;
     animateAvatar(av, dt, this.speed01, this.alive ? this.anim : 'dead');
     av.group.visible = true;
@@ -3856,10 +3101,7 @@ function connect(name, mode) {
     dom.vPing.classList.toggle('bad', G.rtt > 160);
   });
 
-  socket.on('server_hello', (d) => {
-    G.cfg = d.config;
-    applyDevMode(!!d.config.DEV_MODE);
-  });
+  socket.on('server_hello', (d) => { G.cfg = d.config; });
 
   socket.on('init', (d) => {
     G.selfId = d.selfId;
@@ -3877,18 +3119,11 @@ function connect(name, mode) {
       for (const rec of G.pedestals.values()) { rec.state = 'gone'; rec.mesh.visible = false; rec.ring.visible = false; }
     }
 
-    /* 라운드 도중 들어온 경우, 이미 진행된 타일 상태를 복원합니다.
-     * 붕괴된 것뿐 아니라 '2번 밟혀 금이 간' 중간 단계까지 받아야
-     * 나만 멀쩡한 타일을 보고 안심하다 빠지는 일이 없습니다.          */
     for (const b of d.brokenTiles || []) {
       const rec = G.tiles.get(b.id);
       if (!rec) continue;
-      if (b.hits !== undefined) {
-        rec.hits = b.hits;
-        applyTileWear(rec);
-      }
-      if (b.phase === 'broken') { rec.state = 'gone'; rec.mesh.visible = false; }
-      else if (b.phase === 'warning') startWarn(rec, 800);
+      if (b.st === 'broken') { rec.state = 'gone'; rec.mesh.visible = false; }
+      else startWarn(rec, 800);
     }
 
     syncPlayers(d.players);
@@ -3919,7 +3154,7 @@ function connect(name, mode) {
 
   socket.on('round_start', (d) => {
     dom.result.classList.remove('show');
-    resetTileWear();
+    G.steppedTiles.clear();
     syncPlayers(d.players);
     const me = d.players.find((p) => p.id === G.selfId);
     if (me && G.role === 'player') {
@@ -3950,7 +3185,7 @@ function connect(name, mode) {
     dom.result.classList.remove('show');
     for (const id of [...G.boosters.keys()]) removeBooster(id);
     for (const id of [...G.obstacles.keys()]) removeObstacle(id);
-    resetTileWear();
+    G.steppedTiles.clear();
     G.map = d.map;
     applyTheme(d.theme || 0);
     buildMap(d.map, mapCfg());
@@ -4022,26 +3257,9 @@ function connect(name, mode) {
     toast('대기 발판 해제 — 최상층으로 낙하합니다', 'obstacle');
   });
 
-  /* 아직 안 무너진 타격 — 마모 단계만 올라갑니다 (일반 타일 1·2회차). */
-  socket.on('tile_hit', (d) => {
-    const rec = G.tiles.get(d.tileId);
-    if (!rec) return;
-    rec.hits = d.hits;
-    rec.maxHits = d.maxHits;
-    applyTileWear(rec);
-    // 밟을수록 음이 높아져 "몇 번 남았는지"가 소리로도 읽힙니다
-    Sound.sfx('step', {
-      pos: rec, rate: 0.9 + d.hits * 0.08,
-      volume: d.by === G.selfId ? 1 : 0.55
-    });
-  });
-
   socket.on('tile_warn', (d) => {
     const rec = G.tiles.get(d.tileId);
     if (!rec) return;
-    // 마지막 타격이므로 hits 도 확정값으로 맞춰 둡니다
-    if (d.hits !== undefined) rec.hits = d.hits;
-    if (d.maxHits !== undefined) rec.maxHits = d.maxHits;
     startWarn(rec, d.fuse);
     // 내가 밟은 타일만 또렷하게, 남이 밟은 건 거리에 따라 작게
     Sound.sfx('step', {
@@ -4238,8 +3456,7 @@ function frame() {
         v: [local.vel.x, local.vel.y, local.vel.z],
         ry: local.ry,
         layer: local.layer,
-        anim: local.anim,
-        g: local.grounded ? 1 : 0   // 접지 여부 — 원격 클라이언트의 중력 적분 근거
+        anim: local.anim
       });
     }
   }
@@ -4293,22 +3510,7 @@ function renderDiag() {
     row('3D 모델', CHAR.ready, CHAR.ready
         ? ('적용됨 x' + CHAR.scale.toFixed(3))
         : (CHAR.error ? '실패: ' + CHAR.error : '없음 (절차적)')) +
-    row('클립', true, CHAR.ready ? (Object.keys(CHAR.clips).join(',') || '없음') : '—') +
-    /* 원격 주자 동기화 상태. 예측오차가 평상시 0.3 을 넘나들거나 강제스냅이
-     * 계속 늘어나면 네트워크 또는 NET 튜닝값을 의심하면 됩니다.          */
-    row('예측오차', netStats.lastErr < 1.0, netStats.lastErr.toFixed(2) + ' (스냅 ' + NET.SNAP_DIST + ')') +
-    row('강제스냅', netStats.snaps === 0, netStats.snaps + '회') +
-    row('DEV_MODE', null, DEV.on
-      ? '켜짐 (타일 안 무너짐 / 탈락 없음 / 타일 x1.5)'
-      : '꺼짐 (정상 게임)') +
-    row('타일크기', null, (G.hexSize || 0).toFixed(2) + '  카메라 x' + (cam.scale || 1).toFixed(2)) +
-    /* 균열 오버레이는 타일당 드로우콜 1개입니다.
-     * 4인 라운드 실측 최대 53개 (평균 31개) — 타일 본체가 이미 507 드로우콜
-     * 이라 10% 남짓이고, 부하로 잡힌 적은 없습니다. 다만 인원이나 GRID_RADIUS
-     * 를 크게 올린 뒤 이 값이 80 을 넘기 시작하면 인스턴싱/아틀라스로 합치는
-     * 걸 검토하세요.                                                    */
-    row('균열 오버레이', crackStats.peak <= 80,
-        crackStats.live + '개 (최대 ' + crackStats.peak + ')');
+    row('클립', true, CHAR.ready ? (Object.keys(CHAR.clips).join(',') || '없음') : '—');
 }
 
 window.addEventListener('keydown', (e) => {
@@ -4390,11 +3592,6 @@ dom.nameInput.value = '심사관' + Math.floor(Math.random() * 900 + 100);
 
 /* assets/character.glb 가 있으면 절차적 캐릭터를 대체합니다 */
 loadCharacterModel();
-
-/* 균열 텍스처 5종을 미리 구워 둡니다. 첫 균열이 생기는 순간에 만들면
- * 512×512 캔버스 5장을 한꺼번에 그리느라 프레임이 한 번 튑니다 —
- * 하필 라운드 한복판이라 제일 눈에 띄는 타이밍입니다.                */
-getCrackTexture('warmup');
 
 
 dom.btnJoin.addEventListener('click', () => {

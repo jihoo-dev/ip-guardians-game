@@ -19,40 +19,6 @@ const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
 
-/* ═══════════════════════════════════════════════════════════════════════
- * 개발용 테스트 모드
- * ───────────────────────────────────────────────────────────────────────
- * 켜는 법:  바로 아래 DEV_MODE_ON 을 true 로 바꾸고 서버를 재시작하세요.
- *           환경변수로도 됩니다 →  DEV_MODE=1 npm start
- * 끄는 법:  DEV_MODE_ON 을 false 로 되돌리고 재시작. (기본값 false)
- *
- * 브라우저는 새로고침만 하면 됩니다 — 이 값은 접속 시 서버가 클라이언트로
- * 내려주므로, 클라이언트 코드를 따로 고칠 필요가 없습니다.
- *
- * true 일 때 달라지는 것:
- *   1. 타일이 밟혀도 무너지지 않는다            (requestTileBreak 무효화)
- *   2. 떨어져도 탈락하지 않는다                 (player_death 무시)
- *   3. 왼쪽 레이어 안내문에 어두운 배경이 깔린다 (클라이언트 CSS)
- *   4. 그 안내문을 클릭하면 해당 층으로 순간이동 (클라이언트)
- *
- * 타일 크기는 모드와 무관하게 항상 같습니다 — 모드에 따라 크기가 달라지면
- * 겹침/빈틈 특성이 두 벌이 되어 검증이 무의미해지기 때문입니다.
- *
- * false 일 때는 게임 로직과 밸런스가 종전과 완전히 동일합니다.
- * ═══════════════════════════════════════════════════════════════════════ */
-/* ▼▼▼ 여기만 바꾸면 됩니다 ▼▼▼
- *   false = 평소 게임      true = 개발용 테스트 모드                    */
-const DEV_MODE_ON = true;
-/* ▲▲▲ 여기만 바꾸면 됩니다 ▲▲▲ */
-
-/* 파일을 고치지 않고 잠깐만 바꾸고 싶을 때는 환경변수를 씁니다.
- *   DEV_MODE=1 npm start   → 강제로 켬
- *   DEV_MODE=0 npm start   → 강제로 끔 (위 DEV_MODE_ON 이 true 여도)
- * 환경변수가 없으면 DEV_MODE_ON 값을 따릅니다.                         */
-const DEV_MODE =
-  (process.env.DEV_MODE === '0' || process.env.DEV_MODE === 'false') ? false
-    : (DEV_MODE_ON || process.env.DEV_MODE === '1' || process.env.DEV_MODE === 'true');
-
 /* ------------------------------------------------------------------ config */
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
@@ -78,11 +44,6 @@ const RESET_DELAY_MS = 8000;    // podium screen duration before the next map
 const FUSE_NORMAL_MS = 800;     // 0.8s  standard patent tile
 const FUSE_TRAP_MS = 200;       // 0.2s  무단 카피캣 함정 블록
 
-/* 일반 타일 내구도 — 이 횟수만큼 밟아야 무너집니다.
- *   1회차: 색이 옅어짐   2회차: 균열   3회차: 경고 점멸 후 붕괴
- * 함정 타일(trap)은 이 값과 무관하게 항상 1회에 즉시 붕괴합니다.       */
-const TILE_HITS = parseInt(process.env.TILE_HITS, 10) || 3;
-
 // Spectator intervention economy.
 const BOOSTER_COOLDOWN_MS = 9000;
 const OBSTACLE_COOLDOWN_MS = 12000;
@@ -93,42 +54,26 @@ const OBSTACLE_FALL_MS = 1400;
 /* The client rebuilds geometry from exactly these numbers, so any change here
  * automatically propagates — the client never hardcodes the layout.          */
 
-/* 타일 하나의 외접원 반지름(S).
- *
- * flat-top 육각형 규약이라 이 값 하나가 전부를 결정합니다.
- *   가로 = 2S,  세로 = √3·S
- *   이웃 X 간격 = 1.5S,  이웃 중심거리 = √3·S (= 내접원 지름)
- * 이웃 중심거리가 내접원 지름과 같으므로 변끼리 정확히 맞물립니다.
- *
- * DEV_MODE 에서도 같은 값을 씁니다 — 크기가 모드에 따라 달라지면
- * 겹침/빈틈 특성이 두 벌이 되어 검증이 무의미해집니다.               */
-const HEX_SIZE = 3.2 / 1.5;     // 2.1333 (종전 3.2 에서 1.5배 축소)
-const HEX_THICKNESS = 0.7;      // 타일이 얇아진 비율에 맞춤 (종전 1.0)
-
-/* 맵 반경은 인원에 맞춰 늘어납니다.
- * 반경 R 의 육각 그리드 타일 수 = 3R² + 3R + 1
- * 타일이 작아진 만큼 1인당 배분을 22 → 38 로 올려 층당 개수를 약 2배로 만듭니다.
- * (4인 기준: 반경 5/91타일 → 반경 7/169타일)                          */
-const TILES_PER_PLAYER = parseInt(process.env.TILES_PER_PLAYER, 10) || 38;
+const HEX_SIZE = 3.2;           // circumradius of one hex tile
+const HEX_THICKNESS = 1.0;
+/* 맵 반경도 인원에 맞춰 늘어납니다.
+ * 반경 R 의 육각 그리드 타일 수 = 3R^2 + 3R + 1
+ * 1인당 22타일 정도를 확보하도록 잡습니다 (4인 -> 반경 5 = 91타일).   */
 const GRID_RADIUS = parseInt(process.env.GRID_RADIUS, 10) ||
-  Math.max(7, Math.round(Math.sqrt(TILES_PER_PLAYER * MAX_PLAYERS / 3)));
+  Math.max(5, Math.round(Math.sqrt(22 * MAX_PLAYERS / 3)));
 const TRAP_CHANCE = 0.11;
 
 /* ── 대기 발판 ────────────────────────────────────────────────────────
  * 게임 시작 전 각 플레이어가 자기 발판 위에서 대기합니다.
  * 정원이 차면 발판이 사라지고, 플레이어들이 최상층으로 떨어지며 시작됩니다. */
 const PEDESTAL_RISE  = 9.0;   // 최상층 위로 띄우는 높이
-/* 타일이 1.5배 작아졌으므로 발판은 상대 배율을 올려 서 있기 편한 크기를 유지합니다.
- * 1.45 × 3.2 = 4.64  →  2.1 × 2.133 = 4.48 (절대 크기가 거의 그대로)      */
-const PEDESTAL_SCALE = 2.1;
-const SEA_Y = -16;              // 구름바다 높이. 층 간격이 줄어든 만큼 함께 축소
+const PEDESTAL_SCALE = 1.45;  // 일반 타일 대비 크기 (서 있기 편하게)
+const SEA_Y = -20;              // 구름바다 높이. 여기 아래로 떨어지면 탈락
 const THEME_COUNT = 3;          // 배경 맵 개수 (public/assets/bg)
 
-/* 층 높이도 타일 축소에 맞춰 줄입니다 (30/15/0 → 24/12/0).
- * 낙하 시간이 과도하게 길어지지 않도록 간격을 좁혔습니다.               */
 const LAYERS = [
-  { index: 3, y: 24, color: '#00ffcc', name: '우선심사 패스트트랙 레이어', short: 'FAST-TRACK' },
-  { index: 2, y: 12, color: '#0088ff', name: '의견제출통지 레이어', short: 'OFFICE ACTION' },
+  { index: 3, y: 30, color: '#00ffcc', name: '우선심사 패스트트랙 레이어', short: 'FAST-TRACK' },
+  { index: 2, y: 15, color: '#0088ff', name: '의견제출통지 레이어', short: 'OFFICE ACTION' },
   { index: 1, y: 0, color: '#aa00ff', name: '아이디어 구상 레이어', short: 'IDEATION' }
 ];
 
@@ -287,12 +232,7 @@ function createRoom() {
     seed: (Math.random() * 0xffffffff) >>> 0,
     theme: Math.floor(Math.random() * THEME_COUNT),   // 배경 맵. 회차마다 새로 뽑습니다
     map: null,
-    /* tileId -> { hits, phase, warnAt }
-     *   hits  : 밟힌 횟수 (0 ~ maxHits)
-     *   phase : 'idle' | 'warning' | 'broken'
-     * hits 가 올라가도 maxHits 에 닿기 전까지 phase 는 'idle' 로 둡니다.
-     * 그래야 다음 사람이 같은 타일을 다시 밟을 수 있습니다.            */
-    tileState: new Map(),
+    tileState: new Map(),   // tileId -> 'idle' | 'warning' | 'broken'
     players: new Map(),     // socketId -> player
     spectators: new Map(),  // socketId -> { id, name }
     phase: 'waiting',       // waiting | countdown | playing | ended
@@ -305,7 +245,7 @@ function createRoom() {
     seatColors: [...PLAYER_COLORS]
   };
   room.map = buildMap(room.seed);
-  resetTileState(room);
+  for (const t of room.map.tiles) room.tileState.set(t.id, 'idle');
   rooms.set(id, room);
   console.log('[room] created ' + id + ' seed=' + room.seed + ' theme=' + room.theme);
   return room;
@@ -366,9 +306,6 @@ function makePlayer(id, name, seat, room) {
     pos: { x: spawn.x, y: spawn.y, z: spawn.z },
     vel: { x: 0, y: 0, z: 0 },
     ry: 0,
-    /* 접지 여부. 클라이언트 추측 항법이 "중력을 더할지" 판단하는 근거입니다.
-     * 공중이면 낙하 가속을 적분하고, 접지 상태면 수평 등속으로만 밉니다.   */
-    grounded: true,
     wins: 0,
     lastInput: Date.now()
   };
@@ -536,7 +473,7 @@ function resetRoom(room) {
   }
   room.map = buildMap(room.seed);
   room.tileState = new Map();
-  resetTileState(room);
+  for (const t of room.map.tiles) room.tileState.set(t.id, 'idle');
   room.phase = 'waiting';
   room.pedestalsActive = true;
   room.phaseEndsAt = 0;
@@ -588,89 +525,35 @@ function resetRoom(room) {
 
 /* ---------------------------------------------------------- tile handling */
 
-/** 방의 모든 타일을 '한 번도 안 밟은' 상태로 되돌립니다. */
-function resetTileState(room) {
-  for (const t of room.map.tiles) {
-    room.tileState.set(t.id, { hits: 0, phase: 'idle', warnAt: 0 });
-  }
-}
-
-/** 이 타일이 몇 번 밟혀야 무너지는가. 함정은 항상 1회입니다. */
-function maxHitsFor(tile) {
-  return tile.trap ? 1 : TILE_HITS;
-}
-
-/**
- * 타일을 한 번 밟은 것으로 처리합니다.
- *
- * 마지막 타격이 아니면 hits 만 올리고 tile_hit 을 보냅니다. 이때 phase 는
- * 반드시 'idle' 로 남겨둬야 합니다 — 'warning' 으로 바꿔버리면 다음 사람이
- * 같은 타일을 밟아도 위에서 걸러져 3회 규칙이 성립하지 않습니다.
- *
- * 호출처는 두 곳입니다: 플레이어의 tile_step, 관전자 서류의 착탄.
- * 서류도 여기를 타므로 1히트만 줍니다(의도된 동작).
- */
 function requestTileBreak(room, tileId, sourceId) {
-  if (DEV_MODE) return;   // 개발 모드: 타일이 무너지지 않습니다
   if (room.phase !== 'playing') return;
-
-  const st = room.tileState.get(tileId);
-  if (!st || st.phase !== 'idle') return;
+  const state = room.tileState.get(tileId);
+  if (state !== 'idle') return;
 
   const tile = room.map.tiles.find(t => t.id === tileId);
   if (!tile) return;
 
-  const maxHits = maxHitsFor(tile);
-  st.hits++;
-
-  if (st.hits < maxHits) {
-    // 아직 버팁니다 — 마모 단계만 올려서 알립니다
-    io.to(room.id).emit('tile_hit', {
-      tileId,
-      hits: st.hits,
-      maxHits,
-      trap: tile.trap,
-      by: sourceId || null,
-      at: Date.now()
-    });
-    return;
-  }
-
-  // 마지막 타격 — 기존 경고→붕괴 흐름을 그대로 탑니다
   const fuse = tile.trap ? FUSE_TRAP_MS : FUSE_NORMAL_MS;
-  st.phase = 'warning';
-  st.warnAt = Date.now();
+  room.tileState.set(tileId, 'warning');
 
   io.to(room.id).emit('tile_warn', {
     tileId,
     fuse,
     trap: tile.trap,
     by: sourceId || null,
-    at: Date.now(),
-    hits: st.hits,
-    maxHits
+    at: Date.now()
   });
 
   roomTimeout(room, () => {
-    const cur = room.tileState.get(tileId);
-    if (!cur || cur.phase !== 'warning') return;
-    cur.phase = 'broken';
+    if (room.tileState.get(tileId) !== 'warning') return;
+    room.tileState.set(tileId, 'broken');
     io.to(room.id).emit('tile_break', { tileId, at: Date.now() });
   }, fuse);
 }
 
-/**
- * 재접속·중도 참가자에게 보낼 타일 진행 상태.
- * 붕괴된 것뿐 아니라 '2번 밟힌 채 서 있는' 중간 단계까지 복원해야
- * 새로 들어온 사람 화면에서만 타일이 멀쩡해 보이는 일이 없습니다.
- */
-function tileProgress(room) {
+function brokenTileIds(room) {
   const out = [];
-  for (const [id, st] of room.tileState) {
-    if (st.hits > 0 || st.phase !== 'idle') {
-      out.push({ id, hits: st.hits, phase: st.phase });
-    }
-  }
+  for (const [id, st] of room.tileState) if (st !== 'idle') out.push({ id, st });
   return out;
 }
 
@@ -727,7 +610,6 @@ io.on('connection', (socket) => {
   socket.emit('server_hello', {
     now: Date.now(),
     config: {
-      DEV_MODE,   // 클라이언트가 이 값으로 CSS/텔레포트/카메라를 맞춥니다
       MAX_PLAYERS, TICK_HZ, HEX_SIZE, HEX_THICKNESS, GRID_RADIUS,
       SEA_Y, LAYERS, FUSE_NORMAL_MS, FUSE_TRAP_MS, PEDESTAL_RISE, PEDESTAL_SCALE,
       BOOSTER_TTL_MS, OBSTACLE_FALL_MS,
@@ -777,7 +659,7 @@ io.on('connection', (socket) => {
       theme: room.theme,
       map: room.map,
       pedestalsActive: room.pedestalsActive,
-      brokenTiles: tileProgress(room),
+      brokenTiles: brokenTileIds(room),
       players: [...room.players.values()].map(publicPlayer),
       meta: roomSnapshotMeta(room),
       serverTime: Date.now()
@@ -807,8 +689,6 @@ io.on('connection', (socket) => {
     p.ry = +s.ry || 0;
     p.layer = s.layer | 0;
     p.anim = typeof s.anim === 'string' ? s.anim.slice(0, 12) : 'idle';
-    // 접지 여부(g). 구 클라이언트는 이 필드를 안 보내므로, 없으면 종전처럼 공중으로 봅니다.
-    p.grounded = s.g === undefined ? false : !!s.g;
     p.lastInput = Date.now();
   });
 
@@ -821,7 +701,6 @@ io.on('connection', (socket) => {
   });
 
   socket.on('player_death', (data = {}) => {
-    if (DEV_MODE) return;   // 개발 모드: 떨어져도 탈락하지 않습니다
     if (!room || role !== 'player') return;
     const p = room.players.get(socket.id);
     if (!p || !p.alive) return;
@@ -918,9 +797,9 @@ io.on('connection', (socket) => {
     }
 
     const candidates = room.map.tiles.filter(t =>
-      t.layer === targetLayer && (room.tileState.get(t.id) || {}).phase === 'idle');
+      t.layer === targetLayer && room.tileState.get(t.id) === 'idle');
     const pool = candidates.length ? candidates
-      : room.map.tiles.filter(t => (room.tileState.get(t.id) || {}).phase === 'idle');
+      : room.map.tiles.filter(t => room.tileState.get(t.id) === 'idle');
     if (!pool.length) return;
 
     const tile = pool[Math.floor(Math.random() * pool.length)];
@@ -1009,8 +888,7 @@ setInterval(() => {
         ry: +p.ry.toFixed(3),
         l: p.layer,
         a: p.anim,
-        al: p.alive ? 1 : 0,
-        g: p.grounded ? 1 : 0     // 접지 여부 — 클라이언트 추측 항법의 중력 적분 스위치
+        al: p.alive ? 1 : 0
       });
     }
 
@@ -1026,17 +904,6 @@ server.listen(PORT, HOST, () => {
   console.log(' listening on http://' + HOST + ':' + PORT);
   console.log(' static dir: ' + path.join(__dirname, STATIC_DIR));
   console.log(' tick: ' + TICK_HZ + 'Hz   seats/room: ' + MAX_PLAYERS);
-  console.log(' tile: S=' + HEX_SIZE.toFixed(4) + '  radius=' + GRID_RADIUS +
-    '  ' + (3 * GRID_RADIUS * GRID_RADIUS + 3 * GRID_RADIUS + 1) + ' tiles/layer' +
-    '  arena R=' + (HEX_SIZE * 1.5 * GRID_RADIUS).toFixed(1));
-  if (DEV_MODE) {
-    console.log('----------------------------------------------');
-    console.log(' ** 개발용 테스트 모드 (DEV_MODE) 켜짐 **');
-    console.log('    · 타일이 무너지지 않습니다');
-    console.log('    · 떨어져도 탈락하지 않습니다');
-    console.log('    · 왼쪽 레이어 안내문 클릭 = 해당 층으로 이동');
-    console.log('    끄려면 server.js 상단 DEV_MODE_ON 을 false 로');
-  }
   console.log('==============================================');
 });
 
