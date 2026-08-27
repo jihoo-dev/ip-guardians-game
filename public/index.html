@@ -384,6 +384,46 @@ const PLAYER = {
   HEIGHT: 3.1
 };
 
+/* ── 주자간 충돌 (BUMP) ───────────────────────────────────────────────
+ * 원칙 하나: 내 위치는 나만 바꾼다. 상대 좌표는 절대 쓰지 않습니다.
+ * 상대 클라이언트도 자기 자신에게 같은 규칙을 적용하므로 둘은 결국
+ * 떨어지고, 아무도 남의 좌표를 쓰지 않으므로 서버 중계만으로 20Hz 안에
+ * 양쪽 화면이 다시 일치합니다. (관전자 장애물 넉백과 같은 패턴입니다)
+ *
+ * 판정 기준은 RemoteRunner.render — 화면에 실제로 그려지고 있는 위치입니다.
+ * 최신 스냅샷이나 예측 위치를 쓰면 접촉 타이밍은 정확해지지만 "보이지도
+ * 않는 사람에게 밀렸다"가 됩니다. 보이는 대로 밀리는 편이 배우기 쉽습니다.
+ *
+ * 원격 주자는 INTERP_DELAY_MS(110ms) 만큼 과거로 그려지므로, 마주 달리면
+ * 두 화면의 접촉 시점이 타일 한 칸만큼 어긋납니다. 이건 없앨 수 없습니다.
+ * 그래서 밀림은 '위치 밀어내기'가 아니라 '속도 더하기'로만 합니다 —
+ * 어긋나도 유령에게 순간이동당하지는 않습니다.                       */
+const BUMP = {
+  RADIUS: PLAYER.HALF_X * 2,      // 1.56 — 두 주자의 반지름 합
+  /* 분리 가속도. 실측으로 고른 값입니다 (스윕 결과):
+   *    96 → 서로 밀어붙일 때 0.05~0.19 m 까지 겹침. 사실상 한 몸이 됩니다.
+   *   200 → 정착 거리 1.28 m (접촉의 82%), 정지한 상대를 1.7 m 밀어냄. 채택.
+   *   340 → 정착 2.45 m. 스치기만 해도 튕겨 날아가 조작감이 망가집니다.    */
+  ACCEL: 200,
+  /* 관통 방지 강도의 램프 기울기. 겹침 비율 × 이 값이 1 이 되면 완전 차단.
+   * 4 면 접촉 거리의 75%(1.17 m)부터 완전히 막힙니다. 더 낮추면 살짝
+   * 스쳐도 급정거해 옆으로 지나갈 수가 없습니다.                        */
+  BLOCK_RAMP: 4,
+  Y_GATE: PLAYER.HEIGHT * 0.9,    // 높이 차가 이보다 크면 서로 없는 것으로 봅니다
+  AIR_SCALE: 0.45,                // 공중에서는 약하게 — 지연 오차가 가장 큰 구간입니다
+
+  /* 밀려서 떨어질 수 있는가. 켜 두었습니다 — 밀어내기가 이 게임의 재미이고,
+   * 서버 이동 검증(server.js 의 VALIDATE)이 들어가면서 "안 떨어졌다"고
+   * 우기는 클라이언트를 되돌릴 근거도 생겼습니다.
+   * 부당 탈락 항의가 많으면 이 값만 false 로 되돌리면 됩니다.        */
+  PUSH_OFF_EDGE: true,
+
+  START_GRACE_MS: 700,            // 라운드 시작 낙하 중에는 끕니다 (전원이 공중이라 난장판이 됩니다)
+  SFX_DV: 0.35,                   // 이 이상 속도가 변하면 충돌음 (m/s)
+  SFX_GAP_MS: 220,                // 충돌음 최소 간격 (붙어 있으면 매 프레임 울립니다)
+  CREDIT_MS: 1200                 // 밀린 뒤 이 시간 안에 떨어지기 시작하면 그 사람 덕으로 봅니다
+};
+
 const NET = {
   SEND_HZ: 20,
   INTERP_DELAY_MS: 110,   // render remotes this far in the past
@@ -466,6 +506,7 @@ const G = {
   specTarget: null,
   cheerReadyAt: 0,
   dropReadyAt: 0,
+  bumpReadyAt: 0,          // 이 시각 전에는 주자간 충돌을 끕니다 (라운드 시작 낙하 구간)
   started: false
 };
 
@@ -2362,7 +2403,12 @@ const local = {
   alive: true,
   seat: null,        // 내 좌석 번호 (대기 발판 매칭용)
   dying: 0,          // >0 이면 구름바다로 잠기는 연출 진행 중
-  color: '#ffcc00'
+  color: '#ffcc00',
+  /* 낙하가 시작된 시점에 확정하는 사인. 밀려서 떨어졌으면 민 사람의 id 입니다.
+   * 탈락 시점이 아니라 낙하 시작 시점에 잡아야 정확합니다 — 떨어지는 데
+   * 1초, 잠기는 연출에 0.75초가 더 걸려서 그때 판단하면 엉뚱한 사람이 걸립니다. */
+  deathBy: null,
+  deathByName: ''
 };
 
 /* ============================ 7. input ================================= */
@@ -2563,8 +2609,107 @@ function currentLayerOf(y) {
   return 1;
 }
 
+/* 최근에 나를 민 사람. 밀려서 떨어졌을 때 사인을 밝히려고 남깁니다. */
+const lastBump = { id: null, name: '', at: -Infinity, sfxAt: -Infinity };
+
+/**
+ * 주자끼리 겹치지 않게 밀어냅니다 — 내 속도만 바꿉니다.
+ *
+ * 상대는 절대 건드리지 않습니다. 상대 클라이언트도 자기 자신에게 같은
+ * 규칙을 적용하므로 둘은 결국 떨어지고, 남의 좌표를 아무도 쓰지 않으므로
+ * 두 화면은 20Hz 중계만으로 다시 일치합니다 (영구 발산이 없습니다).
+ *
+ * 위치가 아니라 속도를 건드리는 이유는 BUMP 주석 참고 — 110ms 어긋남이
+ * 있는 상태에서 위치를 밀어내면 이미 지나간 자리의 유령에게 순간이동을
+ * 당합니다.
+ */
+function separateFromRunners(dt) {
+  if (!local.alive || G.phase !== 'playing') return;
+
+  const now = performance.now();
+  if (now < G.bumpReadyAt) return;        // 시작 직후 전원 낙하 구간
+
+  const R = BUMP.RADIUS, R2 = R * R;
+  let px = 0, pz = 0;            // 분리 가속 누적
+  let cx = 0, cz = 0;            // 관통 방지로 깎아낼 속도 누적
+  let hardest = null, hardestK = 0;
+
+  for (const r of G.players.values()) {
+    /* G.players 에는 내 메타(RemoteRunner 가 아닌 평범한 객체)도 들어 있습니다.
+     * syncPlayers 를 보면 self 는 render 가 local.pos 를 그대로 가리키므로,
+     * 걸러내지 않으면 자기 자신과 충돌 판정을 하게 됩니다.              */
+    if (!r || r.isSelf || r.id === G.selfId || !r.alive || !r.render) continue;
+    if (Math.abs(local.pos.y - r.render.y) > BUMP.Y_GATE) continue;
+
+    const dx = local.pos.x - r.render.x, dz = local.pos.z - r.render.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 >= R2) continue;
+
+    const d = Math.sqrt(d2);
+    let ux, uz;
+    if (d < 1e-3) {
+      /* 완전히 겹치면 밀 방향이 없습니다. id 비교로 서로 반대쪽을 고르게 해
+       * 양쪽이 같은 방향으로 밀어 붙어버리는 것을 막습니다.             */
+      ux = (G.selfId < r.id) ? 1 : -1; uz = 0;
+    } else {
+      ux = dx / d; uz = dz / d;
+    }
+
+    const air = local.grounded ? 1 : BUMP.AIR_SCALE;
+
+    /* (1) 관통 방지 — 상대를 파고드는 속도 성분만 깎아냅니다.
+     *
+     * 이걸 분리 '가속'만으로 하려고 하면 반드시 통과합니다. 입력 가속이
+     * ACCEL_GROUND(120)인데 분리 가속을 그보다 작게 잡으면 힘 싸움에서
+     * 입력이 항상 이기고, 크게 잡으면 스치기만 해도 튕겨 날아갑니다.
+     * 속도 성분을 직접 없애면 '벽'이 되므로 힘의 크기와 무관해집니다.
+     *
+     * block 은 겹친 깊이에 비례합니다. 살짝 스칠 때 급정거하면
+     * 옆으로 지나가는 것조차 불가능해집니다.                          */
+    const block = Math.min(1, (1 - d / R) * BUMP.BLOCK_RAMP) * air;
+    const vIn = -((local.vel.x + cx) * ux + (local.vel.z + cz) * uz);
+    if (vIn > 0) { cx += ux * vIn * block; cz += uz * vIn * block; }
+
+    /* (2) 분리 — 이미 겹쳐 있는 만큼 밀어냅니다.
+     * 미는 쪽은 (1)에서 멈추므로, 실제로 상대를 날리는 힘은 '상대 쪽
+     * 클라이언트가 자기에게 적용하는 이 가속'입니다.                 */
+    const k = BUMP.ACCEL * (1 - d / R) * air;
+    px += ux * k; pz += uz * k;
+    if (k > hardestK) { hardestK = k; hardest = r; }
+  }
+  if (px === 0 && pz === 0 && cx === 0 && cz === 0) return;
+
+  const nvx = local.vel.x + cx + px * dt;
+  const nvz = local.vel.z + cz + pz * dt;
+
+  /* PUSH_OFF_EDGE 를 끄면, 밀림 때문에 발판을 잃게 되는 프레임에서는
+   * 아예 밀지 않습니다. 지금은 켜져 있어 이 분기를 타지 않습니다.     */
+  if (!BUMP.PUSH_OFF_EDGE && local.grounded) {
+    if (!supportAt(local.pos.x + nvx * dt, local.pos.z + nvz * dt, local.pos.y)) return;
+  }
+
+  local.vel.x = nvx;
+  local.vel.z = nvz;
+
+  if (hardest) {
+    lastBump.id = hardest.id;
+    lastBump.name = hardest.name || '';
+    lastBump.at = now;
+    const dv = Math.hypot(px, pz) * dt + Math.hypot(cx, cz);
+    if (dv > BUMP.SFX_DV && now - lastBump.sfxAt > BUMP.SFX_GAP_MS) {
+      lastBump.sfxAt = now;
+      Sound.sfx('impact', {
+        volume: Math.min(0.5, dv * 0.35),
+        rate: 1.22 + Math.random() * 0.16
+      });
+    }
+  }
+}
+
 function stepPhysics(dt) {
   if (!local.alive) return;
+
+  const wasGrounded = local.grounded;   // 아래 '발판을 잃는 순간' 판정용
 
   // ---- horizontal intent (camera-relative) ----
   const fwd = new THREE.Vector3(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw));
@@ -2588,6 +2733,10 @@ function stepPhysics(dt) {
     const f = Math.max(0, 1 - PHYS.FRICTION * dt);
     local.vel.x *= f; local.vel.z *= f;
   }
+
+  /* 주자간 밀림. 최고속도 클램프 '앞'에 두어야 밀림이 SPRINT 를 넘겨
+   * 누적되지 않습니다 — 넘기면 서버 이동 검증에 곧바로 걸립니다.     */
+  separateFromRunners(dt);
 
   const hs = Math.hypot(local.vel.x, local.vel.z);
   if (hs > maxSpeed) {
@@ -2649,6 +2798,16 @@ function stepPhysics(dt) {
       if (sup.pedestal) { local.pos.y = sup.surf; local.vel.y = 0; }
       if (sup.tile) onSteppedOn(sup.tile);
     }
+  }
+
+  /* 발판을 잃는 순간 사인을 확정합니다.
+   * 여기서 잡아야 정확합니다 — 구름바다까지 떨어지는 데 1초, 잠기는
+   * 연출에 0.75초가 더 걸리므로, 탈락 시점에 판단하면 그 사이 스친
+   * 사람이 엉뚱하게 걸립니다. 스스로 뛴 경우(jumped)는 제외합니다. */
+  if (wasGrounded && !local.grounded && !local.jumped) {
+    const pushed = performance.now() - lastBump.at < BUMP.CREDIT_MS;
+    local.deathBy = pushed ? lastBump.id : null;
+    local.deathByName = pushed ? lastBump.name : '';
   }
 
   // ---- 애니메이션 상태 ----
@@ -2792,10 +2951,14 @@ function eliminateSelf(cause) {
   dom.deadFlash.classList.add('on');
   setTimeout(() => dom.deadFlash.classList.remove('on'), 900);
   if (local.avatar) local.avatar.group.visible = false;
-  G.socket.emit('player_death', { cause });
+  // by 가 있으면 밀려서 떨어진 것입니다 (stepPhysics 에서 발판을 잃는 순간 확정)
+  G.socket.emit('player_death', { cause, by: local.deathBy || undefined });
   G.role = 'spectator';
   updateSpectatorUI();
-  toast('심사 탈락 — 이제 관전자로 개입할 수 있습니다', 'kill');
+  toast(local.deathByName
+    ? safeName(local.deathByName) + ' 님에게 밀려 탈락 — 이제 관전자로 개입할 수 있습니다'
+    : '심사 탈락 — 이제 관전자로 개입할 수 있습니다', 'kill');
+  local.deathBy = null; local.deathByName = '';
 }
 
 /* --- 개발 모드: 레이어 안내문 클릭 → 그 층으로 순간이동 ---------------
@@ -3458,7 +3621,7 @@ function removeObstacle(id) {
 /* 원격 주자 동기화 상태 — F2 진단 패널에 표시합니다.
  * lastErr 이 평상시 0.3 을 넘나들면 SMOOTH_HALFLIFE 를, snaps 가 계속
  * 늘어나면 네트워크나 SNAP_DIST 를 의심하면 됩니다.                     */
-const netStats = { snaps: 0, lastErr: 0 };
+const netStats = { snaps: 0, lastErr: 0, corrections: 0, lastCorrectionToast: -Infinity };
 
 const UP_AXIS = new THREE.Vector3(0, 1, 0);   // slerp 회전축 (공용 상수)
 
@@ -3920,6 +4083,10 @@ function connect(name, mode) {
   socket.on('round_start', (d) => {
     dom.result.classList.remove('show');
     resetTileWear();
+    // 지난 회차의 밀림 기록이 새 회차 사인으로 넘어오지 않게 지웁니다
+    lastBump.id = null; lastBump.name = ''; lastBump.at = -Infinity;
+    local.deathBy = null; local.deathByName = '';
+    G.bumpReadyAt = performance.now() + BUMP.START_GRACE_MS;
     syncPlayers(d.players);
     const me = d.players.find((p) => p.id === G.selfId);
     if (me && G.role === 'player') {
@@ -4019,7 +4186,27 @@ function connect(name, mode) {
 
   socket.on('pedestals_clear', () => {
     clearPedestals();
+    // 전원이 동시에 공중에 뜨는 구간입니다. 여기서 서로 밀면 난장판이 됩니다.
+    G.bumpReadyAt = performance.now() + BUMP.START_GRACE_MS;
     toast('대기 발판 해제 — 최상층으로 낙하합니다', 'obstacle');
+  });
+
+  /* 서버 이동 검증에 걸려 위치가 되돌려졌습니다.
+   * 퇴장이 아니라 보정입니다 — 렉으로 인한 오탐이 퇴장으로 이어지면 안 됩니다. */
+  socket.on('state_correction', (d) => {
+    if (!d || !Array.isArray(d.p) || d.p.length !== 3) return;
+    local.pos.set(d.p[0], d.p[1], d.p[2]);
+    local.vel.set(0, 0, 0);
+    local.grounded = false;
+    local.jumped = false;
+    local.lastGroundY = d.p[1];
+    netStats.corrections++;
+    // 매번 토스트를 띄우면 도배가 됩니다. 3초에 한 번만 알립니다.
+    const now = performance.now();
+    if (now - netStats.lastCorrectionToast > 3000) {
+      netStats.lastCorrectionToast = now;
+      toast('위치가 서버 기준으로 보정되었습니다', 'kill');
+    }
   });
 
   /* 아직 안 무너진 타격 — 마모 단계만 올라갑니다 (일반 타일 1·2회차). */
@@ -4083,8 +4270,29 @@ function connect(name, mode) {
       }
     }
     if (d.id !== G.selfId) {
-      toast(safeName(d.name) + ' 님 탈락 · ' + d.placement + '위', 'kill');
+      // 밀어서 떨어뜨린 사람이 있으면 밝혀 줍니다 (내가 민 경우도 여기로 옵니다)
+      const by = d.byName ? safeName(d.byName) + ' 님이 밀어냄 · ' : '';
+      toast(by + safeName(d.name) + ' 님 탈락 · ' + d.placement + '위', 'kill');
       Sound.sfx('eliminate');
+    } else if (local.alive) {
+      /* 서버가 먼저 탈락시킨 경우 — 보고가 끊겨 서버가 대신 처리했습니다
+       * (server.js 의 eliminateStale). 예전에는 탈락을 항상 클라이언트가
+       * 시작했기 때문에 이 분기가 필요 없었지만, 이제는 서버가 통보할 수
+       * 있으므로 여기서 내 상태를 맞춰야 합니다. 안 그러면 내 화면에서만
+       * 계속 살아 움직이고 서버는 죽은 것으로 아는 어긋남이 생깁니다.
+       * player_death 를 되쏘지는 않습니다 — 이미 서버가 확정한 사실입니다. */
+      local.alive = false;
+      local.dying = 0;
+      G.selfAlive = false;
+      local.anim = 'dead';
+      if (local.avatar) local.avatar.group.visible = false;
+      dom.deadFlash.classList.add('on');
+      setTimeout(() => dom.deadFlash.classList.remove('on'), 900);
+      G.role = 'spectator';
+      Sound.sfx('death');
+      toast(d.cause === 'afk'
+        ? '연결이 끊긴 것으로 처리되어 탈락했습니다'
+        : '통신이 끊겨 탈락 처리되었습니다 — 이제 관전자로 개입할 수 있습니다', 'kill');
     }
     updateRoster(); updateSpectatorUI();
   });
@@ -4180,13 +4388,22 @@ let accumulator = 0;
 let sendAccum = 0;
 let fpsAccum = 0, fpsFrames = 0;
 
-function frame() {
-  requestAnimationFrame(frame);
-  const now = performance.now();
-  let dt = (now - lastTime) / 1000;
-  lastTime = now;
-  if (dt > 0.25) dt = 0.25;
-
+/* ── 왜 시뮬레이션과 렌더를 쪼갰는가 ───────────────────────────────────
+ * 브라우저는 비활성 탭의 requestAnimationFrame 을 멈춥니다. 예전에는
+ * 물리·전송·렌더가 frame() 한 덩어리였기 때문에, 알트탭한 참가자는 물리도
+ * 전송도 같이 멈췄습니다. 서버는 마지막으로 받은 위치를 계속 중계하므로
+ * 다른 사람 화면에서 대기 발판 높이에 낙하 자세로 굳어 버렸고, 죽지도
+ * 않아 checkRoundEnd 가 성립하지 않고 라운드가 5분 타임아웃까지 갔습니다.
+ *
+ *   simulate()    — 물리 + 업링크. 백그라운드에서도 워커 타이머로 돕니다.
+ *   renderFrame() — 아바타/월드/카메라/HUD/GL 드로우. 보일 때만 돕니다.
+ *
+ * 렌더를 백그라운드에서 돌리면 GPU 자원만 낭비하고 컨텍스트를 잃을 수도
+ * 있어서, 화면에 안 보이면 아예 건너뜁니다.
+ *
+ * lastTime 갱신은 stepFrameOnce() 한 곳에서만 합니다. frame() 에서 또
+ * 갱신하면 dt 가 0 이 되거나 물리가 두 배로 돕니다.                   */
+function simulate(dt, now) {
   /* --- fixed-step physics for the local runner --- */
   if (local.dying) {
     updateFallOut(dt);
@@ -4203,6 +4420,40 @@ function frame() {
     accumulator = 0;
   }
 
+  /* --- 20Hz uplink --- */
+  if (G.started && G.socket && G.role === 'player' && local.alive) {
+    sendAccum += dt;
+    if (sendAccum >= 1 / NET.SEND_HZ) {
+      /* 0 으로 밀지 않고 주기만큼 뺍니다. 밀어버리면 나머지가 버려져서
+       * 60fps 에서 3프레임(50.01ms)과 4프레임(66.7ms)이 번갈아 나오고
+       * 실효 전송률이 20Hz 가 아니라 17.5Hz 로 떨어집니다. 워커 틱(33ms)
+       * 에서는 더 심해서 15Hz 까지 내려갑니다.
+       * 다만 오래 멈췄다 돌아왔을 때 밀린 만큼 몰아 보내면 안 되므로,
+       * 두 주기 이상 밀렸으면 밀린 분은 버립니다.                      */
+      sendAccum = sendAccum > 2 / NET.SEND_HZ ? 0 : sendAccum - 1 / NET.SEND_HZ;
+      G.socket.emit('player_state', {
+        p: [local.pos.x, local.pos.y, local.pos.z],
+        v: [local.vel.x, local.vel.y, local.vel.z],
+        ry: local.ry,
+        layer: local.layer,
+        anim: local.anim,
+        g: local.grounded ? 1 : 0   // 접지 여부 — 원격 클라이언트의 중력 적분 근거
+      });
+    }
+  }
+}
+
+/** 한 스텝 전진. 포그라운드는 frame() 이, 백그라운드는 워커가 부릅니다. */
+function stepFrameOnce() {
+  const now = performance.now();
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+  if (dt > 0.25) dt = 0.25;
+  simulate(dt, now);
+  return { dt, now };
+}
+
+function renderFrame(dt, now) {
   /* --- local avatar --- */
   if (local.avatar) {
     local.avatar.group.position.copy(local.pos);
@@ -4228,22 +4479,6 @@ function frame() {
   updateCloudSea(dt, now);
   updateSplash(dt);
 
-  /* --- 20Hz uplink --- */
-  if (G.started && G.socket && G.role === 'player' && local.alive) {
-    sendAccum += dt;
-    if (sendAccum >= 1 / NET.SEND_HZ) {
-      sendAccum = 0;
-      G.socket.emit('player_state', {
-        p: [local.pos.x, local.pos.y, local.pos.z],
-        v: [local.vel.x, local.vel.y, local.vel.z],
-        ry: local.ry,
-        layer: local.layer,
-        anim: local.anim,
-        g: local.grounded ? 1 : 0   // 접지 여부 — 원격 클라이언트의 중력 적분 근거
-      });
-    }
-  }
-
   /* --- HUD --- */
   updateLayerStack(local.alive ? local.layer : currentLayerOf(spectateFocus().y));
   updateCountdown();
@@ -4258,6 +4493,63 @@ function frame() {
 
   renderer.render(scene, camera);
 }
+
+function frame() {
+  requestAnimationFrame(frame);
+  // 화면에 안 보이면 렌더는 건너뜁니다. 물리·전송은 워커 타이머가 맡습니다.
+  if (document.hidden) return;
+  const s = stepFrameOnce();
+  renderFrame(s.dt, s.now);
+}
+
+/* ── 백그라운드 틱 ────────────────────────────────────────────────────
+ * 비활성 탭에서는 setInterval/setTimeout 도 최소 1000ms 로 묶입니다
+ * (크롬은 5분 뒤 더 강하게 조입니다). 20Hz 전송이 1Hz 가 되면 원격
+ * 캐릭터가 뚝뚝 끊깁니다. 워커 타이머는 이 제한을 받지 않으므로,
+ * 워커에서 틱을 만들어 메인 스레드로 넘깁니다.
+ *
+ * 워커 파일을 따로 두면 배포 경로가 꼬이므로 Blob 인라인으로 만듭니다.
+ *
+ * 탭이 보일 때는 반드시 워커 틱을 멈춰야 합니다 — rAF 와 겹치면 물리가
+ * 두 배 속도로 돕니다. (onmessage 안에서도 document.hidden 으로 한 번 더
+ * 거릅니다. 정지 메시지가 늦게 도착하는 경우를 막기 위해서입니다.)   */
+let bgWorker = null;
+let bgFallbackTimer = null;
+
+function startBackgroundTicker() {
+  if (bgWorker || bgFallbackTimer) return;
+  if (typeof Worker === 'undefined') {
+    bgFallbackTimer = setInterval(() => { if (document.hidden) stepFrameOnce(); }, 50);
+    return;
+  }
+  try {
+    const src = 'let id=null;onmessage=e=>{' +
+      'if(e.data==="start"){if(!id)id=setInterval(()=>postMessage(0),33);}' +
+      'else if(e.data==="stop"){clearInterval(id);id=null;}};';
+    const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+    bgWorker = new Worker(url);
+    URL.revokeObjectURL(url);
+    bgWorker.onmessage = () => { if (document.hidden) stepFrameOnce(); };
+  } catch (e) {
+    // 사내 CSP 등으로 Blob 워커가 막히는 환경이 있습니다. 그때는 1Hz 라도 도는 편이 낫습니다.
+    console.warn('[IPG] 워커 타이머 사용 불가 — setInterval 로 대체', e && e.message);
+    bgWorker = null;
+    bgFallbackTimer = setInterval(() => { if (document.hidden) stepFrameOnce(); }, 50);
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    startBackgroundTicker();
+    if (bgWorker) bgWorker.postMessage('start');
+  } else {
+    if (bgWorker) bgWorker.postMessage('stop');
+    /* 복귀 튐 방지. 워커 틱과 rAF 사이에 시간이 비어 있을 수 있고,
+     * 누적기에 큰 값이 남아 있으면 돌아오자마자 물리가 몰아서 돕니다. */
+    lastTime = performance.now();
+    accumulator = 0;
+  }
+});
 
 /* ============================ 15.5 진단 패널 ========================== */
 /* 연결이 안 되거나 라운드가 시작되지 않을 때, 어느 단계에서 막혔는지
@@ -4298,6 +4590,11 @@ function renderDiag() {
      * 계속 늘어나면 네트워크 또는 NET 튜닝값을 의심하면 됩니다.          */
     row('예측오차', netStats.lastErr < 1.0, netStats.lastErr.toFixed(2) + ' (스냅 ' + NET.SNAP_DIST + ')') +
     row('강제스냅', netStats.snaps === 0, netStats.snaps + '회') +
+    /* 서버 이동 검증에 걸린 횟수. 평상시 0 이어야 합니다. 계속 늘어나면
+     * server.js 의 VALIDATE 한계가 너무 빡빡하거나 네트워크가 나쁜 것입니다. */
+    row('이동보정', netStats.corrections === 0,
+        netStats.corrections + '회' + (G.cfg && G.cfg.VALIDATE_ON === false ? ' (검증 꺼짐)' : '')) +
+    row('주자충돌', null, 'BUMP ' + (BUMP.PUSH_OFF_EDGE ? '켜짐 · 밀려서 떨어짐' : '켜짐 · 가장자리 보호')) +
     row('DEV_MODE', null, DEV.on
       ? '켜짐 (타일 안 무너짐 / 탈락 없음 / 타일 x1.5)'
       : '꺼짐 (정상 게임)') +

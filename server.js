@@ -83,6 +83,89 @@ const FUSE_TRAP_MS = 200;       // 0.2s  무단 카피캣 함정 블록
  * 함정 타일(trap)은 이 값과 무관하게 항상 1회에 즉시 붕괴합니다.       */
 const TILE_HITS = parseInt(process.env.TILE_HITS, 10) || 3;
 
+/* ── 이동 검증 (VALIDATE) ─────────────────────────────────────────────
+ * 이동은 여전히 클라이언트 권위입니다. 서버가 물리를 돌리지는 않습니다.
+ * 다만 보고된 위치가 '물리적으로 가능한 범위'인지는 봅니다.
+ *
+ * 왜 지금 필요한가: 주자간 밀림(클라이언트 BUMP)이 들어가면서 밀려서
+ * 떨어지는 것이 정식 탈락 사유가 되었습니다. 검증이 없으면 "나는 안
+ * 밀렸다"고 좌표를 고쳐 보내는 클라이언트를 막을 근거가 없습니다.
+ *
+ * 위반해도 강제 퇴장시키지 않습니다 — 렉으로 인한 오탐이 퇴장으로
+ * 이어지면 안 됩니다. WARN_AT 회 '연속' 위반해야 마지막 정상 위치로
+ * 되돌립니다(state_correction). 통과한 보고가 하나라도 오면 초기화됩니다.
+ *
+ * 속도 한계는 클라이언트 PHYS 와 짝입니다 — public/index.html 의 PHYS 를
+ * 바꾸면 여기도 같이 바꿔야 합니다.
+ *
+ * 끄는 법:  VALIDATE=0 npm start
+ * ------------------------------------------------------------------ */
+const VALIDATE = {
+  ON: process.env.VALIDATE !== '0' && process.env.VALIDATE !== 'false',
+
+  /* 수평 이동은 '토큰 버킷'으로 봅니다.
+   *
+   * 처음에는 패킷당 거리 ÷ 도착 시각 차이로 속도를 냈는데, dt 를 서버 도착
+   * 시각으로 재면서 이동량은 클라이언트 물리 시간 기준이라 지터가 끼면 둘이
+   * 어긋납니다. 정직한 봇이 30초에 62번 보정당했습니다. dt 하한을 올려
+   * 막으려 했더니 이번엔 실효 속도 상한이 36 m/s 로 올라가 버렸습니다.
+   *
+   * 버킷은 둘 다 해결합니다 — 시간에 비례해 예산이 차고(지터가 평균으로
+   * 상쇄됨), BURST 를 넘겨 쌓이지 않으므로 지속 속도는 정확히
+   * MAX_H_SPEED 로 묶입니다.                                          */
+  MAX_H_SPEED: 21.5 * 1.4,   // PHYS.SPRINT(21.5) + 40% 여유 (장애물 넉백이
+                             // 한 프레임 SPRINT 를 넘길 수 있습니다)
+  BURST: 6.0,                // 한 보고에 허용하는 최대 이동거리(m).
+                             // 패킷이 한두 개 유실돼 250ms 만에 몰아 와도
+                             // 스프린트 이동분(5.4 m)이 들어갑니다.
+
+  /* 수직은 버킷을 쓰지 않습니다. 중력이 이미 자연스러운 상한이고,
+   * 낙하는 정상적으로 아주 빠릅니다. 순간 판정 + 여유값으로 충분합니다. */
+  MAX_UP_SPEED: 34,          // PHYS.JUMP_V(21.5) + 장애물 팝(9) + 여유
+  MAX_DOWN_SPEED: 120,       // PHYS.MAX_FALL(90) + 여유
+  V_MIN_DT: 0.02,
+  V_SLACK: 1.0,              // 착지 스냅(findLanding)이 한 프레임에 내는 도약분
+
+  /* MAX_DT 가 없으면 오래 끊겼다 돌아온 클라이언트의 버킷이 가득 차
+   * 순간이동 한 번이 통과합니다. BURST 와 함께 이중으로 막습니다.     */
+  MAX_DT: 0.5,
+  BOUND_XZ: 220,             // 클라이언트 장외 판정(170) 보다 넉넉하게
+  MIN_Y: -140, MAX_Y: 140,
+  WARN_AT: 4,                // 연속 위반 이 횟수에서 보정 (20Hz 기준 약 200ms)
+  LOG: true
+};
+
+/* ── 보고가 끊긴 플레이어 (STALE) ─────────────────────────────────────
+ * 브라우저는 비활성 탭의 requestAnimationFrame 을 멈춥니다. 그러면 물리도
+ * player_state 도 안 나가고, 서버는 마지막 위치를 계속 중계하므로 그 사람은
+ * 다른 화면에서 '공중에 낙하 자세로 굳은 조각상'이 됩니다. 죽지도 않으니
+ * checkRoundEnd 가 성립하지 않아 라운드가 ROUND_MAX_MS(5분)까지 갑니다.
+ *
+ * 클라이언트도 워커 타이머로 백그라운드 전송을 유지하지만(index.html 의
+ * startBackgroundTicker), 그쪽만 믿으면 브라우저 정책이 바뀌거나 절전 모드로
+ * 들어갔을 때 다시 당합니다. 여기가 안전망입니다.
+ *
+ * DROP_MS 를 넉넉히 잡은 이유: 파트 A 가 정상 동작하면 백그라운드 탭도
+ * 33ms 마다 보고하므로 절대 여기 걸리지 않습니다. 너무 짧게 잡으면 순간적인
+ * 렉으로 멀쩡한 플레이어가 떨어집니다.                                */
+const STALE = {
+  ANIM_MS: 700,     // 이만큼 보고가 없으면 anim 을 idle 로 (낙하 자세 고정 방지)
+
+  /* 이만큼 없으면 서버가 대신 중력을 적용합니다.
+   *
+   * 실측으로 2500 에서 5000 으로 올렸습니다. 탈락까지 걸리는 시간은
+   * DROP_MS + 낙하 시간이고, 최상층(y=24.35)에서 구름바다(SEA_Y+2=-14)까지
+   * 38.35 m 를 g=62 로 떨어지는 데 약 1.1~1.4초가 걸립니다.
+   *   DROP_MS 2500 → 약 3.9초 침묵이면 사망   (5초 멈췄다 돌아오면 죽어 있음)
+   *   DROP_MS 5000 → 약 6.2초 침묵이면 사망   (5초 복귀는 무사)
+   * 파트 A(워커 타이머)가 살아 있으면 백그라운드 탭도 20Hz 로 계속 보고하므로
+   * 여기 걸릴 일이 없습니다. 절전 모드·페이지 동결처럼 정말로 플레이가
+   * 불가능한 경우의 안전망이라, 짧게 잡아 얻는 것보다 잃는 게 큽니다.   */
+  DROP_MS: 5000,
+
+  KICK_MS: 20000    // 이만큼 없으면 탈락 처리 (라운드가 안 끝나는 것 방지)
+};
+
 // Spectator intervention economy.
 const BOOSTER_COOLDOWN_MS = 9000;
 const OBSTACLE_COOLDOWN_MS = 12000;
@@ -370,8 +453,64 @@ function makePlayer(id, name, seat, room) {
      * 공중이면 낙하 가속을 적분하고, 접지 상태면 수평 등속으로만 밉니다.   */
     grounded: true,
     wins: 0,
-    lastInput: Date.now()
+    lastInput: Date.now(),
+
+    /* 이동 검증 상태 (VALIDATE).
+     *   lastGood   : 마지막으로 검증을 통과한 위치. 보정할 때 이 자리로 되돌립니다.
+     *   lastGoodAt : 그 시각. 여기부터 흐른 시간만큼 예산이 찹니다.
+     *   budget     : 남은 수평 이동 예산(m). 토큰 버킷.
+     *   strikes    : 연속 위반 횟수. 통과 보고가 하나라도 오면 0 으로 돌아갑니다. */
+    lastGood: { x: spawn.x, y: spawn.y, z: spawn.z },
+    lastGoodAt: Date.now(),
+    budget: VALIDATE.BURST,
+    strikes: 0,
+    corrections: 0
   };
+}
+
+/** 검증 기준점을 지금 위치로 다시 잡습니다. 서버가 위치를 옮긴 직후에 부릅니다. */
+function resetValidation(p) {
+  p.lastGood.x = p.pos.x; p.lastGood.y = p.pos.y; p.lastGood.z = p.pos.z;
+  p.lastGoodAt = Date.now();
+  p.budget = VALIDATE.BURST;
+  p.strikes = 0;
+}
+
+/**
+ * 보고된 위치가 물리적으로 가능한 범위인지 봅니다.
+ *
+ * 통과하면 수평 이동분만큼 버킷을 씁니다(부작용). 거절하면 버킷도 시각도
+ * 건드리지 않으므로, 진짜 렉이었다면 다음 보고에서 예산이 차 있어 스스로
+ * 회복됩니다. 반대로 순간이동은 BURST 를 넘으므로 아무리 기다려도 통과하지
+ * 못합니다.
+ *
+ * 잡을 수 있는 것: 속도 핵, 순간이동, 비행, 장외.
+ * 잡을 수 없는 것: '밀림을 자기에게 적용하지 않는' 클라이언트. 가만히 있는
+ * 것은 물리적으로 가능한 움직임이라 이 방식으로는 구분되지 않습니다.
+ * 다만 밀려 떨어진 뒤 타일 위로 되돌아가는 것은 순간이동이라 잡힙니다.
+ */
+function moveIsPlausible(p, nx, ny, nz, now) {
+  if (!Number.isFinite(nx) || !Number.isFinite(ny) || !Number.isFinite(nz)) return false;
+  if (Math.abs(nx) > VALIDATE.BOUND_XZ || Math.abs(nz) > VALIDATE.BOUND_XZ) return false;
+  if (ny < VALIDATE.MIN_Y || ny > VALIDATE.MAX_Y) return false;
+
+  let dt = (now - p.lastGoodAt) / 1000;
+  if (dt < 0) dt = 0;
+  else if (dt > VALIDATE.MAX_DT) dt = VALIDATE.MAX_DT;
+
+  // 수평 — 토큰 버킷
+  const budget = Math.min(VALIDATE.BURST, (p.budget || 0) + VALIDATE.MAX_H_SPEED * dt);
+  const dh = Math.hypot(nx - p.lastGood.x, nz - p.lastGood.z);
+  if (dh > budget) return false;
+
+  // 수직 — 순간 판정. 위로 솟는 것만 빡빡하게 봅니다.
+  const vdt = Math.max(dt, VALIDATE.V_MIN_DT);
+  const dy = ny - p.lastGood.y;
+  if (dy > VALIDATE.MAX_UP_SPEED * vdt + VALIDATE.V_SLACK) return false;
+  if (-dy > VALIDATE.MAX_DOWN_SPEED * vdt + VALIDATE.V_SLACK) return false;
+
+  p.budget = budget - dh;      // 통과했을 때만 씁니다
+  return true;
 }
 
 function publicPlayer(p) {
@@ -453,6 +592,10 @@ function startRound(room) {
     p.placement = 0;
     p.layer = 3;
     p.anim = 'fall';
+    // 대기 중에는 검증을 쉬므로 기준점이 낡아 있습니다. 지금 자리에서 다시 잡습니다.
+    resetValidation(p);
+    // stale 시계도 지금부터. 안 하면 라운드 시작 직후 곧바로 stale 판정이 납니다.
+    p.lastInput = Date.now();
   }
   room.pedestalsActive = false;
 
@@ -466,6 +609,33 @@ function startRound(room) {
   roomTimeout(room, () => {
     if (room.phase === 'playing') endRound(room, null, 'timeout');
   }, ROUND_MAX_MS);
+}
+
+/**
+ * 서버가 대신 탈락시킵니다 — 보고가 끊겨 클라이언트가 player_death 를
+ * 보낼 수 없는 경우 전용입니다. 처리 내용은 player_death 핸들러와 같습니다.
+ */
+function eliminateStale(room, p, cause) {
+  if (!p.alive) return;
+  p.alive = false;
+  p.anim = 'dead';
+  p.vel.x = 0; p.vel.y = 0; p.vel.z = 0;
+  p.placement = aliveCount(room) + 1;
+
+  io.to(room.id).emit('eliminated', {
+    id: p.id,
+    name: p.name,
+    color: p.color,
+    placement: p.placement,
+    cause,
+    by: null, byName: null,      // 밀려서가 아니라 연결이 끊겨서입니다
+    alive: aliveCount(room)
+  });
+
+  // 탈락한 주자는 곧바로 관전자 개입 권한을 얻습니다 (player_death 와 동일)
+  room.spectators.set(p.id, { id: p.id, name: p.name });
+  console.log('[stale] ' + p.name + ' 자동 탈락 (' + cause + ')');
+  checkRoundEnd(room);
 }
 
 function checkRoundEnd(room) {
@@ -571,6 +741,8 @@ function resetRoom(room) {
     const sp = room.map.spawns[si % room.map.spawns.length];
     p.pos = { x: sp.x, y: sp.y, z: sp.z };
     p.vel = { x: 0, y: 0, z: 0 };
+    resetValidation(p);          // 서버가 옮겼으므로 기준점도 같이 옮깁니다
+    p.lastInput = Date.now();    // 새 회차 — stale 시계도 다시 0 부터
     si++;
   }
 
@@ -710,7 +882,9 @@ app.get('/api/rooms', (_req, res) => {
     id: r.id,
     phase: r.phase,
     players: r.players.size,
-    spectators: r.spectators.size
+    spectators: r.spectators.size,
+    // 이동 검증이 얼마나 개입했는지. 평상시 0 이어야 정상입니다.
+    corrections: [...r.players.values()].reduce((n, p) => n + (p.corrections || 0), 0)
   })));
 });
 
@@ -728,6 +902,7 @@ io.on('connection', (socket) => {
     now: Date.now(),
     config: {
       DEV_MODE,   // 클라이언트가 이 값으로 CSS/텔레포트/카메라를 맞춥니다
+      VALIDATE_ON: VALIDATE.ON,   // 진단 패널에 검증 동작 여부를 표시합니다
       MAX_PLAYERS, TICK_HZ, HEX_SIZE, HEX_THICKNESS, GRID_RADIUS,
       SEA_Y, LAYERS, FUSE_NORMAL_MS, FUSE_TRAP_MS, PEDESTAL_RISE, PEDESTAL_SCALE,
       BOOSTER_TTL_MS, OBSTACLE_FALL_MS,
@@ -796,9 +971,46 @@ io.on('connection', (socket) => {
     if (!p || !p.alive) return;
     if (!s || !Array.isArray(s.p) || s.p.length !== 3) return;
 
-    p.pos.x = +s.p[0] || 0;
-    p.pos.y = +s.p[1] || 0;
-    p.pos.z = +s.p[2] || 0;
+    const nx = +s.p[0] || 0, ny = +s.p[1] || 0, nz = +s.p[2] || 0;
+    const now = Date.now();
+
+    /* "이 클라이언트가 살아서 말을 걸고 있다"는 사실은 좌표가 타당한지와
+     * 별개입니다. 검증 거절 경로보다 먼저 찍어야, 렉으로 보정을 연달아
+     * 받는 사람이 stale(AFK) 로도 오인되어 두 번 벌받지 않습니다.      */
+    p.lastInput = now;
+
+    /* 검증은 라운드 중에만 합니다.
+     * 대기 중에는 발판에서 떨어진 사람을 클라이언트가 제자리로 순간이동시키고
+     * (stepPhysics 의 '대기 중 이탈 방지'), 개발 모드에는 레이어 텔레포트가
+     * 있습니다. 둘 다 정상 동작이라 검증에 걸리면 안 됩니다.            */
+    if (VALIDATE.ON && !DEV_MODE && room.phase === 'playing') {
+      if (!moveIsPlausible(p, nx, ny, nz, now)) {
+        p.strikes++;
+        if (p.strikes >= VALIDATE.WARN_AT) {
+          p.strikes = 0;
+          p.corrections++;
+          p.pos.x = p.lastGood.x; p.pos.y = p.lastGood.y; p.pos.z = p.lastGood.z;
+          p.vel.x = 0; p.vel.y = 0; p.vel.z = 0;
+          p.lastGoodAt = now;
+          socket.emit('state_correction', {
+            p: [p.lastGood.x, p.lastGood.y, p.lastGood.z],
+            at: now
+          });
+          if (VALIDATE.LOG) {
+            console.log('[validate] ' + p.name + ' 위치 보정 (' + p.corrections + '회) -> ' +
+              p.lastGood.x.toFixed(1) + ',' + p.lastGood.y.toFixed(1) + ',' + p.lastGood.z.toFixed(1));
+          }
+        }
+        return;                    // 이번 보고는 버립니다
+      }
+      p.strikes = 0;               // 통과 — 연속 카운터 초기화
+      p.lastGood.x = nx; p.lastGood.y = ny; p.lastGood.z = nz;
+      p.lastGoodAt = now;
+    }
+
+    p.pos.x = nx;
+    p.pos.y = ny;
+    p.pos.z = nz;
     if (Array.isArray(s.v) && s.v.length === 3) {
       p.vel.x = +s.v[0] || 0;
       p.vel.y = +s.v[1] || 0;
@@ -809,7 +1021,7 @@ io.on('connection', (socket) => {
     p.anim = typeof s.anim === 'string' ? s.anim.slice(0, 12) : 'idle';
     // 접지 여부(g). 구 클라이언트는 이 필드를 안 보내므로, 없으면 종전처럼 공중으로 봅니다.
     p.grounded = s.g === undefined ? false : !!s.g;
-    p.lastInput = Date.now();
+    // lastInput 은 이 핸들러 맨 위에서 이미 찍었습니다 (검증 거절 경로에서도 찍히도록)
   });
 
   socket.on('tile_step', (data = {}) => {
@@ -831,12 +1043,23 @@ io.on('connection', (socket) => {
     p.anim = 'dead';
     p.placement = aliveCount(room) + 1;
 
+    /* 밀어서 떨어뜨린 사람. 클라이언트가 by 로 보내오지만 그대로 믿지 않고
+     * 같은 방에 살아 있는 주자인지만 확인합니다 — 자기 자신을 넣거나
+     * 없는 id 를 넣어 로그를 어지럽히는 것을 막습니다.                 */
+    let pusher = null;
+    if (typeof data.by === 'string' && data.by !== p.id) {
+      const cand = room.players.get(data.by);
+      if (cand) pusher = cand;
+    }
+
     io.to(room.id).emit('eliminated', {
       id: p.id,
       name: p.name,
       color: p.color,
       placement: p.placement,
       cause: typeof data.cause === 'string' ? data.cause.slice(0, 24) : 'fall',
+      by: pusher ? pusher.id : null,
+      byName: pusher ? pusher.name : null,
       alive: aliveCount(room)
     });
 
@@ -999,6 +1222,45 @@ setInterval(() => {
     if (pruned) { broadcastPhase(room); checkRoundEnd(room); }
 
     if (room.players.size === 0 && room.spectators.size === 0) continue;
+
+    /* ── 보고가 끊긴 플레이어 처리 (STALE) ──────────────────────────
+     * 스냅샷을 만들기 전에 손봅니다. 여기서 고치지 않으면 마지막으로 받은
+     * 낙하 자세가 그대로 중계되어 공중에 굳어 보입니다.
+     *
+     * 클라이언트 워커 타이머가 정상이면 여기 걸릴 일이 없습니다.
+     * 절전 모드·CSP 로 워커가 막힌 경우의 안전망입니다.               */
+    if (room.phase === 'playing') {
+      for (const p of room.players.values()) {
+        if (!p.alive) continue;
+        const age = now - (p.lastInput || 0);
+        if (age <= STALE.ANIM_MS) continue;
+
+        if (age > STALE.KICK_MS) { eliminateStale(room, p, 'afk'); continue; }
+
+        if (age > STALE.DROP_MS) {
+          /* 서버가 대신 중력을 적용합니다. 타일 충돌은 보지 않고 그냥
+           * 떨어뜨립니다 — 서버에는 물리가 없어 착지 판정을 할 수 없고,
+           * 여기까지 온 시점에서 그 플레이어는 이미 게임을 진행하지 못하는
+           * 상태입니다.
+           *
+           * 일부러 lastGood(VALIDATE 기준점)은 건드리지 않습니다. 돌아온
+           * 클라이언트가 자기 원래 높이를 보고했을 때 '비행'으로 걸려
+           * 구름바다로 보정당하는 것을 막기 위해서입니다. 즉 이 낙하는
+           * 구름바다에 닿기 전까지는 되돌릴 수 있는 연출입니다.        */
+          const dts = TICK_MS / 1000;
+          p.vel.y = Math.max(-90, (p.vel.y || 0) - 62 * dts);
+          p.pos.y += p.vel.y * dts;
+          p.anim = 'fall';
+          p.grounded = false;
+          if (p.pos.y <= SEA_Y + 2) eliminateStale(room, p, 'timeout');
+        } else if (p.anim === 'fall') {
+          /* 낙하 자세로 굳는 것을 막습니다 — 보고된 증상의 직접 해결.
+           * startRound 가 anim='fall' 로 시작시키는데 클라이언트가 갱신을
+           * 못 보내면 영원히 그 자세로 남습니다.                       */
+          p.anim = 'idle';
+        }
+      }
+    }
 
     const players = [];
     for (const p of room.players.values()) {
