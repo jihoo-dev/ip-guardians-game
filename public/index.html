@@ -18,9 +18,11 @@
   --paper:#ece7d8;
   --ink:#12141c;
   --stamp:#ff2d2d;
-  --l3:#00ffcc;   /* 우선심사 패스트트랙 */
-  --l2:#0088ff;   /* 의견제출통지 */
-  --l1:#aa00ff;   /* 아이디어 구상 */
+  /* 층 색이 아니라 UI 강조색입니다. 층 색은 서버 LAYER_DEFS 에서 내려와
+   * 각 .doc 에 인라인 --layer-c 로 꽂힙니다 (buildLayerStack).        */
+  --l3:#00ffcc;   /* 주 강조 (버튼·수치) */
+  --l2:#0088ff;   /* 보조 강조 */
+  --l1:#aa00ff;   /* 보조 강조 2 */
   --fall:#ff6b8a;
   --gold:#ffcc00;
   --rule:rgba(236,231,216,.18);
@@ -53,9 +55,21 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
 #vPing.bad{color:var(--stamp)}
 
 /* ------------------------------------------ signature: 심사단계 스탬프 ---- */
+/* 층 수는 서버 LAYER_DEFS 가 정하므로 3개일 수도 7개일 수도 있습니다.
+ * 항목이 4개 이상이면 .compact 로 높이를 줄이고, 그래도 넘치면 .scroll
+ * 이 붙어 스크롤됩니다(둘 다 buildLayerStack 이 판단해 붙입니다).
+ * padding-right 는 .doc.on 의 translateX 가 잘리지 않게 두는 여백입니다. */
 #layerStack{
-  position:absolute;left:18px;top:96px;display:flex;flex-direction:column;gap:8px;width:196px;
+  position:absolute;left:18px;top:96px;display:flex;flex-direction:column;gap:8px;
+  width:208px;padding-right:12px;max-height:calc(100vh - 190px);
 }
+#layerStack.scroll{overflow-y:auto;pointer-events:auto;scrollbar-width:thin}
+#layerStack.compact{gap:5px}
+#layerStack.compact .doc{padding:6px 10px 7px}
+#layerStack.compact .doc .nm{font-size:11px;margin-top:2px;line-height:1.25}
+#layerStack.compact .doc .alt{margin-top:2px}
+#layerStack.compact .doc.on{transform:translateX(6px)}
+#layerStack.compact .doc.on::before{top:6px;right:10px}
 .doc{
   position:relative;background:rgba(236,231,216,.06);border:1px solid var(--rule);
   padding:10px 12px 11px;transition:.28s cubic-bezier(.2,.8,.2,1);
@@ -77,34 +91,66 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
   padding:1px 5px;transform:rotate(-7deg);animation:stamp .5s cubic-bezier(.2,1.5,.4,1)
 }
 @keyframes stamp{from{transform:rotate(-7deg) scale(2.1);opacity:0}to{transform:rotate(-7deg) scale(1);opacity:1}}
-.doc[data-l="3"]{--layer-c:var(--l3)} .doc[data-l="2"]{--layer-c:var(--l2)} .doc[data-l="1"]{--layer-c:var(--l1)}
+/* --layer-c 는 buildLayerStack 이 서버 층 색으로 인라인 지정합니다.
+ * 여기 있던 .doc[data-l="3"] … 3줄짜리 매핑은 층이 3개일 때만 맞았습니다. */
+.doc{--layer-c:var(--l3)}
 
 /* ── 개발용 테스트 모드 (body.dev) ────────────────────────────────────
  * 레이어 안내문은 평소 거의 투명한 배경(6% 흰색)이라, 밝은 배경 테마에서는
  * 흰 글씨가 하늘에 묻혀 읽기 어렵습니다. 개발 모드에서는 뒤에 검정 60%
  * 박스를 깔아 배경이 밝든 어둡든 항상 읽히게 합니다.
- * 클릭하면 그 층으로 이동하므로 커서도 손가락으로 바꿉니다.            */
-/* #hud 전체가 pointer-events:none 이라 그대로는 클릭이 통과해 버립니다.
- * 개발 모드에서만 레이어 안내문이 클릭을 받도록 되살립니다.            */
-body.dev #layerStack{pointer-events:auto}
+ * (층 이동은 아래 #devLayers 버튼이 담당합니다 — 안내문은 안내문으로 둡니다) */
 body.dev .doc{
   background:rgba(0,0,0,.6);
   border-color:rgba(236,231,216,.34);
-  cursor:pointer;
   /* 글자 자체에도 옅은 그림자를 줘서 밝은 배경에서 윤곽이 살아납니다 */
   text-shadow:0 1px 3px rgba(0,0,0,.85);
 }
-body.dev .doc:hover{background:rgba(0,0,0,.78);border-color:rgba(236,231,216,.6)}
 body.dev .doc.on{background:rgba(0,0,0,.72)}
 /* 배경이 어두워진 만큼 보조 텍스트 대비도 올립니다 */
 body.dev .doc .no{color:rgba(236,231,216,.62)}
 body.dev .doc .alt{color:rgba(236,231,216,.55)}
-/* 개발 모드임을 화면에서도 알 수 있게 배지를 답니다 */
-body.dev #layerStack::before{
-  content:'DEV MODE · 클릭하면 이동';
+
+/* 개발 모드 배지 — 상단 가운데. 실수로 운영에 켜 두면 바로 보이게 크게 답니다. */
+#devBadge{
+  position:absolute;left:50%;top:10px;transform:translateX(-50%);
+  display:none;flex-direction:column;align-items:center;gap:3px;
+  pointer-events:none;z-index:30;
+}
+body.dev #devBadge{display:flex}
+#devBadge .tag{
+  font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.22em;
+  color:var(--ink);background:var(--gold);padding:4px 12px;
+  box-shadow:0 2px 10px rgba(0,0,0,.45);
+}
+#devBadge .flags{
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;
+  color:var(--paper);background:rgba(0,0,0,.68);padding:3px 9px;
+  display:flex;gap:9px;white-space:nowrap;
+}
+#devBadge .flags b{font-weight:700;color:var(--gold)}
+#devBadge .flags s{text-decoration:line-through;opacity:.42}
+
+/* 층 이동 버튼 — 층 수는 서버 config(LAYERS)를 따라가므로 개수가 고정이 아닙니다 */
+#devLayers{
+  position:absolute;left:18px;display:none;flex-direction:column;gap:4px;width:196px;
+  pointer-events:auto;z-index:20;
+}
+body.dev #devLayers{display:flex}
+#devLayers .hd{
   font-family:var(--mono);font-size:9px;letter-spacing:.14em;
   color:var(--ink);background:var(--gold);padding:3px 7px;align-self:flex-start;
 }
+#devLayers button{
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-align:left;
+  color:var(--paper);background:rgba(0,0,0,.6);border:1px solid rgba(236,231,216,.34);
+  padding:7px 10px;cursor:pointer;transition:.18s;
+  display:flex;justify-content:space-between;align-items:center;gap:8px;
+}
+#devLayers button:hover{background:rgba(0,0,0,.82);border-color:var(--gold)}
+#devLayers button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+#devLayers button.cur{border-color:var(--gold);color:var(--gold)}
+#devLayers button .y{opacity:.55;font-size:10px}
 
 /* ------------------------------------------------------- roster (right) -- */
 #roster{position:absolute;right:18px;top:96px;width:212px;display:flex;flex-direction:column;gap:6px;
@@ -270,11 +316,15 @@ input[type=text]{
     </button>
   </div>
 
-  <div id="layerStack">
-    <div class="doc" data-l="3"><div class="no">LAYER 03</div><div class="nm">우선심사 패스트트랙 레이어</div><div class="alt">FAST-TRACK EXAMINATION</div></div>
-    <div class="doc" data-l="2"><div class="no">LAYER 02</div><div class="nm">의견제출통지 레이어</div><div class="alt">OFFICE ACTION</div></div>
-    <div class="doc" data-l="1"><div class="no">LAYER 01</div><div class="nm">아이디어 구상 레이어</div><div class="alt">IDEATION</div></div>
-  </div>
+  <!-- 층 안내문은 비워 둡니다. 서버 config.LAYERS 를 받은 뒤
+       buildLayerStack() 이 층 수만큼 만들어 넣습니다. -->
+  <div id="layerStack"></div>
+
+  <!-- 개발 모드 UI. 평소에는 display:none 이고 body.dev 일 때만 나타납니다.
+       #devLayers 의 버튼은 서버 config(LAYERS)로 만들어지므로 층이 5개가 되면
+       버튼도 5개가 됩니다 (buildDevLayerButtons). -->
+  <div id="devBadge"><div class="tag">DEV MODE</div><div class="flags" id="devFlags"></div></div>
+  <div id="devLayers"><div class="hd">층 이동</div></div>
 
   <div id="roster"><div class="rname">출원인 명단</div><div id="rosterList"></div></div>
 
@@ -290,7 +340,8 @@ input[type=text]{
   </div>
 
   <div id="diag" class="panel"><b>진단 F2</b><div id="diagBody">대기</div></div>
-  <div id="hint">WASD 이동 · SPACE 점프 · SHIFT 질주 · 마우스 드래그로 시점 회전<br><b>일반 타일 3회</b> · 함정 블록 1회에 붕괴</div>
+  <!-- 두 번째 줄(타일 규칙)은 buildRulesText 가 서버 상수로 채웁니다 -->
+  <div id="hint">WASD 이동 · SPACE 점프 · SHIFT 질주 · 마우스 드래그로 시점 회전<br><span id="hintRules"></span></div>
 </div>
 
 <div id="mixer" class="panel">
@@ -304,9 +355,11 @@ input[type=text]{
 
 <div class="screen show" id="joinScreen">
   <div class="card">
-    <div class="eyebrow">KIPO SURVIVAL PROTOCOL · 3-LAYER</div>
+    <!-- 층 수와 타일 규칙 문구는 서버 config 로 채웁니다 (buildRulesText).
+         하드코딩해 두면 LAYER_DEFS / TILE_KINDS 를 고칠 때마다 같이 틀립니다. -->
+    <div class="eyebrow" id="joinEyebrow">KIPO SURVIVAL PROTOCOL</div>
     <h1>바닥이 무너지기 전에<br><em>등록결정</em>까지 살아남으세요.</h1>
-    <p class="sub">일반 특허 심사 타일은 <b>3번 밟으면</b> 무너집니다. 밟을수록 색이 옅어지고 균열이 갑니다. 무단 카피캣 함정 블록은 <b>한 번에</b> 붕괴합니다. 정원이 차면 대기 발판이 사라지며 시작됩니다. 1층 아래로 떨어지면 구름바다에 빠져 탈락합니다. 마지막 한 명이 등록결정을 받습니다.</p>
+    <p class="sub" id="joinRules">심사 규격을 불러오는 중…</p>
     <div class="field">
       <label for="nameInput">출원인 이름</label>
       <input type="text" id="nameInput" maxlength="14" placeholder="예: 김심사" autocomplete="off" />
@@ -458,7 +511,10 @@ const dom = {
   countdown: $('countdown'), cdNum: $('cdNum'), cdLabel: $('cdLabel'),
   result: $('result'), resultTitle: $('resultTitle'), resultSub: $('resultSub'),
   resultRank: $('resultRank'), resultEyebrow: $('resultEyebrow'),
-  deadFlash: $('deadFlash'), hint: $('hint'), docs: Array.from(document.querySelectorAll('.doc'))
+  deadFlash: $('deadFlash'), hint: $('hint'),
+  /* 층 안내문은 서버 층 수만큼 동적으로 만들어집니다.
+   * buildLayerStack() 이 만든 뒤 여기를 다시 채웁니다.               */
+  docs: []
 };
 
 function toast(text, kind) {
@@ -490,17 +546,31 @@ const G = {
   pedestals: new Map(),    // 대기 발판
   pedestalsActive: true,
   seats: 4,
-  layerTiles: { 1: [], 2: [], 3: [] },
-  // 서버 config 를 받기 전에도 어긋나지 않도록 새 규격과 같은 값으로 둡니다
-  layerY: { 1: 0, 2: 12, 3: 24 },
-  seaY: -16,
+  /* 층 관련 상태는 전부 서버 config.LAYERS 에서 만들어집니다(buildMap).
+   * 층 번호를 키로 쓰는 맵이라 층이 몇 개든, 번호가 무엇이든 따라옵니다. */
+  layerTiles: {},          // 층 번호 -> 타일 레코드 배열
+  layerY: {},              // 층 번호 -> 바닥 y
+  layerColor: {},          // 층 번호 -> 층 색(hex 숫자)
+  layerOrder: [],          // 층 번호를 위→아래 순으로 (예: [5,4,3,2,1])
+  kindCount: {},           // 진단 패널용 — 종류별 타일 수
+  seaY: 0,
   hexSize: 3.2 / 1.5,
   hexThick: 0.7,
   players: new Map(),      // id -> remote record (includes self meta)
   boosters: new Map(),
   obstacles: new Map(),
   selfAlive: true,
-  selfLayer: 3,
+  selfLayer: 0,            // init 이 서버 값으로 덮어씁니다
+
+  /* ── 위상 타일 ────────────────────────────────────────────────────
+   * phaseEpoch : 서버가 준 라운드 시작 시각. 0 이면 아직 모릅니다.
+   * phaseOn    : 지금 위상 타일이 켜져 있는가. 매 프레임 simulate() 가 갱신.
+   * phaseTrust : 내 공식 계산이 서버와 맞고 있는가.
+   *              어긋나면 false 가 되고 서버가 보내주는 ph 값을 그대로 씁니다.
+   * ---------------------------------------------------------------- */
+  phaseEpoch: 0,
+  phaseOn: true,
+  phaseTrust: true,
   serverOffset: 0,
   rtt: 0,
   specTarget: null,
@@ -512,8 +582,28 @@ const G = {
 
 /* ============================ 3. three.js core ========================== */
 
+/* ── 렌더 해상도 상한 (MAX_PIXEL_RATIO) ──────────────────────────────
+ * ★ 성능이 안 나올 때 이 값부터 낮추고 싶어지는데, 그래봐야 소용없습니다.
+ *
+ * 카메라·조명·타일을 전부 고정하고 DPR 만 번갈아 재봤습니다
+ * (타일 845개, 드로우콜 375 고정, 배치 6회×15프레임의 최솟값):
+ *     DPR 2.0 → 6.27 / 6.35 ms   (3.45 Mpx)
+ *     DPR 1.5 → 7.03 / 6.89 ms   (1.94 Mpx)
+ *     DPR 1.0 → 6.05 ms          (0.86 Mpx)
+ * 픽셀을 4배 줄여도 비용이 그대로입니다 — fill 병목이 아닙니다.
+ *
+ * 진짜 병목은 드로우콜입니다. 해상도를 고정한 채 보이는 타일 수만 바꾸면
+ * 비용이 그대로 따라옵니다 (388콜 8.29ms / 129콜 3.22ms / 29콜 1.82ms
+ * ≈ 콜당 18µs). 타일 하나하나가 개별 메시라서 그렇습니다.
+ * 성능을 손보려면 여기가 아니라 InstancedMesh 쪽을 보세요.
+ *
+ * 층을 3→5 로 늘린 것 자체는 거의 영향이 없었습니다 — 프러스텀 컬링으로
+ * 아래 층이 대부분 화면 밖입니다 (3층 32.6fps vs 5층 34.7fps, 노이즈 이내).
+ * ------------------------------------------------------------------ */
+const MAX_PIXEL_RATIO = 2;
+
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.shadowMap.enabled = true;
@@ -1070,11 +1160,144 @@ function updateSplash(dt) {
 
 /* ============================ 4. map building ========================== */
 
-const LAYER_COLORS = { 3: 0x00ffcc, 2: 0x0088ff, 1: 0xaa00ff };
-const TRAP_COLOR = 0x6b0d12;
+/* ── 타일 종류별 겉모습 ───────────────────────────────────────────────
+ * 4종이 한눈에 갈려야 하므로 '무엇으로' 구분되는지를 종류마다 다르게 잡았습니다.
+ *
+ *   normal     층 색을 흰색 쪽으로 많이 섞어 옅게. 바닥의 대부분이라 차분하게.
+ *   fragile    짙은 적갈색 고정 — 밟으면 0.2초 만에 꺼지므로 층과 무관한 경고색.
+ *   reinforced 황동 금속색 고정 + 두꺼움 — 층과 무관하게 '단단한 것'으로 읽힙니다.
+ *   special    층 색 원색 + 강한 발광 — 층마다 색이 달라 층 정체성을 드러냅니다.
+ *
+ * 결과적으로 같은 층에서 normal(옅음) 과 special(진함) 은 밝기로 갈리고,
+ * fragile / reinforced 는 어느 층에 있든 항상 같은 색입니다.
+ *
+ *   mix           : 층 색을 흰색 쪽으로 섞는 비율 (color 가 있으면 무시)
+ *   color         : 층과 무관한 고정 색
+ *   emissiveColor : 발광 색 (없으면 본체 색과 같음)
+ *   thick         : 타일 두께 배율. 물리 판정은 항상 hexThick 기준이라
+ *                   두껍게 해도 착지 높이는 변하지 않습니다(윗면만 살짝 도톰).
+ * ------------------------------------------------------------------ */
+const TILE_STYLE = {
+  normal:     { mix: 0.62,                                    emissive: 0.14, rough: 0.62, metal: 0.18, thick: 1.00 },
+  fragile:    { color: 0x6b0d12, emissiveColor: 0x330000,     emissive: 0.50, rough: 0.85, metal: 0.10, thick: 1.15 },
+  reinforced: { color: 0xc9a227, emissiveColor: 0x4a3200,     emissive: 0.30, rough: 0.35, metal: 0.85, thick: 1.28 },
+  special:    { mix: 0.00,                                    emissive: 0.85, rough: 0.30, metal: 0.45, thick: 1.08 }
+};
+/* ── 특수 타일 세부 종류별 색 덮어쓰기 ───────────────────────────────
+ * TILE_STYLE 은 '종류(kind)' 단위라 special 안에서 갈리는 것들은 여기서
+ * 따로 정합니다. 점프 타일은 한 층/두 층이 한눈에 갈려야 하므로 색상
+ * 자체를 멀리 떨어뜨렸습니다 (청록 vs 자홍).
+ * 키는 specialType 이므로 층 번호와 무관합니다 — 아이디어 층이 어디로
+ * 가든 그대로 따라옵니다.                                            */
+const SPECIAL_TYPE_STYLE = {
+  jump1: { color: 0x00e5ff, emissiveColor: 0x0090b8, emissive: 0.9 },   // 한 층 위
+  jump2: { color: 0xff00c8, emissiveColor: 0xa0007e, emissive: 1.1 }    // 두 층 위
+};
 
-let hexGeo = null, trapGeo = null;
+const WHITE_C = new THREE.Color(0xffffff);
+
+/* 두께가 종류마다 다르므로 지오메트리도 두께별로 하나씩 만들어 공유합니다.
+ * (종전에는 hexGeo / trapGeo 두 개였습니다)                            */
+let hexGeos = null;   // '1.00' 같은 두께 키 -> CylinderGeometry
 let geoHexSize = 0;   // 공유 지오메트리를 만든 시점의 타일 크기 (달라지면 재생성)
+
+function tileGeoFor(thick) {
+  const key = thick.toFixed(2);
+  let g = hexGeos.get(key);
+  if (g) return g;
+  /* thetaStart = π/6 이 핵심입니다.
+   * CylinderGeometry(…, 6) 은 꼭짓점이 ±Z 를 향하는 pointy-top 육각형을
+   * 만드는데, 우리 좌표계(axialToWorld)는 flat-top 을 전제합니다.
+   * 30도를 돌려주지 않으면 메시가 이웃 간격보다 커져 반드시 겹칩니다.
+   * 0.985 는 타일 사이에 머리카락 굵기의 이음선을 남기기 위한 값입니다. */
+  g = new THREE.CylinderGeometry(
+    G.hexSize * 0.985, G.hexSize * 0.94, G.hexThick * thick, 6, 1, false, HEX_THETA, Math.PI * 2);
+  hexGeos.set(key, g);
+  return g;
+}
+
+/** 층 번호로 층 색을 꺼냅니다. 없는 층이면 흰색. */
+function layerColorOf(layerIndex) {
+  const c = G.layerColor[layerIndex];
+  return c === undefined ? 0xffffff : c;
+}
+
+/* ── 위상 타일 (phase tile) ───────────────────────────────────────────
+ * 서버 LAYER_DEFS 에서 special:'phase' 인 층의 특수 타일입니다.
+ * 켜졌다 꺼졌다 하며, 꺼진 동안에는 지지력이 없어 밟으면 빠집니다.
+ *
+ * ★ ON/OFF 는 서버가 매 틱 보내주지 않습니다. 서버가 라운드 시작 시각
+ *   (phaseEpoch)만 주고 양쪽이 같은 공식으로 계산합니다. 내 시계를
+ *   G.serverOffset(RTT 보정값)으로 서버 시각에 맞춘 뒤 넣기 때문에
+ *   어느 클라이언트에서 보든 같은 순간에 같은 상태가 됩니다.
+ * ------------------------------------------------------------------ */
+const PHASE_OFF_ALPHA = 0.22;        // OFF 일 때 타일 불투명도 (층 반투명과 곱해집니다)
+/* 전환 경계 근처에서는 서버와 검산하지 않습니다 — 시계가 몇 ms만 어긋나도
+ * 멀쩡한 계산이 틀린 것으로 나오기 때문입니다.                        */
+const PHASE_EDGE_GUARD_MS = 60;
+
+/**
+ * 주어진 '서버 시각'에서의 위상 상태.
+ *   known    : 계산할 수 있는가 (config·epoch 가 있는가)
+ *   on       : 켜져 있는가
+ *   marginMs : 가장 가까운 전환 경계까지 남은 시간
+ */
+function phaseInfoAt(serverNow) {
+  const c = G.cfg && G.cfg.PHASE_TILE;
+  if (!c || !G.phaseEpoch) return { known: false, on: true, marginMs: Infinity };
+  const period = c.onMs + c.offMs;
+  let elapsed = serverNow - G.phaseEpoch;
+  if (elapsed < 0) elapsed = 0;
+  const t = elapsed % period;
+  const on = t < c.onMs;
+  const marginMs = on ? Math.min(t, c.onMs - t) : Math.min(t - c.onMs, period - t);
+  return { known: true, on, marginMs };
+}
+
+/** 지금 이 순간 위상 타일이 켜져 있는가 (내 시계를 서버 시각으로 환산해서). */
+function phaseTilesNow() {
+  return phaseInfoAt(Date.now() + G.serverOffset).on;
+}
+
+/* OFF 일 때 얹는 육각 윤곽선. "여기 타일이 있긴 한데 지금은 못 밟는다"를
+ * 한눈에 보여줍니다. 지오메트리는 모든 위상 타일이 공유합니다.        */
+let phaseRingGeo = null, phaseRingGeoSize = 0;
+function ensurePhaseRingGeo() {
+  const S = G.hexSize || HEX_SIZE_BASE;
+  if (phaseRingGeo && phaseRingGeoSize === S) return phaseRingGeo;
+  if (phaseRingGeo) phaseRingGeo.dispose();
+  phaseRingGeoSize = S;
+  /* flat-top 육각형의 6꼭짓점. 0도에서 시작해 60도씩 — 꼭짓점이 ±X 에
+   * 오므로 타일 본체(CylinderGeometry + HEX_THETA 교정)와 방향이 맞습니다. */
+  const pts = [];
+  const R = S * 0.985;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    pts.push(new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R));
+  }
+  phaseRingGeo = new THREE.BufferGeometry().setFromPoints(pts);
+  return phaseRingGeo;
+}
+
+/**
+ * 타일의 최종 불투명도.
+ *
+ * ★ 층 반투명(applyLayerTransparency)과 위상 OFF 반투명은 서로 다른 이유로
+ *   생깁니다. 한쪽이 다른 쪽을 덮어쓰면, 아래층에서 올려다볼 때 OFF 타일이
+ *   도로 진해지거나 그 반대가 됩니다. 그래서 '곱해서' 씁니다.
+ */
+function tileAlphaFor(rec) {
+  const layerAlpha = rec.targetOpacity !== undefined ? rec.targetOpacity : 1;
+  const phaseAlpha = (rec.phaseTile && !G.phaseOn) ? PHASE_OFF_ALPHA : 1;
+  return layerAlpha * phaseAlpha;
+}
+
+/** 맨 위 층 번호. 층이 몇 개든, 번호가 무엇이든 여기서만 답합니다. */
+function topLayerIndex() {
+  if (G.layerOrder.length) return G.layerOrder[0];
+  const Ls = (G.cfg && G.cfg.LAYERS) || [];
+  return Ls.length ? Ls[0].index : 1;
+}
 
 /* pointy-top → flat-top 교정각. 타일·대기 발판 모두 이 값을 써서 방향을 맞춥니다.
  * 이 값을 빼면 육각형이 30도 돌아간 채로 놓여 이웃과 반드시 겹칩니다.   */
@@ -1102,31 +1325,153 @@ function boosterR2() {
   return r * r;
 }
 
+/* 서버 config 를 그대로 쓰는 얇은 래퍼입니다.
+ * 폴백은 '서버가 아직 말을 안 걸었을 때 터지지 않게' 하는 용도일 뿐,
+ * 실제 렌더는 init 이후에만 일어나므로 값이 쓰이지는 않습니다.
+ * 그래서 폴백에도 층 배열을 박지 않고 최소 1층만 만들어 둡니다.        */
 function mapCfg() {
   const c = G.cfg || {};
+  const gap = c.LAYER_GAP || 12;
+  const base = c.LAYER_BASE_Y || 0;
   return {
     HEX_SIZE: c.HEX_SIZE || (3.2 / 1.5),
     HEX_THICKNESS: c.HEX_THICKNESS || 0.7,
-    SEA_Y: (c.SEA_Y !== undefined ? c.SEA_Y : -16),
-    LAYERS: c.LAYERS || [{ index: 3, y: 24 }, { index: 2, y: 12 }, { index: 1, y: 0 }]
+    SEA_Y: (c.SEA_Y !== undefined ? c.SEA_Y : base - 16),
+    LAYER_GAP: gap,
+    LAYERS: (c.LAYERS && c.LAYERS.length)
+      ? c.LAYERS
+      : [{ index: 1, y: base, color: '#00ffcc', name: '—', short: '—' }]
   };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
  * 개발용 테스트 모드 (클라이언트 측)
  * ───────────────────────────────────────────────────────────────────────
- * 켜고 끄는 곳은 server.js 의 DEV_MODE 상수 하나뿐입니다. 여기서는 서버가
- * server_hello 로 알려준 값을 그대로 받아 적용만 합니다.                */
-const DEV = { on: false };
+ * 최종 설정 = 서버가 내려준 값  +  이 탭의 URL 옵션
+ *
+ *   ?dev=1                  이 탭에서 개발 UI 를 켭니다
+ *   ?dev=1&noElim=0         떨어지면 그냥 탈락시킵니다 (탈락 흐름 시험용)
+ *   ?dev=1&jump=0           층 이동 버튼을 숨깁니다
+ *   ?dev=0                  서버가 dev 여도 이 탭만 평소처럼 씁니다
+ *
+ * ?dev 를 아예 안 붙이면 서버 설정을 그대로 따릅니다(종전과 동일).
+ * 창을 4개 띄워 한 개만 dev 로 두는 식의 테스트를 하려고 이렇게 나눴습니다.
+ *
+ * noFuse / fastEvents 는 여기서 못 바꿉니다 — 타일 상태를 바꾸는 항목이라
+ * 사람마다 다르면 같은 방에서 서로 다른 맵을 보게 됩니다. 서버 전역입니다.
+ * ═══════════════════════════════════════════════════════════════════════ */
+const DEV = {
+  on: false,           // 이 탭에서 개발 모드 UI/동작을 쓰는가
+  serverOn: false,     // 서버가 DEV 로 떠 있는가 (아래 항목들의 전제)
+  noEliminate: false,  // 개인 — 떨어져도 탈락하지 않고 최상층 복귀
+  layerJump: false,    // 개인 — 층 이동 버튼
+  noFuse: false,       // 서버 전역 (읽기 전용, 표시용)
+  fastEvents: false,   // 서버 전역 (읽기 전용, 표시용)
+  eventSpeedup: 1
+};
 
-function applyDevMode(on) {
-  if (DEV.on === on) return;
-  DEV.on = on;
-  document.body.classList.toggle('dev', on);   // CSS(배경 박스)를 켜는 스위치
-  if (on) {
-    toast('개발용 테스트 모드 — 타일이 무너지지 않고 탈락도 없습니다', 'cheer');
-    toast('왼쪽 레이어 안내문을 클릭하면 그 층으로 이동합니다', 'cheer');
+/** URL 옵션 읽기. 없으면 undefined 를 돌려 '서버 값을 따른다'는 뜻이 됩니다. */
+function devUrlFlag(name) {
+  const v = new URLSearchParams(location.search).get(name);
+  if (v === null) return undefined;
+  return !(v === '0' || v === 'false');
+}
+
+/**
+ * server_hello 의 config.DEV 를 받아 이 탭의 최종 설정을 확정합니다.
+ * 서버가 dev 가 아니면 무엇을 붙여도 켜지지 않습니다 — 위치를 옮기는
+ * 동작은 전부 서버의 이동 검증 면제가 필요하기 때문입니다.
+ */
+function applyDevMode(cfg) {
+  const sv = cfg || {};
+  DEV.serverOn = !!sv.on;
+  DEV.noFuse = !!sv.noFuse;
+  DEV.fastEvents = !!sv.fastEvents;
+  DEV.eventSpeedup = sv.eventSpeedup || 1;
+
+  const want = devUrlFlag('dev');
+  if (!DEV.serverOn) {
+    DEV.on = false;
+    document.body.classList.remove('dev');
+    if (want === true) {
+      toast('이 서버는 개발 모드가 아닙니다 — DEV_MODE=1 npm start 로 켜세요', 'kill');
+    }
+    return;
   }
+
+  DEV.on = want === undefined ? true : want;    // dev 서버 기본은 켜짐 (종전과 동일)
+  const elim = devUrlFlag('noElim'), jump = devUrlFlag('jump');
+  DEV.noEliminate = DEV.on && (elim === undefined ? !!sv.noEliminate : elim);
+  DEV.layerJump = DEV.on && (jump === undefined ? !!sv.layerJump : jump);
+
+  document.body.classList.toggle('dev', DEV.on);
+  renderDevBadge();
+  buildDevLayerButtons();
+
+  if (DEV.on) {
+    toast('개발 모드 — ' + devFlagSummary(), 'cheer');
+    if (DEV.layerJump) toast('왼쪽 "층 이동" 버튼으로 각 층을 오갈 수 있습니다', 'cheer');
+  }
+}
+
+function devFlagSummary() {
+  const on = [];
+  if (DEV.noFuse) on.push('noFuse');
+  if (DEV.fastEvents) on.push('fastEvents×' + DEV.eventSpeedup);
+  if (DEV.noEliminate) on.push('noEliminate');
+  if (DEV.layerJump) on.push('layerJump');
+  return on.length ? on.join(' · ') : '켜진 항목 없음';
+}
+
+/** 상단 배지에 어떤 항목이 켜져 있는지 표시합니다 (꺼진 건 취소선). */
+function renderDevBadge() {
+  const el = document.getElementById('devFlags');
+  if (!el) return;
+  const item = (name, on, scope) =>
+    (on ? '<b>' + name + '</b>' : '<s>' + name + '</s>') +
+    '<span style="opacity:.4">' + scope + '</span>';
+  el.innerHTML = [
+    item('noFuse', DEV.noFuse, '전역'),
+    item('fastEvents', DEV.fastEvents, '전역'),
+    item('noEliminate', DEV.noEliminate, '개인'),
+    item('layerJump', DEV.layerJump, '개인')
+  ].join('');
+}
+
+/* 층 이동 버튼을 서버 config 의 LAYERS 로 만듭니다.
+ * HTML 에 박아 두지 않는 이유: 왼쪽 안내문(#layerStack)은 3층이 하드코딩돼
+ * 있어서 층이 늘면 손으로 고쳐야 합니다. 이 버튼은 층이 5개가 되면 자동으로
+ * 5개가 됩니다.                                                        */
+function buildDevLayerButtons() {
+  const box = document.getElementById('devLayers');
+  if (!box) return;
+  box.querySelectorAll('button').forEach((b) => b.remove());
+  box.style.display = (DEV.on && DEV.layerJump) ? 'flex' : 'none';
+  if (!DEV.on || !DEV.layerJump) return;
+
+  const layers = (G.cfg && G.cfg.LAYERS) ? G.cfg.LAYERS : [];
+  for (const L of layers) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.l = L.index;
+    b.innerHTML = '<span>LAYER ' + String(L.index).padStart(2, '0') + '</span>' +
+                  '<span class="y">y ' + L.y + '</span>';
+    b.addEventListener('click', () => devTeleport(L.index));
+    box.appendChild(b);
+  }
+  // 안내문 아래로 내려 겹치지 않게 합니다 (안내문 높이는 층 수에 따라 달라집니다)
+  const stack = document.getElementById('layerStack');
+  box.style.top = (stack ? stack.offsetTop + stack.offsetHeight + 12 : 300) + 'px';
+  markDevLayerButton(local.layer);
+}
+
+/** 지금 있는 층 버튼을 강조합니다. */
+function markDevLayerButton(layerIndex) {
+  const box = document.getElementById('devLayers');
+  if (!box) return;
+  box.querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('cur', parseInt(b.dataset.l, 10) === layerIndex);
+  });
 }
 
 /* 타일이 커지면 카메라도 그만큼 물러나야 시야가 종전과 비슷해집니다.
@@ -1157,19 +1502,38 @@ function buildMap(map, cfg) {
   // clear previous map
   for (const rec of G.tiles.values()) {
     releaseCrack(rec);            // 균열 오버레이도 같이 떼어냅니다 (안 하면 tileGroup 에 그대로 남습니다)
+    if (rec.phaseRing) {          // 위상 타일 윤곽선도 함께 (지오메트리는 공유라 두고 재질만 버립니다)
+      tileGroup.remove(rec.phaseRing);
+      rec.phaseRing.material.dispose();
+      rec.phaseRing = null;
+    }
     tileGroup.remove(rec.mesh);
     rec.mesh.geometry = null;
     rec.mesh.material.dispose();
   }
   G.tiles.clear();
-  G.layerTiles = { 1: [], 2: [], 3: [] };
 
   G.hexSize = cfg.HEX_SIZE;
   G.hexThick = cfg.HEX_THICKNESS;
   G.seaY = cfg.SEA_Y;
   bounceLight.position.y = cfg.SEA_Y + 6;
   if (currentTheme >= 0) buildCloudSea(THEMES[currentTheme]);
-  for (const L of cfg.LAYERS) G.layerY[L.index] = L.y;
+
+  /* 층 색인을 통째로 새로 만듭니다.
+   * 덮어쓰기가 아니라 '새로 만들기'여야 합니다 — 층이 5개에서 4개로 줄면
+   * 예전 키가 남아 사라진 층의 빈 배열을 계속 훑게 됩니다.            */
+  G.layerY = {};
+  G.layerTiles = {};
+  G.layerColor = {};
+  G.layerOrder = [];
+  for (const L of cfg.LAYERS) {
+    G.layerY[L.index] = L.y;
+    G.layerTiles[L.index] = [];
+    G.layerColor[L.index] = new THREE.Color(L.color || '#ffffff').getHex();
+    G.layerOrder.push(L.index);
+  }
+  // 위 → 아래 순. findLanding 등이 이 순서를 그대로 씁니다.
+  G.layerOrder.sort((a, b) => G.layerY[b] - G.layerY[a]);
 
   // 타일 크기가 바뀌면(DEV_MODE 전환 등) 카메라 거리도 같이 맞춥니다
   applyWorldScale(G.hexSize);
@@ -1180,24 +1544,14 @@ function buildMap(map, cfg) {
   /* 지오메트리는 한 번 만들어 모든 타일이 공유합니다. 다만 타일 크기가
    * 달라졌다면 (서버 DEV_MODE 를 켜고 재접속한 경우) 반드시 다시 만들어야
    * 합니다 — 안 그러면 옛 크기 그대로 남아 물리 AABB 와 어긋납니다.    */
-  if (hexGeo && geoHexSize !== G.hexSize) {
-    hexGeo.dispose(); trapGeo.dispose();
-    hexGeo = trapGeo = null;
+  if (hexGeos && geoHexSize !== G.hexSize) {
+    for (const g of hexGeos.values()) g.dispose();
+    hexGeos = null;
     if (pedGeo) { pedGeo.dispose(); pedRingGeo.dispose(); pedGeo = pedRingGeo = null; }
   }
-  if (!hexGeo) {
+  if (!hexGeos) {
     geoHexSize = G.hexSize;
-    /* thetaStart = π/6 이 핵심입니다.
-     * CylinderGeometry(…, 6) 은 꼭짓점이 ±Z 를 향하는 pointy-top 육각형을
-     * 만드는데, 우리 좌표계(axialToWorld)는 flat-top 을 전제합니다.
-     * 30도를 돌려주지 않으면 메시가 이웃 간격보다 커져 반드시 겹칩니다.
-     *   교정 전: 가로 2·S/cos30 = 2.309·S  vs  이웃 X 간격 1.5·S
-     *   교정 후: 가로 2·S                   vs  이웃 X 간격 1.5·S  (정상)
-     * 0.985 는 타일 사이에 머리카락 굵기의 이음선을 남기기 위한 값입니다. */
-    hexGeo = new THREE.CylinderGeometry(
-      G.hexSize * 0.985, G.hexSize * 0.94, G.hexThick, 6, 1, false, HEX_THETA, Math.PI * 2);
-    trapGeo = new THREE.CylinderGeometry(
-      G.hexSize * 0.985, G.hexSize * 0.94, G.hexThick * 1.15, 6, 1, false, HEX_THETA, Math.PI * 2);
+    hexGeos = new Map();   // 두께별 지오메트리는 tileGeoFor 가 필요할 때 만듭니다
   }
 
   // AABB half-extents of a flat-top hexagon: adjacent boxes overlap in X and
@@ -1205,50 +1559,123 @@ function buildMap(map, cfg) {
   const halfX = G.hexSize;
   const halfZ = G.hexSize * Math.sqrt(3) / 2;
 
+  G.kindCount = {};
   for (const t of map.tiles) {
-    const base = t.trap ? TRAP_COLOR : LAYER_COLORS[t.layer];
+    const kind = t.kind || 'normal';
+    /* ★ 거절이유 타일만은 '특수 타일 겉모습'을 쓰지 않고 일반 타일로 위장합니다.
+     * 특수 색(층 원색 + 강한 발광)으로 두면 멀리서도 눈에 띄어 그냥 피해
+     * 가면 그만이라 함정이 성립하지 않습니다. 밟혀서 서버가 tile_reject 를
+     * 보낸 뒤에야 노랑→주황→빨강으로 정체를 드러냅니다.
+     * 로직상으로는 여전히 kind='special' 입니다 — 겉모습만 바꿉니다.   */
+    const disguised = kind === 'special' && t.specialType === 'reject';
+    const baseStyle = disguised ? TILE_STYLE.normal : (TILE_STYLE[kind] || TILE_STYLE.normal);
+    /* 세부 종류 색이 정의돼 있으면 그것으로 덮어씁니다 (점프 타일 A/B) */
+    const sub = (!disguised && t.specialType) ? SPECIAL_TYPE_STYLE[t.specialType] : null;
+    const st = sub ? Object.assign({}, baseStyle, sub) : baseStyle;
+    G.kindCount[kind] = (G.kindCount[kind] || 0) + 1;
+
+    // 고정색 종류는 층과 무관, 그 외에는 층 색을 흰색 쪽으로 섞습니다
+    const base = (st.color !== undefined)
+      ? new THREE.Color(st.color)
+      : new THREE.Color(layerColorOf(t.layer)).lerp(WHITE_C, st.mix);
+    const emis = (st.emissiveColor !== undefined)
+      ? new THREE.Color(st.emissiveColor)
+      : base.clone();
+
     const mat = new THREE.MeshStandardMaterial({
-      color: base,
-      emissive: t.trap ? 0x330000 : base,
-      emissiveIntensity: t.trap ? 0.5 : 0.22,
-      roughness: t.trap ? 0.85 : 0.55,
-      metalness: t.trap ? 0.1 : 0.22,
+      color: base.clone(),
+      emissive: emis,
+      emissiveIntensity: st.emissive,
+      roughness: st.rough,
+      metalness: st.metal,
       transparent: true,
       opacity: 1
     });
     if (TEX.road) mat.map = TEX.road;
 
-    const mesh = new THREE.Mesh(t.trap ? trapGeo : hexGeo, mat);
+    const mesh = new THREE.Mesh(tileGeoFor(st.thick), mat);
     mesh.position.set(t.x, t.y, t.z);
     mesh.receiveShadow = true;
     mesh.castShadow = false;
     tileGroup.add(mesh);
 
     const rec = {
-      id: t.id, layer: t.layer, trap: !!t.trap,
+      id: t.id, layer: t.layer,
+      /* kind : 'normal' | 'fragile' | 'reinforced' | 'special'  (서버가 정함)
+       * specialType : 특수 타일이면 그 층의 태그 (예: 'phase'). 지금은
+       *   표시용이고 동작은 일반 타일과 같습니다 — 다음 작업에서 씁니다. */
+      kind: kind, specialType: t.specialType || null,
+      /* 위상 타일인가. 착지 판정 3곳에서 매 프레임 타일마다 보는 값이라
+       * 문자열 비교 대신 불리언으로 미리 접어 둡니다.                 */
+      phaseTile: kind === 'special' && t.specialType === 'phase',
+      phaseRing: null,
+      /* 신속심사 타일. 방향은 밟는 사람의 진행 방향이라 타일마다 다르지
+       * 않으므로, 타일에는 '여기서 튀어나간다'는 강조만 두고 실제 방향
+       * 화살표는 내가 올라선 타일 위에 하나만 띄웁니다(dashArrow).   */
+      accelTile: kind === 'special' && t.specialType === 'accel',
+      /* 거절이유 타일. 평소엔 일반 타일과 똑같이 보이고, 밟혀서 서버가
+       * tile_reject 를 보내야 비로소 색이 변하기 시작합니다.
+       * (미리 티가 나면 밟지 않고 피할 수 있어 함정이 성립하지 않습니다) */
+      rejectTile: kind === 'special' && t.specialType === 'reject',
+      /* 보정 타일. 밟으면 부서진 이웃 하나가 되살아납니다.
+       * 어느 타일을 되살릴지는 서버가 정해 tile_restore 로 알려줍니다. */
+      amendTile: kind === 'special' && t.specialType === 'amend',
+      /* 점프 타일이면 '몇 층 위로' 보내는지 (아니면 0).
+       * 서버가 정한 specialType 'jumpN' 을 그대로 읽습니다 — 색과 진동
+       * 세기만 여기서 쓰고, 실제 발사는 서버 player_impulse 가 시킵니다. */
+      jumpLevel: (function () {
+        const m = kind === 'special' && /^jump(\d+)$/.exec(t.specialType || '');
+        return m ? parseInt(m[1], 10) : 0;
+      })(),
       x: t.x, y: t.y, z: t.z,
+      // 두께가 종류마다 달라도 착지면은 항상 hexThick 기준입니다.
+      // 여기를 종류별로 바꾸면 같은 층인데 층마다 발 높이가 달라집니다.
       top: t.y + G.hexThick / 2,
       hexR: G.hexSize,   // 육각형 판정용 외접원 반지름
       // AABB 는 빠른 배제용으로 남겨 둡니다 (findLanding 등에서 먼저 걸러냄)
       minX: t.x - halfX, maxX: t.x + halfX,
       minZ: t.z - halfZ, maxZ: t.z + halfZ,
-      state: 'idle', warnStart: 0, fuse: 800, breakStart: 0,
-      /* 3회 밟기 규칙용.
+      state: 'idle', warnStart: 0, fuse: t.fuse || 800, breakStart: 0,
+      /* 밟기 누적. 종전 '3회 규칙' 구조를 강화 타일이 그대로 물려받았습니다.
        *   hits        : 서버가 확정한 히트 수 (낙관적으로 올리지 않습니다)
-       *   maxHits     : 이 타일이 버티는 횟수 (함정은 1)
+       *   maxHits     : 이 타일이 버티는 횟수 (강화 2, 나머지 1)
+       *   autoMs      : 첫 밟기 뒤 자동 파괴까지 (강화 3000, 나머지 0)
        *   wear        : hits/maxHits 를 0~1 로 정규화한 마모도
        *   myLastHitAt : 내가 마지막으로 이 타일을 때린 시각 (연타 방지)  */
-      hits: 0, maxHits: t.trap ? 1 : 3, wear: 0, myLastHitAt: -Infinity,
-      /* crack : 2회차부터 얹는 균열 오버레이 { mesh, mat, born } (없으면 null)
+      hits: 0, maxHits: t.maxHits || 1, autoMs: t.autoMs || 0,
+      wear: 0, myLastHitAt: -Infinity,
+      /* crack : 강화 타일이 금 간 뒤 얹는 오버레이 { mesh, mat, born }
        * crackShake : 금이 간 직후 타일이 흔들리는 남은 시간(초)          */
       crack: null, crackShake: 0,
-      mesh, mat, baseColor: new THREE.Color(base), baseY: t.y
+      mesh, mat, baseColor: base.clone(), baseGlow: st.emissive, baseY: t.y,
+      /* ★ 발광 '색'의 원본. 거절이유 카운트다운이 mat.emissive 를 노랑~빨강
+       * 으로 덮어쓰기 때문에, 이걸 안 들고 있으면 복구(tile_restore)해도
+       * 타일이 벌겋게 남습니다. baseGlow(세기)와는 다른 값입니다.      */
+      baseEmissive: emis.clone(),
+      /* 복구 연출이 시작된 시각. 0 이면 연출 중이 아닙니다. */
+      restoreStart: 0
     };
+    /* 위상 타일에는 OFF 용 윤곽선을 미리 달아 둡니다 (평소엔 visible=false).
+     * 재질을 타일마다 따로 두는 이유: 층 반투명이 층마다 다르므로 공유하면
+     * 두 층에 위상 타일이 생겼을 때 한쪽 투명도가 다른 쪽을 덮어씁니다.
+     * 개수가 한 층의 20% 정도라 재질을 따로 둬도 부담이 없습니다.     */
+    if (rec.phaseTile) {
+      const ringMat = new THREE.LineBasicMaterial({
+        color: base.clone(), transparent: true, opacity: 0, depthWrite: false, toneMapped: false
+      });
+      const ring = new THREE.LineLoop(ensurePhaseRingGeo(), ringMat);
+      ring.position.set(t.x, t.y + G.hexThick / 2 + 0.03, t.z);
+      ring.renderOrder = 3;
+      ring.visible = false;
+      tileGroup.add(ring);
+      rec.phaseRing = ring;
+    }
+
     G.tiles.set(t.id, rec);
-    G.layerTiles[t.layer].push(rec);
+    if (G.layerTiles[t.layer]) G.layerTiles[t.layer].push(rec);
   }
   buildPedestals(map, cfg);
-  applyLayerTransparency(3);
+  applyLayerTransparency(topLayerIndex());
 }
 
 
@@ -1402,7 +1829,8 @@ let lastTransparencyLayer = -1;
 function applyLayerTransparency(currentLayer) {
   if (currentLayer === lastTransparencyLayer) return;
   lastTransparencyLayer = currentLayer;
-  for (const L of [1, 2, 3]) {
+  // 층 번호가 클수록 위입니다(서버 파생 규칙). 층이 몇 개든 그대로 성립합니다.
+  for (const L of G.layerOrder) {
     const target = L > currentLayer ? 0.16 : 1.0;
     for (const rec of G.layerTiles[L]) {
       if (rec.state === 'gone') continue;
@@ -2388,14 +2816,16 @@ function animateAvatar(av, dt, speed01, state) {
 /* ============================ 6. local runner =========================== */
 
 const local = {
-  pos: new THREE.Vector3(0, 24.35, 0),
+  /* 아래 위치·층 값은 init 이 서버 스폰으로 곧바로 덮어씁니다.
+   * 층 높이를 여기 박아 두면 층 구성이 바뀔 때마다 같이 고쳐야 합니다. */
+  pos: new THREE.Vector3(0, 0, 0),
   vel: new THREE.Vector3(0, 0, 0),
   ry: 0,
   grounded: false,
   groundTile: null,
-  lastGroundY: 24.35,   // 마지막으로 서 있던 바닥 높이
+  lastGroundY: 0,      // 마지막으로 서 있던 바닥 높이
   jumped: false,       // 점프로 떠올랐는지 (발을 헛디딘 것과 구분)
-  layer: 3,
+  layer: 0,
   anim: 'idle',
   avatar: null,
   coyote: 0,
@@ -2408,7 +2838,14 @@ const local = {
    * 탈락 시점이 아니라 낙하 시작 시점에 잡아야 정확합니다 — 떨어지는 데
    * 1초, 잠기는 연출에 0.75초가 더 걸려서 그때 판단하면 엉뚱한 사람이 걸립니다. */
   deathBy: null,
-  deathByName: ''
+  deathByName: '',
+
+  /* ── 대시(신속심사 타일) ──────────────────────────────────────────
+   * 서버 player_impulse 를 받으면 채워집니다. null 이면 대시 중이 아닙니다.
+   *   { dirX, dirZ, speed, remain, untilMs }
+   *   remain : 남은 이동 거리(유닛). 0 이 되면 대시가 끝납니다.
+   * 대시 중에는 stepPhysics 가 수평 속도 상한과 마찰을 풀어 줍니다.  */
+  dash: null
 };
 
 /* ============================ 7. input ================================= */
@@ -2506,13 +2943,15 @@ function pointInXZ(px, pz, rec) {
 function findLanding(px, pz, prevY, nextY) {
   let best = null;
 
-  for (const L of [3, 2, 1]) {
+  for (const L of G.layerOrder) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (prevY < surf - 0.02) continue;      // already below this floor
     if (nextY > surf) continue;             // haven't reached it yet
     let owner = null, ownerD = Infinity;
     for (const rec of G.layerTiles[L]) {
       if (rec.state === 'gone') continue;
+      // 위상 타일이 꺼져 있으면 없는 것으로 봅니다 (착지 판정 1/3)
+      if (rec.phaseTile && !G.phaseOn) continue;
       if (!pointInXZ(px, pz, rec)) continue;
       const d = (px - rec.x) * (px - rec.x) + (pz - rec.z) * (pz - rec.z);
       if (d < ownerD) { ownerD = d; owner = rec; }
@@ -2536,7 +2975,7 @@ function findLanding(px, pz, prevY, nextY) {
       // 발판이 위아래로 떠 있으므로 여유를 크게 둡니다
       if (prevY < surf - 0.5 || nextY > surf) continue;
       if (!pointInXZ(px, pz, rec)) continue;
-      if (!best || surf > best.surf) best = { surf, tile: null, layer: 3, pedestal: rec };
+      if (!best || surf > best.surf) best = { surf, tile: null, layer: topLayerIndex(), pedestal: rec };
     }
   }
 
@@ -2545,12 +2984,15 @@ function findLanding(px, pz, prevY, nextY) {
 
 /** Is the runner still supported at its current feet height? */
 function supportAt(px, pz, feetY) {
-  for (const L of [3, 2, 1]) {
+  for (const L of G.layerOrder) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (Math.abs(feetY - surf) > 0.12) continue;
     let owner = null, ownerD = Infinity;
     for (const rec of G.layerTiles[L]) {
       if (rec.state === 'gone') continue;
+      // 위상 타일이 꺼져 있으면 없는 것으로 봅니다 (착지 판정 2/3)
+      // 여기가 빠지면 OFF 가 되어도 그 위에 계속 서 있게 됩니다.
+      if (rec.phaseTile && !G.phaseOn) continue;
       if (!pointInXZ(px, pz, rec)) continue;
       const d = (px - rec.x) * (px - rec.x) + (pz - rec.z) * (pz - rec.z);
       if (d < ownerD) { ownerD = d; owner = rec; }
@@ -2567,7 +3009,7 @@ function supportAt(px, pz, feetY) {
     for (const rec of G.pedestals.values()) {
       if (rec.state !== 'idle') continue;
       if (Math.abs(feetY - rec.top) > 0.9) continue;    // 발판이 떠다니므로 여유를 둡니다
-      if (pointInXZ(px, pz, rec)) return { tile: null, layer: 3, surf: rec.top, pedestal: rec };
+      if (pointInXZ(px, pz, rec)) return { tile: null, layer: topLayerIndex(), surf: rec.top, pedestal: rec };
     }
   }
   return null;
@@ -2577,11 +3019,15 @@ function supportAt(px, pz, feetY) {
  * 2.5D 는 원근 단서가 약해서, 그림자로 높이를 읽게 하는 것이 매우 중요합니다. */
 function groundYUnder(px, pz, fromY) {
   let best = G.seaY;
-  for (const L of [1, 2, 3]) {
+  // 가장 높은 바닥을 고르므로 순서는 상관없습니다
+  for (const L of G.layerOrder) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (surf > fromY + 0.05) continue;
     for (const rec of G.layerTiles[L]) {
       if (rec.state === 'gone') continue;
+      // 위상 타일이 꺼져 있으면 없는 것으로 봅니다 (착지 판정 3/3)
+      // 여기가 빠지면 그림자만 OFF 타일 위에 남아 높이가 어긋나 보입니다.
+      if (rec.phaseTile && !G.phaseOn) continue;
       if (!pointInXZ(px, pz, rec)) continue;
       if (surf > best) best = surf;
       break;
@@ -2603,10 +3049,21 @@ function groundYUnder(px, pz, fromY) {
   return best;
 }
 
+/* 이 높이가 '어느 층인가'.
+ *
+ * 예전에는 y >= layerY[3] - 3 처럼 층 번호와 문턱값이 박혀 있었습니다.
+ * 층이 5개가 되면 위 두 층만 판정되고 나머지가 전부 1층으로 뭉갭니다.
+ * 층 y 중 가장 가까운 것을 고르는 방식이면 층이 몇 개든, 간격이 얼마든
+ * 그대로 맞습니다 (최상층보다 높은 대기 발판도 자연히 최상층으로 읽힙니다). */
 function currentLayerOf(y) {
-  if (y >= G.layerY[3] - 3) return 3;
-  if (y >= G.layerY[2] - 3) return 2;
-  return 1;
+  const order = G.layerOrder;
+  if (!order.length) return 1;
+  let best = order[0], bestD = Infinity;
+  for (const L of order) {
+    const d = Math.abs(y - G.layerY[L]);
+    if (d < bestD) { bestD = d; best = L; }
+  }
+  return best;
 }
 
 /* 최근에 나를 민 사람. 밀려서 떨어졌을 때 사인을 밝히려고 남깁니다. */
@@ -2706,6 +3163,71 @@ function separateFromRunners(dt) {
   }
 }
 
+/* ── 대시 (신속심사 타일) ─────────────────────────────────────────────
+ * 발동 판정과 도착 지점은 서버가 정합니다(권위). 여기서는 서버가 준
+ * 속도를 실제로 적용하고, 그동안 수평 속도 상한을 풀어 줄 뿐입니다.
+ *
+ * ★ 왜 to 로 순간이동하지 않는가
+ *   순간이동시키면 20Hz 스냅샷에서 다른 사람 화면에 뚝 끊겨 보이고,
+ *   거기에 서버가 준 속도(38)까지 얹히면 2칸이 아니라 6칸을 갑니다.
+ *   대신 to 까지의 거리를 remain 에 넣어 두고 그만큼 '실제로' 달립니다.
+ *   38 유닛/초로 2칸(약 7.4유닛)이면 약 194ms — 서버 면제 창 400ms 의
+ *   절반이라 대시 전체가 면제 안에서 끝납니다.
+ * ------------------------------------------------------------------ */
+function applyDashImpulse(d) {
+  if (!d || !Array.isArray(d.vel) || !Array.isArray(d.to)) return;
+  const vx = +d.vel[0] || 0, vz = +d.vel[2] || 0;
+  const speed = Math.hypot(vx, vz);
+  if (speed < 1e-6) return;
+
+  // 서버가 준 도착 지점까지의 남은 거리. 이만큼만 달리고 멈춥니다.
+  const remain = Math.hypot(d.to[0] - local.pos.x, d.to[2] - local.pos.z);
+
+  local.dash = {
+    dirX: vx / speed, dirZ: vz / speed, speed: speed,
+    remain: remain,
+    // 시간 상한도 함께 둡니다 — 벽에 막히거나 떨어져도 영원히 안 끝나면 안 됩니다
+    untilMs: performance.now() + (d.graceMs || 400)
+  };
+  local.vel.x = vx;
+  local.vel.z = vz;
+  // 지면에 붙어 나가야 합니다. 살짝 뜬 상태에서 대시하면 공중 가속이 걸립니다.
+  local.ry = Math.atan2(local.dash.dirX, local.dash.dirZ);
+  Sound.sfx('jump', { rate: 1.35 });
+  spawnDashFx(local.pos.x, local.pos.y, local.pos.z, local.dash.dirX, local.dash.dirZ);
+}
+
+/* ── 점프 타일 발사 ───────────────────────────────────────────────────
+ * 서버가 정한 수직 속도를 그대로 넣고, 나머지는 평소 물리에 맡깁니다.
+ * 수평 속도는 건드리지 않습니다 — 달리던 관성을 유지한 채 솟아올라야
+ * 자연스럽고, 목표도 '바로 위 같은 q,r' 이라 수평 보정이 필요 없습니다.
+ *
+ * 대시(applyDashImpulse)와 달리 속도 상한 해제가 필요 없습니다.
+ * 클라이언트 물리는 수평 속도만 maxSpeed 로 자르고 수직은 자르지 않기
+ * 때문입니다(아래쪽 MAX_FALL 만 있습니다). 서버 검증은 이미
+ * graceMs 동안 면제돼 있습니다 — 그게 없으면 VALIDATE.MAX_UP_SPEED(34)에
+ * 걸립니다(한 층 39.5 / 두 층 55.2).
+ * ------------------------------------------------------------------ */
+function applyJumpImpulse(d) {
+  if (!d || !Array.isArray(d.vel)) return;
+  const vy = +d.vel[1] || 0;
+  if (vy <= 0) return;
+
+  local.vel.y = vy;
+  local.grounded = false;
+  /* jumped=true 로 둬야 낙하 애니메이션 판정이 '떨어지는 중'이 아니라
+   * '뛰어오른 중'이 됩니다. 안 그러면 솟는 동안 fall 자세가 나옵니다. */
+  local.jumped = true;
+  local.lastGroundY = local.pos.y;
+  local.coyote = 0;
+  local.groundTile = null;
+  contactTile = null;
+  local.dash = null;              // 대시 중이었다면 여기서 끝냅니다
+
+  Sound.sfx('jump', { rate: d.level >= 2 ? 0.8 : 1.0, volume: 0.9 });
+  spawnJumpFx(local.pos.x, local.pos.y, local.pos.z, d.level || 1);
+}
+
 function stepPhysics(dt) {
   if (!local.alive) return;
 
@@ -2721,15 +3243,57 @@ function stepPhysics(dt) {
   if (keys['KeyA'] || keys['ArrowLeft']) wish.sub(right);
 
   const sprinting = keys['ShiftLeft'] || keys['ShiftRight'];
-  const maxSpeed = sprinting ? PHYS.SPRINT : PHYS.MOVE;
   const accel = local.grounded ? PHYS.ACCEL_GROUND : PHYS.ACCEL_AIR;
+
+  /* ── 대시 진행 ────────────────────────────────────────────────────
+   * 남은 거리(remain)를 이번 프레임 이동량만큼 깎습니다. 다 깎이거나
+   * 시간 상한을 넘으면 끝냅니다. 대시 중에는 아래 두 가지를 풉니다.
+   *   · 수평 속도 상한 — 안 풀면 다음 프레임에 15 로 잘려 대시가 사라집니다
+   *   · 마찰          — 안 풀면 키를 안 눌렀을 때 프레임당 20% 씩 죽습니다  */
+  let dashing = false;
+  if (local.dash) {
+    if (performance.now() >= local.dash.untilMs || local.dash.remain <= 0) {
+      /* 거리를 다 채워서 끝났으면 수평 속도를 끊습니다.
+       * 안 끊으면 38 이 상한(15)으로 잘린 뒤 마찰로 1유닛 넘게 더 미끄러져
+       * '2칸'이 2.3칸이 됩니다. 착지 지점이 생사를 가르는 게임이라
+       * 여기서는 정확도가 손맛보다 우선입니다. 키를 누르고 있으면 곧바로
+       * 다시 가속하므로 벽에 부딪힌 느낌은 나지 않습니다.
+       * 시간 초과로 끝난 경우(공중에서 멈춘 경우)는 손대지 않습니다 —
+       * 낙하 중 수평 속도를 끊으면 허공에서 뚝 떨어집니다.            */
+      if (local.dash.remain <= 0 && local.grounded) { local.vel.x = 0; local.vel.z = 0; }
+      local.dash = null;
+    } else {
+      dashing = true;
+      const stepDist = local.dash.speed * dt;
+      if (stepDist >= local.dash.remain) {
+        /* 마지막 프레임 — 남은 거리만큼만 갑니다.
+         * 프레임 단위로 잘라 쓰면 최대 한 프레임(38/60 = 0.63유닛)을
+         * 더 가서 도착 지점이 어긋납니다.                             */
+        const v = local.dash.remain / dt;
+        local.vel.x = local.dash.dirX * v;
+        local.vel.z = local.dash.dirZ * v;
+        local.dash.remain = 0;
+      } else {
+        local.dash.remain -= stepDist;
+        // 대시 방향 속도를 매 프레임 다시 세워 둡니다 (밀림·마찰로 흐르지 않게)
+        local.vel.x = local.dash.dirX * local.dash.speed;
+        local.vel.z = local.dash.dirZ * local.dash.speed;
+      }
+    }
+  }
+
+  const maxSpeed = dashing
+    ? local.dash.speed                      // 대시 중에는 상한을 대시 속도까지
+    : (sprinting ? PHYS.SPRINT : PHYS.MOVE);
 
   if (wish.lengthSq() > 0) {
     wish.normalize();
-    local.vel.x += wish.x * accel * dt;
-    local.vel.z += wish.z * accel * dt;
+    if (!dashing) {                         // 대시 중에는 입력이 방향을 흔들지 않게
+      local.vel.x += wish.x * accel * dt;
+      local.vel.z += wish.z * accel * dt;
+    }
     local.ry = Math.atan2(wish.x, wish.z);
-  } else if (local.grounded) {
+  } else if (local.grounded && !dashing) {
     const f = Math.max(0, 1 - PHYS.FRICTION * dt);
     local.vel.x *= f; local.vel.z *= f;
   }
@@ -2743,6 +3307,8 @@ function stepPhysics(dt) {
     local.vel.x = local.vel.x / hs * maxSpeed;
     local.vel.z = local.vel.z / hs * maxSpeed;
   }
+  /* 대시가 끝난 다음 프레임에는 maxSpeed 가 다시 평소 값이므로, 위 클램프가
+   * 알아서 38 → 15 로 내립니다. 따로 감속 코드를 두지 않습니다. */
 
   // ---- jump (with coyote time + input buffering) ----
   local.coyote = local.grounded ? 0.11 : Math.max(0, local.coyote - dt);
@@ -2800,6 +3366,10 @@ function stepPhysics(dt) {
     }
   }
 
+  /* 타일에서 발이 떨어졌습니다 — 다음에 닿을 때 '다시 밟은 것'으로 셉니다.
+   * (부스터·대기 발판 위도 groundTile 이 null 이라 여기서 풀립니다)   */
+  if (!local.groundTile) contactTile = null;
+
   /* 발판을 잃는 순간 사인을 확정합니다.
    * 여기서 잡아야 정확합니다 — 구름바다까지 떨어지는 데 1초, 잠기는
    * 연출에 0.75초가 더 걸리므로, 탈락 시점에 판단하면 그 사이 스친
@@ -2843,7 +3413,7 @@ function stepPhysics(dt) {
   //
   // 단, 개발 모드에서는 이 복귀를 끕니다. 대기 중에 레이어를 클릭해 내려가도
   // 곧바로 발판으로 튕겨 올라와 버려서 층 확인이 불가능하기 때문입니다.
-  if (G.phase !== 'playing' && !DEV.on) {
+  if (G.phase !== 'playing' && !(DEV.on && DEV.layerJump)) {
     const myPed = pedestalForSeat(local.seat);
     if (myPed && local.pos.y < myPed.top - 3) {
       local.pos.set(myPed.x, myPed.top, myPed.z);
@@ -2867,8 +3437,17 @@ function stepPhysics(dt) {
 
 /* 같은 타일에 연속으로 히트를 주지 않기 위한 최소 간격.
  * onSteppedOn 은 매 물리 프레임(60Hz) 호출되므로 이 쿨다운이 없으면
- * 가만히 서 있기만 해도 몇 프레임 만에 3히트가 쌓여 즉시 무너집니다.   */
+ * 한두 프레임 사이 발이 떴다 붙는 것만으로 히트가 겹칩니다.            */
 const TILE_HIT_COOLDOWN_MS = 400;
+
+/* ★ 지금 발이 닿아 있는 타일.
+ *
+ * 강화 타일이 "2회째 밟기에 파괴"가 되면서, 계속 서 있는 것을 재밟기로
+ * 세면 안 되게 됐습니다. 쿨다운만으로는 가만히 서 있어도 0.4초 뒤
+ * 두 번째 히트가 들어가 강화 타일이 일반 타일보다 빨리 꺼집니다.
+ * 그래서 '발이 떨어졌다가 다시 닿았을 때'만 한 번 셉니다.
+ * 계속 서 있는 경우는 서버의 autoMs(3초 자동 파괴)가 처리합니다.       */
+let contactTile = null;
 
 /**
  * 타일을 밟았다고 서버에 보고합니다.
@@ -2883,8 +3462,15 @@ const TILE_HIT_COOLDOWN_MS = 400;
  * 마모 표현은 서버의 tile_hit / tile_warn 을 받아서 반영합니다.
  */
 function onSteppedOn(rec) {
-  if (!rec || rec.state === 'gone' || rec.state === 'warn') return;
+  if (!rec || rec.state === 'gone' || rec.state === 'warn' || rec.state === 'reject') return;
   if (G.phase !== 'playing') return;
+  if (contactTile === rec) return;      // 계속 서 있는 중 — 새로 밟은 게 아닙니다
+  contactTile = rec;
+
+  /* 위상 타일은 밟아도 무너지지 않습니다(서버도 막지만 여기서 먼저 끊어
+   * 쓸데없는 패킷을 안 보냅니다). contactTile 기록은 위에서 이미 했으므로
+   * 다른 타일로 옮겨갈 때의 판정은 그대로 동작합니다.                */
+  if (rec.phaseTile) return;
 
   const now = performance.now();
   if (now - rec.myLastHitAt < TILE_HIT_COOLDOWN_MS) return;
@@ -2893,18 +3479,24 @@ function onSteppedOn(rec) {
   G.socket.emit('tile_step', { tileId: rec.id });
 }
 
-/* 개발 모드에서 구름바다까지 떨어졌을 때 — 탈락시키지 않고 최상층 위로
- * 되돌려 계속 테스트할 수 있게 합니다.                                  */
+/* DEV.noEliminate: 구름바다까지 떨어졌을 때 탈락시키지 않고 최상층 위로
+ * 되돌립니다. player_death 는 보내지 않습니다.
+ *
+ * devTeleport 를 거치므로 서버 이동 검증 면제(dev_teleport)도 같이 탑니다.
+ * layerJump 를 꺼 둔 탭에서도 복귀는 되어야 하므로 여기서만 잠시 허용합니다. */
 function reviveForDev() {
   const topLayer = G.cfg && G.cfg.LAYERS ? G.cfg.LAYERS[0].index : 3;
+  const hadJump = DEV.layerJump;
+  DEV.layerJump = true;
   devTeleport(topLayer);
+  DEV.layerJump = hadJump;
   toast('개발 모드 — 최상층으로 되돌렸습니다', 'cheer');
 }
 
 /* 구름을 뚫고 들어가는 연출을 시작합니다. 실제 탈락 처리는 끝난 뒤에. */
 function beginFallOut() {
-  // 개발 모드: 가라앉는 연출 없이 곧바로 최상층으로 되돌립니다
-  if (DEV.on) { reviveForDev(); return; }
+  // DEV.noEliminate: 가라앉는 연출 없이 곧바로 최상층으로 되돌립니다
+  if (DEV.on && DEV.noEliminate) { reviveForDev(); return; }
   if (local.dying || !local.alive) return;
   local.dying = 0.75;
   local.anim = 'fall';
@@ -2941,9 +3533,10 @@ function updateFallOut(dt) {
 }
 
 function eliminateSelf(cause) {
-  /* 개발 모드: 떨어져도 탈락시키지 않습니다. 서버도 player_death 를 무시하지만,
-   * 여기서 먼저 막아야 화면이 붉게 번쩍이거나 아바타가 사라지지 않습니다.  */
-  if (DEV.on) { reviveForDev(); return; }
+  /* DEV.noEliminate: 떨어져도 탈락시키지 않습니다. 서버도 player_death 를
+   * 무시하지만, 여기서 먼저 막아야 화면이 붉게 번쩍이거나 아바타가 사라지지
+   * 않습니다. player_death 를 아예 보내지 않는 것도 이 return 이 보장합니다. */
+  if (DEV.on && DEV.noEliminate) { reviveForDev(); return; }
   if (!local.alive) return;
   local.alive = false;
   G.selfAlive = false;
@@ -2965,22 +3558,34 @@ function eliminateSelf(cause) {
  * 층별 기능을 확인할 때 매번 떨어져서 내려갈 필요가 없게 합니다.
  * 서버가 DEV_MODE=false 를 내려주면 클릭해도 아무 일이 없습니다.       */
 function devTeleport(layerIndex) {
-  if (!DEV.on) return;
+  if (!DEV.on || !DEV.layerJump) return;
   if (G.role !== 'player') { toast('관전 중에는 이동할 수 없습니다', 'kill'); return; }
 
   const y = G.layerY[layerIndex];
   if (y === undefined) return;
 
+  /* 위치를 바꾸기 '전에' 서버에 알립니다. 순간이동은 정의상 이동 검증에
+   * 걸리므로, 서버가 잠깐 면제 창을 열어 준 뒤에 옮겨야 곧바로
+   * state_correction 으로 되돌려지지 않습니다.
+   * 앞으로 만들 순간이동 이벤트도 이 순서를 그대로 쓰세요.            */
+  if (G.socket) G.socket.emit('dev_teleport', { layer: layerIndex });
+
   /* 그 층에서 실제로 살아 있는 타일 위에 내려놓습니다. 맵 한가운데가
    * 이미 무너져 있을 수도 있으니, 중심에서 가장 가까운 성한 타일을 고릅니다.
    * (개발 모드에선 타일이 안 무너지지만, 모드를 끈 채 켜 둔 탭에서도
    *  안전하게 동작하도록 이렇게 둡니다.)                                */
+  /* 위상 타일 위에 내려놓으면 OFF 순간 곧바로 떨어져서 관찰이 안 됩니다.
+   * 단단한 타일을 우선 고르고, 그런 게 없을 때만 위상 타일로 갑니다.  */
   let best = null, bestD = Infinity;
+  let anyBest = null, anyBestD = Infinity;
   for (const rec of (G.layerTiles[layerIndex] || [])) {
     if (rec.state === 'gone') continue;
     const d = rec.x * rec.x + rec.z * rec.z;
+    if (d < anyBestD) { anyBestD = d; anyBest = rec; }
+    if (rec.phaseTile) continue;
     if (d < bestD) { bestD = d; best = rec; }
   }
+  if (!best) best = anyBest;
 
   const px = best ? best.x : 0;
   const pz = best ? best.z : 0;
@@ -2991,14 +3596,14 @@ function devTeleport(layerIndex) {
   local.grounded = false;
   local.jumped = false;
   local.dying = 0;
-  local.stagger = 0;
   local.layer = layerIndex;
   local.lastGroundY = py;
 
-  // 떨어져 있던 상태에서 눌렀다면 되살립니다
+  // 떨어져 있던 상태에서 눌렀다면 되살립니다 (서버도 dev_teleport 에서 같이 살립니다)
   if (!local.alive) {
     local.alive = true;
     G.selfAlive = true;
+    G.role = 'player';
     local.anim = 'idle';
     if (local.avatar) {
       local.avatar.group.visible = true;
@@ -3006,17 +3611,12 @@ function devTeleport(layerIndex) {
       local.avatar.group.scale.set(1, 1, 1);
     }
     dom.deadFlash.classList.remove('on');
+    updateSpectatorUI();
   }
 
   applyLayerTransparency(layerIndex);
-  toast('LAYER 0' + layerIndex + ' 로 이동했습니다', 'cheer');
-}
-
-for (const d of dom.docs) {
-  d.addEventListener('click', () => {
-    const L = parseInt(d.dataset.l, 10);
-    if (!isNaN(L)) devTeleport(L);
-  });
+  markDevLayerButton(layerIndex);
+  toast('LAYER ' + String(layerIndex).padStart(2, '0') + ' 로 이동했습니다', 'cheer');
 }
 
 /* ============================ 9. tile FX =============================== */
@@ -3307,10 +3907,11 @@ function applyTileWear(rec) {
   const maxH = rec.maxHits || 1;
   rec.wear = Math.min(1, rec.hits / maxH);
 
-  /* 2회차부터 균열 오버레이를 답니다. 함정 타일은 maxHits 가 1 이라
-   * 2회차 자체가 없으므로 자연히 제외됩니다 (1회 붕괴 규칙 유지).
-   * 1회차 표현(옅은 색)은 updateTiles 쪽 그대로 두고 손대지 않습니다. */
-  if (rec.hits >= 2 && maxH > 1) {
+  /* ★ 균열 오버레이는 이제 '강화 타일 전용' 표현입니다.
+   * 2회차에 있던 이 연출은 일반 타일이 3회 밟기였을 때의 것인데,
+   * 일반 타일이 1회 + 퓨즈로 바뀌면서 중간 상태 자체가 없어졌습니다.
+   * 강화 타일만 1회에 금이 가고 2회째에 무너지므로 그대로 이관했습니다. */
+  if (rec.kind === 'reinforced' && rec.hits > 0) {
     if (!rec.crack) {
       attachCrack(rec);
       rec.crackShake = CRACK_SHAKE_S;   // 금이 갈 때 짧게 흔들려야 타격감이 납니다
@@ -3331,6 +3932,28 @@ function resetTileWear() {
   }
 }
 
+/* ── 거절이유 타일 색 단계 ────────────────────────────────────────────
+ * 노랑 → 주황 → 빨강 을 시간에 따라 이어 붙입니다. 세 색 사이를 선형
+ * 보간하므로 단계가 뚝뚝 끊기지 않습니다.
+ * 마지막 REJECT_BLINK_MS 구간에는 빠른 점멸로 "곧 터진다"를 알립니다. */
+const REJECT_COLORS = [
+  new THREE.Color(0xffd400),   // 0%   노랑 — 거절이유 발견
+  new THREE.Color(0xff8a00),   // 50%  주황
+  new THREE.Color(0xff2020)    // 100% 빨강 — 폭발 직전
+];
+const REJECT_BLINK_MS = 500;   // 마지막 이만큼은 빠르게 점멸합니다
+
+/**
+ * 거절이유 카운트다운을 시작합니다.
+ * 서버가 정한 delay 를 그대로 씁니다 — 클라이언트는 그리기만 합니다.
+ */
+function startReject(rec, delay) {
+  if (!rec || rec.state === 'gone' || rec.state === 'reject') return;
+  rec.state = 'reject';
+  rec.rejectStart = performance.now();
+  rec.rejectDelay = Math.max(1, delay || 1500);
+}
+
 function startWarn(rec, fuse) {
   if (rec.state === 'gone' || rec.state === 'warn') return;
   rec.state = 'warn';
@@ -3338,26 +3961,142 @@ function startWarn(rec, fuse) {
   rec.fuse = fuse;
 }
 
-function breakTile(rec) {
+/* 복구 연출 길이. 아래에서 솟아오르는 데 걸리는 시간(ms). */
+const RESTORE_RISE_MS = 300;
+
+/**
+ * 부서진 타일을 되살립니다 (서버 tile_restore 수신 시).
+ *
+ * ★ 여기서 하나라도 빠뜨리면 '유령 타일'이 됩니다.
+ *   breakTile 이 남긴 흔적은 한 곳이 아니라 여러 곳에 흩어져 있습니다 —
+ *   상태값(state/hits), 메시 변환(위치·회전·크기·visible), 재질(색·발광·
+ *   투명도), 얹혀 있던 균열 오버레이, 그리고 재밟기 판정용 캐시까지.
+ *   되돌리지 않은 항목은 다음 프레임에 updateTiles 가 덮어쓰지 않는 한
+ *   그대로 남습니다 (예: rotation 은 idle 분기에서 손대지 않습니다).
+ */
+function restoreTile(rec) {
+  if (!rec) return;
+
+  // ── 상태 ──
+  rec.state = 'idle';
+  rec.hits = 0;
+  rec.wear = 0;
+  rec.warnStart = 0;
+  rec.breakStart = 0;
+  rec.rejectStart = 0;
+  rec.rejectDelay = 0;
+  rec.crackShake = 0;
+  /* 재밟기 쿨다운을 풀어 줍니다. 안 풀면 방금 밟혀 부서진 타일이
+   * 되살아났을 때 400ms 동안 밟아도 서버에 보고가 안 갑니다.      */
+  rec.myLastHitAt = -Infinity;
+
+  // ── 균열 오버레이 (강화 타일이 부서지기 전에 얹혀 있었을 수 있습니다) ──
+  releaseCrack(rec);
+
+  // ── 메시 변환 (breakTile 의 낙하 연출이 전부 여기에 남습니다) ──
+  rec.mesh.visible = true;
+  rec.mesh.position.set(rec.x, rec.baseY, rec.z);
+  rec.mesh.rotation.set(0, 0, 0);
+  rec.mesh.scale.setScalar(1);
+
+  // ── 재질 ──
+  rec.mat.color.copy(rec.baseColor);
+  rec.mat.emissive.copy(rec.baseEmissive);
+  rec.mat.emissiveIntensity = rec.baseGlow;
+  // 층 반투명이 걸려 있으면 그 값으로 (1 로 두면 위층에서 혼자 불투명해집니다)
+  rec.mat.opacity = tileAlphaFor(rec);
+
+  /* 내가 이 타일 위에 서 있다가 떨어졌다면 접촉 기록이 남아 있을 수 있습니다.
+   * 안 지우면 되살아난 타일에 다시 올라서도 '계속 서 있던 것'으로 보여
+   * tile_step 이 안 나갑니다.                                        */
+  if (contactTile === rec) contactTile = null;
+
+  // ── 솟아오르는 연출 시작 ──
+  rec.restoreStart = performance.now();
+}
+
+function breakTile(rec, scale) {
   if (!rec || rec.state === 'gone') return;
   rec.state = 'gone';
   rec.breakStart = performance.now();
-  spawnDebris(rec);
+  spawnDebris(rec, scale);
+}
+
+/* 점프 타일 발사 이펙트 — 발밑에서 위로 솟는 링.
+ * 대시 잔상(dashTrails)과 같은 풀을 씁니다. 수명·감쇠 규칙이 같고,
+ * 둘이 동시에 뜰 일이 거의 없어 따로 관리할 이유가 없습니다.        */
+function spawnJumpFx(x, y, z, level) {
+  const S = G.hexSize || 3.2 / 1.5;
+  if (!dashTrailGeo) dashTrailGeo = new THREE.RingGeometry(S * 0.35, S * 0.62, 18);
+  const color = level >= 2 ? 0xff00c8 : 0x00e5ff;
+  const rings = 4 + level * 2;
+  for (let i = 0; i < rings; i++) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: color, transparent: true, opacity: 0.8,
+      side: THREE.DoubleSide, depthWrite: false, toneMapped: false
+    });
+    const m = new THREE.Mesh(dashTrailGeo, mat);
+    // 위로 층층이 쌓아 '솟아오른다'로 읽히게 합니다
+    m.position.set(x, y + 0.1 + i * (S * 0.55), z);
+    m.rotation.x = -Math.PI / 2;
+    fxGroup.add(m);
+    dashTrails.push({ mesh: m, mat, life: 0.5 - i * 0.03 });
+  }
+}
+
+/* 대시할 때 발밑에 남기는 잔상. 파편(debris)과 같은 풀을 쓰지 않고
+ * 따로 둔 이유는 수명·중력이 달라서입니다 (잔상은 안 떨어집니다).   */
+const dashTrails = [];
+let dashTrailGeo = null;
+function spawnDashFx(x, y, z, dirX, dirZ) {
+  const S = G.hexSize || 3.2 / 1.5;
+  if (!dashTrailGeo) dashTrailGeo = new THREE.RingGeometry(S * 0.35, S * 0.62, 18);
+  for (let i = 0; i < 5; i++) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x00ffcc, transparent: true, opacity: 0.7,
+      side: THREE.DoubleSide, depthWrite: false, toneMapped: false
+    });
+    const m = new THREE.Mesh(dashTrailGeo, mat);
+    // 진행 방향 뒤쪽으로 늘어놓아 '튀어나간' 궤적으로 읽히게 합니다
+    const back = i * S * 0.5;
+    m.position.set(x - dirX * back, y + 0.12, z - dirZ * back);
+    m.rotation.x = -Math.PI / 2;
+    fxGroup.add(m);
+    dashTrails.push({ mesh: m, mat, life: 0.45 - i * 0.05 });
+  }
+}
+function updateDashTrails(dt) {
+  for (let i = dashTrails.length - 1; i >= 0; i--) {
+    const d = dashTrails[i];
+    d.life -= dt;
+    if (d.life <= 0) {
+      fxGroup.remove(d.mesh); d.mat.dispose(); dashTrails.splice(i, 1); continue;
+    }
+    d.mat.opacity = Math.max(0, d.life * 1.6);
+    d.mesh.scale.setScalar(1 + (0.45 - d.life) * 2.2);
+  }
 }
 
 const debris = [];
 const debrisGeo = new THREE.TetrahedronGeometry(0.38);   // 타일 축소에 맞춰 작게
-function spawnDebris(rec) {
-  for (let i = 0; i < 6; i++) {
+/**
+ * 타일 파편.
+ * @param scale 1 = 평범한 붕괴. 폭발처럼 크게 보여야 할 때 올립니다
+ *              (개수·흩어지는 범위·튀는 속도가 함께 커집니다).
+ */
+function spawnDebris(rec, scale) {
+  const k = scale || 1;
+  const count = Math.round(6 * k);
+  for (let i = 0; i < count; i++) {
     const m = new THREE.Mesh(debrisGeo, new THREE.MeshStandardMaterial({
       color: rec.baseColor, emissive: rec.baseColor, emissiveIntensity: 0.6, transparent: true
     }));
-    const spread = (G.hexSize || 3.2 / 1.5) * FX.DEBRIS_SPREAD;
+    const spread = (G.hexSize || 3.2 / 1.5) * FX.DEBRIS_SPREAD * k;
     m.position.set(rec.x + (Math.random() - 0.5) * spread, rec.y, rec.z + (Math.random() - 0.5) * spread);
     fxGroup.add(m);
     debris.push({
       mesh: m,
-      vel: new THREE.Vector3((Math.random() - 0.5) * 7, Math.random() * 5 + 1.5, (Math.random() - 0.5) * 7),
+      vel: new THREE.Vector3((Math.random() - 0.5) * 7 * k, (Math.random() * 5 + 1.5) * k, (Math.random() - 0.5) * 7 * k),
       spin: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6),
       life: 1.6
     });
@@ -3387,9 +4126,30 @@ function updateTiles(dt, now) {
   for (const rec of G.tiles.values()) {
     const mesh = rec.mesh;
 
-    if (rec.state === 'warn') {
+    if (rec.state === 'reject') {
+      /* 거절이유 카운트다운. 노랑 → 주황 → 빨강 을 부드럽게 잇습니다. */
+      const p = Math.min(1, (now - rec.rejectStart) / rec.rejectDelay);
+      const seg = p < 0.5 ? 0 : 1;                    // 0: 노랑→주황, 1: 주황→빨강
+      const k = p < 0.5 ? p / 0.5 : (p - 0.5) / 0.5;
+      rec.mat.color.copy(REJECT_COLORS[seg]).lerp(REJECT_COLORS[seg + 1], k);
+      rec.mat.emissive.copy(rec.mat.color);
+
+      /* 마지막 0.5초는 빠른 점멸 — 여기서 벗어나지 못하면 휘말립니다. */
+      const leftMs = rec.rejectDelay - (now - rec.rejectStart);
+      if (leftMs <= REJECT_BLINK_MS) {
+        const blink = Math.sin(now * 0.045) * 0.5 + 0.5;
+        rec.mat.emissiveIntensity = 0.6 + blink * 3.4;
+        mesh.scale.setScalar(1 + blink * 0.05);
+      } else {
+        rec.mat.emissiveIntensity = 0.5 + p * 1.6;
+        mesh.scale.setScalar(1);
+      }
+      // 점점 크게 흔들려 임박했음을 몸으로 알립니다
+      mesh.position.y = rec.baseY + Math.sin(now * 0.03) * 0.10 * p;
+    } else if (rec.state === 'warn') {
       const p = Math.min(1, (now - rec.warnStart) / rec.fuse);
-      const blink = Math.sin(p * Math.PI * (rec.trap ? 16 : 10)) * 0.5 + 0.5;
+      // 취약 타일은 퓨즈가 0.2초뿐이라 점멸을 훨씬 빠르게 해야 읽힙니다
+      const blink = Math.sin(p * Math.PI * (rec.kind === 'fragile' ? 16 : 10)) * 0.5 + 0.5;
       rec.mat.emissiveIntensity = 0.3 + blink * 2.6;
       rec.mat.color.copy(rec.baseColor).lerp(new THREE.Color(0xff2d2d), 0.35 + p * 0.55);
       mesh.position.y = rec.baseY + Math.sin(now * 0.05) * 0.09 * p;
@@ -3412,32 +4172,39 @@ function updateTiles(dt, now) {
       }
       continue;
     } else {
-      // idle — breathe the emissive very gently so the grid feels alive
-      const glow = rec.trap
-        ? 0.45 + Math.sin(now * 0.004 + rec.x) * 0.2
-        : 0.2 + Math.sin(now * 0.0016 + rec.x * 0.2 + rec.z * 0.2) * 0.07;
+      /* 점프 타일은 위아래로 살랑살랑 떠 있게 해서 '발판'으로 읽히게 합니다.
+       * 두 층짜리가 더 크게·빠르게 움직여 색 말고도 구분이 하나 더 생깁니다.
+       * 메시 위치만 건드리므로 드로우콜은 늘지 않습니다.               */
+      const glow = rec.accelTile
+        ? rec.baseGlow + Math.sin(now * 0.011 + (rec.x + rec.z) * 0.5) * 0.55
+        : rec.kind === 'fragile'
+        ? rec.baseGlow + Math.sin(now * 0.004 + rec.x) * 0.20
+        : rec.kind === 'special'
+          ? rec.baseGlow + Math.sin(now * 0.0035 + rec.x * 0.3 + rec.z * 0.3) * 0.25
+          : rec.baseGlow + Math.sin(now * 0.0016 + rec.x * 0.2 + rec.z * 0.2) * 0.07;
       rec.mat.color.copy(rec.baseColor);
 
-      /* 마모 단계를 여기서 덧입힙니다.
-       * 위에서 baseColor 로 되돌린 뒤에 적용해야 합니다 — 순서가 바뀌면
+      /* 마모 표현. 이제 hits 가 쌓인 채 서 있는 타일은 강화 타일뿐입니다
+       * (나머지는 1회에 곧바로 warn 으로 넘어갑니다).
+       * baseColor 로 되돌린 뒤에 적용해야 합니다 — 순서가 바뀌면
        * 매 프레임 원래 색이 마모 표현을 덮어써서 아무 변화도 안 보입니다. */
       if (rec.hits > 0) {
-        if (rec.hits === 1) {
-          // 1회차 — 색이 옅어지고 발광이 죽으며 살짝 가라앉습니다
-          rec.mat.color.lerp(WEAR_WHITE, 0.45);
-          rec.mat.emissiveIntensity = glow * 0.4;
-          mesh.position.y = rec.baseY - 0.06;
-        } else {
-          // 2회차 이상 — 더 옅게 + 회색조 + 균열 오버레이 + 미세한 떨림
-          rec.mat.color.lerp(WEAR_WHITE, 0.65).lerp(WEAR_GREY, 0.5);
-          rec.mat.emissiveIntensity = glow * 0.25;
-          mesh.position.y = rec.baseY - 0.12 + Math.sin(now * 0.02 + rec.x) * 0.03;
-          mesh.scale.setScalar(0.985);
-        }
+        // 금이 간 강화 타일 — 회색조로 죽고 살짝 가라앉으며 미세하게 떱니다
+        rec.mat.color.lerp(WEAR_WHITE, 0.35).lerp(WEAR_GREY, 0.45);
+        rec.mat.emissiveIntensity = glow * 0.3;
+        mesh.position.y = rec.baseY - 0.10 + Math.sin(now * 0.02 + rec.x) * 0.03;
+        mesh.scale.setScalar(0.985);
       } else {
         rec.mat.emissiveIntensity = glow;
         mesh.position.y = rec.baseY;
         mesh.scale.setScalar(1);
+      }
+
+      if (rec.jumpLevel > 0) {
+        const amp = 0.06 + rec.jumpLevel * 0.05;
+        const spd = 0.0025 + rec.jumpLevel * 0.0018;
+        mesh.position.y = rec.baseY + Math.sin(now * spd + rec.x * 0.4 + rec.z * 0.4) * amp;
+        rec.mat.emissiveIntensity = glow * (1 + rec.jumpLevel * 0.15);
       }
 
       /* 금이 간 직후 아주 짧게 흔듭니다. 균열이 소리 없이 슬며시 나타나면
@@ -3449,9 +4216,46 @@ function updateTiles(dt, now) {
       }
     }
 
-    if (rec.targetOpacity !== undefined) {
-      rec.mat.opacity += (rec.targetOpacity - rec.mat.opacity) * Math.min(1, dt * 6);
+    /* ── 위상 타일 겉모습 ─────────────────────────────────────────
+     * ON  : 위 분기에서 정해진 특수 타일 색 그대로 (꽉 찬 모습)
+     * OFF : 사라지지 않고 반투명 + 윤곽선. 발광을 죽여 '실체가 아님'을
+     *       보여주되, 위치와 크기는 그대로 둡니다 — 가라앉히면 무너지는
+     *       타일과 헷갈립니다.
+     * 실제 투명도는 아래 tileAlphaFor 가 층 반투명과 곱해서 냅니다.  */
+    if (rec.phaseTile) {
+      const layerAlpha = rec.targetOpacity !== undefined ? rec.targetOpacity : 1;
+      if (!G.phaseOn) {
+        rec.mat.emissiveIntensity = rec.baseGlow * 0.25;
+        rec.mat.color.copy(rec.baseColor).lerp(WHITE_C, 0.18);
+      }
+      if (rec.phaseRing) {
+        rec.phaseRing.visible = !G.phaseOn && rec.state !== 'gone';
+        // 윤곽선은 층 반투명만 따릅니다 — OFF 반투명까지 곱하면 안 보입니다
+        rec.phaseRing.material.opacity = layerAlpha * 0.95;
+      }
     }
+
+    /* ── 복구 연출 ────────────────────────────────────────────────
+     * 아래에서 솟아오르며 나타납니다. 그냥 툭 나타나면 "원래 있었나?"
+     * 싶어 복구가 일어났다는 걸 못 읽습니다.
+     * if/else 체인 뒤에서 위치·크기만 덮어쓰므로 idle 분기가 매 프레임
+     * 세워 놓은 baseY/scale 을 그대로 밀어냅니다.                    */
+    if (rec.restoreStart) {
+      const rt = (now - rec.restoreStart) / RESTORE_RISE_MS;
+      if (rt >= 1) {
+        rec.restoreStart = 0;
+      } else {
+        const e = 1 - Math.pow(1 - rt, 3);          // ease-out — 끝에서 부드럽게 멈춤
+        mesh.position.y = rec.baseY - (1 - e) * G.hexThick * 6;
+        mesh.scale.setScalar(0.55 + e * 0.45);
+        // 솟는 동안만 살짝 빛나게 해서 눈이 따라가게 합니다
+        rec.mat.emissiveIntensity = rec.baseGlow + (1 - rt) * 1.8;
+      }
+    }
+
+    /* 층 반투명 × 위상 OFF 반투명. 둘을 곱하는 이유는 tileAlphaFor 참고. */
+    const wantAlpha = tileAlphaFor(rec);
+    rec.mat.opacity += (wantAlpha - rec.mat.opacity) * Math.min(1, dt * 6);
 
     /* ── 균열 오버레이 추종 ────────────────────────────────────────
      * 타일은 마모되면 가라앉고, 경고 중엔 진동하고, 스케일도 줄어듭니다.
@@ -3461,12 +4265,12 @@ function updateTiles(dt, now) {
       const c = rec.crack;
       const t = Math.min(1, (now - c.born) / CRACK_GROW_MS);
       // 위층이 반투명해지면 균열도 같이 흐려져야 합니다
-      const baseAlpha = (rec.targetOpacity !== undefined ? rec.targetOpacity : 1) * 0.9;
+      const baseAlpha = tileAlphaFor(rec) * 0.9;
       c.mesh.position.set(rec.x, mesh.position.y + G.hexThick / 2 + 0.02, rec.z);
       c.mesh.scale.setScalar(mesh.scale.x * (0.55 + 0.45 * t));   // 툭 튀어나오지 않게 퍼짐
       c.mesh.rotation.x = -Math.PI / 2;
       if (rec.state === 'warn') {
-        // 3회차 — 마지막 단계이므로 가장 진하게, 붉은 틴트로 경고와 맞춥니다
+        // 마지막 단계이므로 가장 진하게, 붉은 틴트로 경고와 맞춥니다
         c.mat.opacity = baseAlpha;
         c.mat.color.setHex(CRACK_WARN_TINT);
       } else {
@@ -3475,6 +4279,46 @@ function updateTiles(dt, now) {
       }
     }
   }
+}
+
+/* ── 신속심사 타일 방향 화살표 ────────────────────────────────────────
+ * 대시 방향은 '밟는 사람의 진행 방향'이라 타일에 고정으로 그릴 수 없습니다.
+ * 그래서 화살표는 하나만 만들어 두고, 내가 신속심사 타일 위에 올라섰을 때만
+ * 그 타일 위에 띄우고 local.ry 로 돌립니다. 드로우콜은 1개 늘어납니다.
+ * ------------------------------------------------------------------ */
+let dashArrow = null;
+function ensureDashArrow() {
+  if (dashArrow) return dashArrow;
+  const S = G.hexSize || HEX_SIZE_BASE;
+  // 납작한 삼각형(원뿔 3각) 하나. 위에서 내려다보므로 이걸로 충분합니다.
+  const geo = new THREE.ConeGeometry(S * 0.34, S * 0.78, 3);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false
+  });
+  dashArrow = new THREE.Mesh(geo, mat);
+  dashArrow.rotation.x = Math.PI / 2;      // 눕혀서 XZ 평면을 향하게
+  dashArrow.renderOrder = 4;
+  dashArrow.visible = false;
+  fxGroup.add(dashArrow);
+  return dashArrow;
+}
+
+function updateDashArrow() {
+  const a = ensureDashArrow();
+  const rec = local.groundTile;
+  if (!local.alive || G.role !== 'player' || !rec || !rec.accelTile || rec.state === 'gone') {
+    a.visible = false;
+    return;
+  }
+  a.visible = true;
+  a.position.set(rec.x, rec.top + 0.35, rec.z);
+  /* ConeGeometry 는 +Y 를 향하는데 rotation.x=π/2 로 눕히면 +Z 를 봅니다.
+   * local.ry 는 atan2(dirX, dirZ) 이므로 그대로 y 회전에 넣으면 맞습니다. */
+  a.rotation.y = local.ry;
+  a.material.color.setHex(local.dash ? 0x00ffcc : 0xffffff);
+  const pulse = 0.55 + (Math.sin(performance.now() * 0.012) * 0.5 + 0.5) * 0.45;
+  a.material.opacity = pulse;
+  a.scale.setScalar(1 + (1 - pulse) * 0.25);
 }
 
 /* ============================ 10. boosters & obstacles ================= */
@@ -3621,7 +4465,10 @@ function removeObstacle(id) {
 /* 원격 주자 동기화 상태 — F2 진단 패널에 표시합니다.
  * lastErr 이 평상시 0.3 을 넘나들면 SMOOTH_HALFLIFE 를, snaps 가 계속
  * 늘어나면 네트워크나 SNAP_DIST 를 의심하면 됩니다.                     */
-const netStats = { snaps: 0, lastErr: 0, corrections: 0, lastCorrectionToast: -Infinity };
+const netStats = { snaps: 0, lastErr: 0, corrections: 0, lastCorrectionToast: -Infinity,
+  phaseFixes: 0,     // 위상 타일 계산이 서버와 어긋나 서버 값으로 넘어간 횟수
+  dashes: 0,         // 신속심사 타일로 대시한 횟수
+  jumps: 0 };        // 점프 타일로 발사된 횟수
 
 const UP_AXIS = new THREE.Vector3(0, 1, 0);   // slerp 회전축 (공용 상수)
 
@@ -3748,8 +4595,14 @@ class RemoteRunner {
      * 오차가 SNAP_DIST 를 넘으면 보간을 포기합니다. 이 경우 부드럽게
      * 따라가면 상대가 몇 초에 걸쳐 허공을 가로지르며 미끄러집니다.
      * 순간이동이 보기 흉해도, 틀린 위치에 오래 머무는 것보다 낫습니다.  */
+    /* 대시 중인 주자는 스냅샷 간 이동량이 평소의 두 배라 평소 기준으로는
+     * 강제 스냅이 걸립니다. player_impulse 를 받은 동안만 허용 오차를
+     * 넓혀 부드럽게 따라가게 합니다 (기본값은 그대로 둡니다).        */
+    const tolerant = this.tolerantUntil !== undefined && localNow < this.tolerantUntil;
+    const snapSq = tolerant ? NET.SNAP_DIST_SQ * 9 : NET.SNAP_DIST_SQ;
+
     const errSq = this.render.distanceToSquared(target);
-    if (errSq > NET.SNAP_DIST_SQ) {
+    if (errSq > snapSq) {
       this.render.copy(target);
       this.snaps = (this.snaps || 0) + 1;
       netStats.snaps++;
@@ -3853,15 +4706,139 @@ function spectateFocus() {
     if (r && r.alive) return r.render;
   }
   for (const r of G.players.values()) if (r.alive) return r.render;
-  return new THREE.Vector3(0, G.layerY[2], 0);
+  // 아무도 안 남았으면 가운데 층 높이를 봅니다 (층이 몇 개든)
+  const mid = G.layerOrder[Math.floor(G.layerOrder.length / 2)];
+  return new THREE.Vector3(0, mid === undefined ? 0 : G.layerY[mid], 0);
 }
 
 /* ============================ 13. HUD ================================= */
+
+/* 층 안내문을 서버 config.LAYERS 로 만듭니다.
+ *
+ * 종전에는 HTML 에 3개가 박혀 있었고 CSS 도 data-l="1|2|3" 만 색을 줬습니다.
+ * 층이 5개가 되면 두 곳을 손으로 고쳐야 했고, 순서를 뒤집으면 색이
+ * 어긋났습니다. 이제 이름·약칭·색이 전부 서버에서 옵니다.
+ *
+ * 5개가 세로로 안 들어가는 문제:
+ *   1) 4개 이상이면 .compact 로 항목 높이를 줄이고
+ *   2) 그래도 넘치면 .scroll 을 붙여 스크롤합니다
+ * .scroll 일 때만 pointer-events 를 켭니다 — 항상 켜 두면 안내문 위에서
+ * 카메라 드래그가 먹지 않습니다.                                       */
+/* 참가 화면의 규칙 설명을 서버 상수로 만듭니다.
+ * 종전에는 "3번 밟으면 무너집니다 / 함정 블록" 이 문장으로 박혀 있었는데,
+ * 규칙이 4종 체계로 바뀌면서 그대로 두면 거짓 설명이 됩니다.           */
+function buildRulesText() {
+  const cfg = G.cfg || {};
+  const layers = cfg.LAYERS || [];
+  const K = cfg.TILE_KINDS || {};
+
+  const eb = document.getElementById('joinEyebrow');
+  if (eb) eb.textContent = 'KIPO SURVIVAL PROTOCOL · ' + (layers.length || '?') + '-LAYER';
+
+  const el = document.getElementById('joinRules');
+  if (!el) return;
+  const sec = (ms) => (ms / 1000).toFixed(1).replace(/\.0$/, '') + '초';
+  const span = (k) => (K[k].fuseMin === K[k].fuseMax)
+    ? sec(K[k].fuseMin)
+    : sec(K[k].fuseMin) + '~' + sec(K[k].fuseMax);
+
+  const parts = [];
+  if (K.normal) parts.push('일반 타일은 한 번 밟으면 ' + span('normal') + ' 뒤에 무너집니다.');
+  if (K.fragile) parts.push('취약 타일은 ' + span('fragile') + ' 만에 꺼집니다.');
+  if (K.reinforced) {
+    parts.push('강화 타일은 누구든 ' + K.reinforced.hits + '번 밟거나, 처음 밟힌 뒤 ' +
+      sec(K.reinforced.autoMs) + '가 지나면 무너집니다.');
+  }
+  const accelLayer = layers.find((L) => L.special === 'accel');
+  if (accelLayer && cfg.DASH) {
+    parts.push(accelLayer.name + ' 층의 특수 타일은 신속심사 타일입니다 — ' +
+      '밟으면 진행 방향으로 ' + cfg.DASH.tiles + '칸 튀어나갑니다. ' +
+      '앞이 비어 있으면 그대로 떨어집니다.');
+  }
+  const rejectLayer = layers.find((L) => L.special === 'reject');
+  if (rejectLayer) {
+    parts.push('같은 층의 보정 타일을 밟으면 주변에서 무너진 타일 하나가 되살아납니다.');
+  }
+  if (rejectLayer && cfg.REJECT_TILE) {
+    const R = cfg.REJECT_TILE;
+    parts.push(rejectLayer.name + ' 층에는 거절이유 타일이 숨어 있습니다 — ' +
+      '평소엔 일반 타일처럼 보이다가 밟으면 ' + sec(R.delayMin) + '~' + sec(R.delayMax) +
+      ' 뒤에 자기 자신과 이웃 타일까지 함께 터집니다.');
+  }
+  const jumpLayer = layers.find((L) => L.special === 'jump');
+  if (jumpLayer && cfg.JUMP_TILE) {
+    parts.push(jumpLayer.name + ' 층의 특수 타일은 점프 타일입니다 — ' +
+      cfg.JUMP_TILE.levels.join('층 · ') + '층 위로 쏘아 올립니다. ' +
+      '위에 발판이 없으면 그대로 떨어집니다.');
+  }
+  const phaseLayer = layers.find((L) => L.special === 'phase');
+  if (phaseLayer && cfg.PHASE_TILE) {
+    parts.push(phaseLayer.name + ' 층의 특수 타일은 위상 타일입니다 — ' +
+      sec(cfg.PHASE_TILE.onMs) + ' 실체 → ' + sec(cfg.PHASE_TILE.offMs) +
+      ' 비활성을 반복하고, 밟아도 무너지지 않는 대신 비활성일 때 위에 있으면 떨어집니다.');
+  }
+  parts.push('그 밖의 특수 타일은 층마다 색이 다릅니다.');
+  parts.push('정원이 차면 대기 발판이 사라지며 시작됩니다.');
+  if (layers.length) {
+    parts.push('맨 아래 ' + (layers[layers.length - 1].name || '') +
+      ' 층 밑으로 떨어지면 구름바다에 빠져 탈락합니다.');
+  }
+  parts.push('마지막 한 명이 등록결정을 받습니다.');
+  el.textContent = parts.join(' ');
+
+  /* 화면 하단 한 줄 요약. 종전에는 "일반 타일 3회 · 함정 블록 1회" 였습니다.
+   * 종류가 늘거나 수치가 바뀌면 여기도 자동으로 따라옵니다.            */
+  const hint = document.getElementById('hintRules');
+  if (!hint) return;
+  const label = { normal: '일반', fragile: '취약', reinforced: '강화', special: '특수' };
+  const bits = [];
+  for (const k of Object.keys(K)) {
+    if (K[k].autoMs > 0) bits.push(label[k] + ' ' + K[k].hits + '회 또는 ' + sec(K[k].autoMs));
+    else bits.push(label[k] + ' ' + K[k].hits + '회 ' + span(k));
+  }
+  hint.textContent = bits.join(' · ') + ' 뒤 붕괴';
+}
+
+function buildLayerStack() {
+  const box = document.getElementById('layerStack');
+  if (!box) return;
+
+  const layers = (G.cfg && G.cfg.LAYERS) ? G.cfg.LAYERS : [];
+  box.innerHTML = '';
+  box.classList.remove('scroll');
+  box.classList.toggle('compact', layers.length > 3);
+
+  for (const L of layers) {
+    const d = document.createElement('div');
+    d.className = 'doc';
+    d.dataset.l = L.index;
+    // 층 색은 CSS 가 아니라 서버 값입니다 (LAYER_DEFS.color)
+    d.style.setProperty('--layer-c', L.color || '#00ffcc');
+
+    const no = document.createElement('div');
+    no.className = 'no';
+    no.textContent = 'LAYER ' + String(L.index).padStart(2, '0');
+    const nm = document.createElement('div');
+    nm.className = 'nm';
+    nm.textContent = L.name || '';
+    const alt = document.createElement('div');
+    alt.className = 'alt';
+    alt.textContent = L.short || '';
+
+    d.appendChild(no); d.appendChild(nm); d.appendChild(alt);
+    box.appendChild(d);
+  }
+
+  dom.docs = Array.from(box.querySelectorAll('.doc'));
+  // 여백까지 다 그려진 뒤에야 넘치는지 알 수 있습니다
+  if (box.scrollHeight > box.clientHeight + 1) box.classList.add('scroll');
+}
 
 function updateLayerStack(layer) {
   for (const d of dom.docs) {
     d.classList.toggle('on', parseInt(d.dataset.l, 10) === layer);
   }
+  if (DEV.on && DEV.layerJump) markDevLayerButton(layer);
 }
 
 function updateRoster() {
@@ -3988,6 +4965,24 @@ function showResult(data) {
 
 /* ============================ 14. networking ========================== */
 
+/* 소켓은 참가 버튼을 눌러야 붙습니다. 그런데 참가 화면이야말로 층 구성과
+ * 타일 규칙을 설명해야 하는 곳이라, 그때까지 비워 둘 수 없습니다.
+ * 그래서 페이지가 뜨자마자 /api/config 로 규격만 먼저 받아 옵니다.
+ * (server_hello 가 도착하면 같은 내용으로 다시 덮어씁니다 — 무해합니다)
+ * 실패해도 게임에는 지장이 없으므로 조용히 넘어갑니다.                */
+function preloadConfig() {
+  fetch('/api/config', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((cfg) => {
+      if (!cfg || G.started) return;
+      G.cfg = cfg;
+      buildLayerStack();
+      buildRulesText();
+    })
+    .catch(() => {});
+}
+preloadConfig();
+
 function connect(name, mode) {
   /* polling 으로 먼저 붙은 뒤 websocket 으로 업그레이드합니다.
    * socket.io-client 4.8 부터 tryAllTransports 기본값이 false 라서,
@@ -4021,7 +5016,11 @@ function connect(name, mode) {
 
   socket.on('server_hello', (d) => {
     G.cfg = d.config;
-    applyDevMode(!!d.config.DEV_MODE);
+    // 층 안내문과 규칙 설명은 서버가 규격을 알려준 지금 만들 수 있습니다
+    buildLayerStack();
+    buildRulesText();
+    // 구 서버 호환: DEV 객체가 없으면 예전 불리언(DEV_MODE)을 그대로 씁니다
+    applyDevMode(d.config.DEV || { on: !!d.config.DEV_MODE, noEliminate: true, layerJump: true });
   });
 
   socket.on('init', (d) => {
@@ -4051,7 +5050,13 @@ function connect(name, mode) {
         applyTileWear(rec);
       }
       if (b.phase === 'broken') { rec.state = 'gone'; rec.mesh.visible = false; }
-      else if (b.phase === 'warning') startWarn(rec, 800);
+      // 서버가 '남은' 퓨즈를 보내줍니다. 여기서 기본값으로 다시 세면
+      // 중간 참가자 화면에서만 타일이 더 오래 버팁니다.
+      // 폭발 대기 중(explode)이면 붉은 경고가 아니라 거절이유 연출이어야 합니다.
+      else if (b.phase === 'warning') {
+        if (b.explode) startReject(rec, b.fuse !== undefined ? b.fuse : 1500);
+        else startWarn(rec, b.fuse !== undefined ? b.fuse : rec.fuse);
+      }
     }
 
     syncPlayers(d.players);
@@ -4075,6 +5080,11 @@ function connect(name, mode) {
     }
     updateSpectatorUI();
     updateRoster();
+    /* 안내문·층 버튼을 여기서 한 번 더 만듭니다. server_hello 시점에는
+     * 참가 화면이 덮여 있어 #layerStack 의 높이를 못 재고, 그러면
+     * 넘침(.scroll) 판정과 버튼 위치가 둘 다 틀립니다.                 */
+    buildLayerStack();
+    buildDevLayerButtons();
     G.started = true;
   });
 
@@ -4083,6 +5093,12 @@ function connect(name, mode) {
   socket.on('round_start', (d) => {
     dom.result.classList.remove('show');
     resetTileWear();
+    contactTile = null;      // 지난 회차의 접촉 기록이 새 회차로 넘어오지 않게
+    local.dash = null;       // 지난 회차의 대시가 넘어오지 않게
+    // 위상 타일은 라운드 시작 순간 ON 으로 출발합니다
+    if (d.phaseEpoch) G.phaseEpoch = d.phaseEpoch;
+    G.phaseTrust = true;
+    G.phaseOn = true;
     // 지난 회차의 밀림 기록이 새 회차 사인으로 넘어오지 않게 지웁니다
     lastBump.id = null; lastBump.name = ''; lastBump.at = -Infinity;
     local.deathBy = null; local.deathByName = '';
@@ -4094,7 +5110,7 @@ function connect(name, mode) {
       local.pos.set(me.pos.x, me.pos.y, me.pos.z);
       local.vel.set(0, 0, 0);
       local.alive = true;
-      local.layer = 3;
+      local.layer = topLayerIndex();
       local.anim = 'idle';
       local.dying = 0;
       local.jumped = false;
@@ -4134,7 +5150,7 @@ function connect(name, mode) {
       local.seat = mine.seat;
       local.pos.set(mine.pos.x, mine.pos.y, mine.pos.z);
       local.vel.set(0, 0, 0);
-      local.layer = 3;
+      local.layer = topLayerIndex();
       local.anim = 'idle';
       local.jumped = false;
       local.lastGroundY = local.pos.y;
@@ -4173,6 +5189,28 @@ function connect(name, mode) {
   });
 
   socket.on('state', (snap) => {
+    /* ── 위상 타일 검산 ──────────────────────────────────────────
+     * 서버가 스냅샷에 현재 ON/OFF 를 1바이트(ph)로 실어 보냅니다.
+     *
+     * 비교 기준은 '지금'이 아니라 '스냅샷을 만든 시각(snap.t)' 입니다 —
+     * 패킷은 늘 조금 늦게 오므로 지금과 비교하면 전환 때마다 멀쩡한
+     * 계산이 틀린 것으로 나옵니다.
+     * 경계 근처(PHASE_EDGE_GUARD_MS)에서는 시계 지터만으로도 갈리므로
+     * 아예 판정하지 않습니다.                                       */
+    if (snap.ph !== undefined) {
+      const serverOn = !!snap.ph;
+      const pi = phaseInfoAt(snap.t);
+      if (pi.known && pi.marginMs > PHASE_EDGE_GUARD_MS) {
+        if (pi.on !== serverOn) {
+          if (G.phaseTrust) { G.phaseTrust = false; netStats.phaseFixes++; }
+        } else if (!G.phaseTrust) {
+          G.phaseTrust = true;      // 다시 맞기 시작했습니다 — 공식으로 복귀
+        }
+      }
+      // 공식을 못 믿는 동안에는 서버 값을 그대로 씁니다
+      if (!G.phaseTrust) G.phaseOn = serverOn;
+    }
+
     const now = performance.now();
     for (const s of snap.players) {
       if (s.id === G.selfId) continue;         // never overwrite local prediction
@@ -4181,6 +5219,37 @@ function connect(name, mode) {
       r.push(s, now);
       r.alive = !!s.al;
       r.layer = s.l;
+    }
+  });
+
+  /* 서버가 정한 강제 이동(지금은 대시 하나, 앞으로 점프 타일도 여기로).
+   *
+   * 내 것이면 그대로 적용합니다 — 서버가 이미 graceMs 동안 이동 검증을
+   * 면제해 뒀으므로 state_correction 이 오지 않습니다.
+   * 남의 것이면 그 주자의 보간 허용 오차를 잠깐 넓힙니다. 대시 중에는
+   * 스냅샷 간 이동량이 평소의 두 배라 NET.SNAP_DIST(2.0)를 넘겨
+   * 강제 스냅(뚝 끊김)이 걸리기 때문입니다.                          */
+  socket.on('player_impulse', (d) => {
+    if (!d || !d.id) return;
+    if (d.id === G.selfId) {
+      if (G.role !== 'player' || !local.alive) return;
+      if (d.type === 'dash') { applyDashImpulse(d); netStats.dashes++; }
+      else if (d.type === 'jump') {
+        applyJumpImpulse(d);
+        netStats.jumps++;
+        if (!d.landed) {
+          toast(d.reason === 'phase_off' ? '위상 타일이 꺼져 있습니다 — 착지 실패'
+                                         : '위쪽에 발판이 없습니다 — 착지 실패', 'kill');
+        }
+      }
+      return;
+    }
+    const r = G.players.get(d.id);
+    if (r instanceof RemoteRunner) {
+      r.tolerantUntil = performance.now() + (d.graceMs || 400) + NET.INTERP_DELAY_MS;
+      if (d.type === 'jump') spawnJumpFx(r.render.x, r.render.y, r.render.z, d.level || 1);
+      else if (d.to) spawnDashFx(d.to[0], d.to[1], d.to[2],
+        Array.isArray(d.vel) ? d.vel[0] : 0, Array.isArray(d.vel) ? d.vel[2] : 0);
     }
   });
 
@@ -4215,6 +5284,7 @@ function connect(name, mode) {
     if (!rec) return;
     rec.hits = d.hits;
     rec.maxHits = d.maxHits;
+    if (d.kind) rec.kind = d.kind;
     applyTileWear(rec);
     // 밟을수록 음이 높아져 "몇 번 남았는지"가 소리로도 읽힙니다
     Sound.sfx('step', {
@@ -4235,6 +5305,59 @@ function connect(name, mode) {
       pos: rec, rate: 0.94 + Math.random() * 0.12,
       volume: d.by === G.selfId ? 1 : 0.55
     });
+  });
+
+  /* 거절이유 타일을 누군가 밟았습니다. 색 변화는 여기서 시작합니다.
+   * 언제 터질지(delay)는 서버가 정하고 우리는 그대로 그립니다.       */
+  socket.on('tile_reject', (d) => {
+    const rec = G.tiles.get(d.tileId);
+    if (!rec) return;
+    startReject(rec, d.delay);
+    Sound.sfx('crack', { pos: rec, rate: 1.25 });
+    if (d.by === G.selfId) {
+      toast('거절이유 발견 — 주변까지 무너집니다. 피하세요', 'kill');
+    } else if (d.byName) {
+      toast(safeName(d.byName) + ' 님이 거절이유를 건드렸습니다', 'obstacle');
+    }
+  });
+
+  /* 폭발 — 서버가 없앨 타일 목록을 통째로 보냅니다.
+   * 이웃 계산도 연쇄 방지도 전부 서버가 이미 끝냈으므로,
+   * 여기서는 목록대로 부수고 파편만 크게 냅니다.                     */
+  socket.on('tile_explode', (d) => {
+    if (!d || !Array.isArray(d.tiles)) return;
+    const center = G.tiles.get(d.tileId);
+    for (const id of d.tiles) {
+      const rec = G.tiles.get(id);
+      if (!rec || rec.state === 'gone') continue;      // 이미 사라진 건 건너뜁니다
+      // 중앙은 더 크게, 이웃은 조금 작게 터집니다
+      breakTile(rec, id === d.tileId ? 2.4 : 1.6);
+    }
+    if (center) {
+      Sound.sfx('crack', { pos: center, rate: 0.72 });
+      Sound.sfx('death', { pos: center, volume: 0.5 });
+    }
+  });
+
+  /* 보정 타일을 밟았습니다. 어느 타일이 되살아나는지는 서버가 정하고
+   * 여기로는 결과만 옵니다 (restored 가 null 이면 되살릴 이웃이 없었음). */
+  socket.on('tile_amend', (d) => {
+    const rec = G.tiles.get(d.tileId);
+    if (rec) Sound.sfx('booster', { pos: rec, rate: 1.15, volume: 0.7 });
+    if (d.by === G.selfId) {
+      toast(d.restored ? '보정 성공 — 무너진 타일 하나를 되살렸습니다'
+                       : '보정 성공 — 되살릴 타일이 주변에 없습니다', 'cheer');
+    } else if (d.byName && d.restored) {
+      toast(safeName(d.byName) + ' 님이 보정으로 타일을 되살렸습니다', 'cheer');
+    }
+  });
+
+  /* 타일 되살리기. breakTile 이 남긴 흔적을 restoreTile 이 전부 되돌립니다. */
+  socket.on('tile_restore', (d) => {
+    const rec = G.tiles.get(d.tileId);
+    if (!rec) return;
+    restoreTile(rec);
+    Sound.sfx('land', { pos: rec, rate: 1.3, volume: 0.8 });
   });
 
   socket.on('tile_break', (d) => {
@@ -4344,6 +5467,9 @@ function applyMeta(meta) {
     else Sound.playBgm('lobby');
   }
   G.phaseEndsAt = meta.phaseEndsAt;
+  /* 위상 타일 기준 시각. meta 는 init·phase·map_reset 에 다 실려 오므로
+   * 중도 참가자도 여기서 받아 곧바로 같은 리듬에 올라탑니다.         */
+  if (meta.phaseEpoch !== undefined) G.phaseEpoch = meta.phaseEpoch;
   if (meta.theme !== undefined) applyTheme(meta.theme);
   if (meta.seats) G.seats = meta.seats;
   G.roster = meta.total;
@@ -4404,6 +5530,27 @@ let fpsAccum = 0, fpsFrames = 0;
  * lastTime 갱신은 stepFrameOnce() 한 곳에서만 합니다. frame() 에서 또
  * 갱신하면 dt 가 0 이 되거나 물리가 두 배로 돕니다.                   */
 function simulate(dt, now) {
+  /* ── 위상 타일 상태를 프레임당 한 번만 정합니다 ──────────────────
+   * 착지 판정 3곳(findLanding·supportAt·groundYUnder)과 그리기가 모두
+   * 이 값을 봅니다. 각자 계산하게 두면 전환 순간에 한 곳만 먼저 넘어가
+   * "발밑은 없는데 그림자는 있다" 같은 어긋남이 생깁니다.
+   *
+   * phaseTrust 가 false 면 내 공식이 서버와 어긋난 것이므로 계산하지 않고,
+   * state 핸들러가 넣어 준 서버 값을 그대로 씁니다.                  */
+  if (G.phaseTrust) {
+    const on = phaseTilesNow();
+    if (on !== G.phaseOn) {
+      G.phaseOn = on;
+      /* 두 클라이언트의 전환 시각을 맞대 보려면 이 로그를 비교하세요.
+       * 서버 시각 기준이라 기기 시계가 달라도 같은 값이 나와야 합니다. */
+      if (DEV.on) {
+        console.log('[위상] ' + (on ? 'ON ' : 'OFF') +
+          ' 서버시각=' + Math.round(Date.now() + G.serverOffset) +
+          ' 경과=' + Math.round(Date.now() + G.serverOffset - G.phaseEpoch) + 'ms');
+      }
+    }
+  }
+
   /* --- fixed-step physics for the local runner --- */
   if (local.dying) {
     updateFallOut(dt);
@@ -4470,6 +5617,8 @@ function renderFrame(dt, now) {
   /* --- world --- */
   updateTiles(dt, now);
   updateDebris(dt);
+  updateDashTrails(dt);
+  updateDashArrow();
   updateBoosters(dt, now);
   updateObstacles(dt, now);
   updateCamera(dt);
@@ -4574,7 +5723,32 @@ function renderDiag() {
     row('init 수신', G.started, G.started ? '완료' : '대기중') +
     row('룸', !!G.roomId && G.roomId !== '—', G.roomId) +
     row('내 역할', null, G.role) +
+    row('층', G.layerOrder.length > 0,
+        G.layerOrder.length + '층 [' + G.layerOrder.join(',') + '] y=' +
+        G.layerOrder.map((L) => G.layerY[L]).join(',') + ' sea=' + G.seaY) +
     row('타일', G.tiles.size > 0, G.tiles.size + '개') +
+    /* 타일 종류 비율 확인용. 서버 TILE_MIX 가 실제로 그 비율로 깔렸는지
+     * 게임을 켠 채로 바로 셀 수 있어야 합니다.                        */
+    /* 위상 타일 동기화 상태. 두 탭을 띄워 두 값이 같은 순간에 같은지 보면
+     * 동기화가 맞는지 바로 확인됩니다 (DEV 모드면 콘솔에도 찍힙니다). */
+    /* 대시 중 이동 보정이 0 이어야 정상입니다. 여기가 올라가면 서버
+     * 면제 창(graceMs)이 대시 시간보다 짧다는 뜻입니다.              */
+    row('점프', netStats.corrections === 0,
+        netStats.jumps + '회' +
+        (G.cfg && G.cfg.JUMP_TILE ? ' · ' + G.cfg.JUMP_TILE.levels.join('/') + '층↑' : '')) +
+    row('대시', netStats.corrections === 0,
+        netStats.dashes + '회' + (local.dash ? ' (진행 중)' : '') +
+        ' · 이동보정 ' + netStats.corrections + '회') +
+    row('위상타일', G.phaseTrust,
+        (G.phaseEpoch ? (G.phaseOn ? 'ON' : 'OFF') : '대기') +
+        ' · ' + (G.phaseTrust ? '공식계산' : '서버값 사용') +
+        ' · 보정 ' + netStats.phaseFixes + '회' +
+        ' · 경과 ' + (G.phaseEpoch ? Math.round(Date.now() + G.serverOffset - G.phaseEpoch) : 0) + 'ms') +
+    row('타일종류', null, Object.keys(G.kindCount).length
+        ? Object.keys(G.kindCount).map((k) =>
+            k.slice(0, 4) + ' ' + G.kindCount[k] + '(' +
+            Math.round(G.kindCount[k] / G.tiles.size * 100) + '%)').join(' ')
+        : '—') +
     row('주자', null, G.players.size + '명') +
     row('phase', null, G.phase) +
     row('내 아바타', !!local.avatar,
@@ -4595,9 +5769,9 @@ function renderDiag() {
     row('이동보정', netStats.corrections === 0,
         netStats.corrections + '회' + (G.cfg && G.cfg.VALIDATE_ON === false ? ' (검증 꺼짐)' : '')) +
     row('주자충돌', null, 'BUMP ' + (BUMP.PUSH_OFF_EDGE ? '켜짐 · 밀려서 떨어짐' : '켜짐 · 가장자리 보호')) +
-    row('DEV_MODE', null, DEV.on
-      ? '켜짐 (타일 안 무너짐 / 탈락 없음 / 타일 x1.5)'
-      : '꺼짐 (정상 게임)') +
+    row('DEV', DEV.on ? null : true,
+        (DEV.on ? '켜짐 — ' + devFlagSummary() : '꺼짐 (정상 게임)') +
+        (DEV.serverOn && !DEV.on ? ' · 서버는 dev (?dev=1 로 켜기)' : '')) +
     row('타일크기', null, (G.hexSize || 0).toFixed(2) + '  카메라 x' + (cam.scale || 1).toFixed(2)) +
     /* 균열 오버레이는 타일당 드로우콜 1개입니다.
      * 4인 라운드 실측 최대 53개 (평균 31개) — 타일 본체가 이미 507 드로우콜
