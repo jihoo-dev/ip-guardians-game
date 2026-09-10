@@ -213,17 +213,90 @@ body.dev #devLayers{display:flex}
 @keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 
 /* ------------------------------------------------------------- overlays -- */
+/* ★ align-items:center + overflow 없음 조합이었습니다.
+ * 카드가 뷰포트보다 커지면 위아래가 동시에 잘리고 스크롤도 안 됩니다 —
+ * 규격을 펼치거나 창이 낮은 노트북에서 제목과 입장 버튼이 같이 사라졌습니다.
+ * flex-start + 카드에 margin:auto 가 정석입니다: 남으면 가운데, 넘치면 스크롤. */
 .screen{
-  position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  position:absolute;inset:0;display:none;align-items:flex-start;justify-content:center;
+  overflow-y:auto;padding:24px 16px;
   background:radial-gradient(120% 90% at 50% 40%,rgba(5,6,10,.72),rgba(5,6,10,.97));
   pointer-events:auto;z-index:20
 }
 .screen.show{display:flex}
-.card{width:min(500px,92vw);border:1px solid var(--rule);background:rgba(11,14,22,.96);padding:34px 32px 30px}
+.card{width:min(500px,92vw);margin:auto;border:1px solid var(--rule);background:rgba(11,14,22,.96);padding:34px 32px 30px}
+/* 대기 화면만 넓힙니다 — 층 스택이 한 단을 차지해 시놉시스가 좁아졌습니다.
+ * 결과 화면(.card 공용)은 종전 폭 그대로 두어야 문장 길이가 안 흐트러집니다. */
+#joinScreen .card{width:min(600px,94vw)}
 .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.32em;color:var(--stamp)}
 h1{font-size:29px;font-weight:900;line-height:1.18;margin:11px 0 6px;letter-spacing:-.01em}
 h1 em{font-style:normal;color:var(--l3)}
 .sub{font-size:13px;line-height:1.75;color:rgba(236,231,216,.6)}
+/* ── 대기 화면 시놉시스 ───────────────────────────────────────────────
+ * 종전에는 이 자리에 buildRulesText() 가 만든 규격 설명이 통째로 들어가
+ * 스무 줄 가까이 됐습니다. 첫 화면에서 읽히지 않아, 세계관 문장으로 바꾸고
+ * 규격은 아래 토글로 접었습니다 (지우지 않았습니다 — 규격은 config 파생이라
+ * 그 자체가 유일한 최신 설명이기 때문입니다).                          */
+.synopsis{font-size:13.5px;line-height:1.85;color:rgba(236,231,216,.74);margin:12px 0 0}
+.synopsis .q{display:block;font-size:15px;font-weight:800;color:var(--l3);
+  letter-spacing:-.01em;margin-bottom:10px}
+.synopsis .ln{display:block;margin-top:9px}
+.synopsis b{color:var(--paper);font-weight:600}
+/* 규격 토글 — 링크처럼 보이되 버튼입니다(키보드 접근) */
+.rulesToggle{margin-top:14px;background:none;border:0;padding:0;cursor:pointer;
+  font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:rgba(236,231,216,.5);
+  border-bottom:1px dotted rgba(236,231,216,.35)}
+.rulesToggle:hover{color:var(--l3);border-bottom-color:var(--l3)}
+#joinRules{margin-top:12px}
+#joinRules[hidden]{display:none}
+
+/* ── 대기 화면: 층 스택 + 시놉시스 2단 ────────────────────────────────
+ * 좁은 화면에서는 세로로 떨어집니다. 카드가 min(500px,92vw) 라 모바일에서
+ * 2단을 유지하면 두 칸 다 못 읽는 폭이 됩니다.                        */
+.synWrap{display:flex;gap:18px;align-items:flex-start;margin-top:12px}
+.synWrap .synopsis{margin:0;flex:1;min-width:0}
+@media (max-width:560px){ .synWrap{flex-direction:column;gap:14px} .lsMini{width:100%} }
+
+/* ── 층 스택 미니 다이어그램 ─────────────────────────────────────────
+ * "권리는 위에서 아래로 깎여 내려간다" 를 글이 아니라 그림으로 읽히게 합니다.
+ * 색·이름·순서는 전부 cfg.LAYERS 파생이라 LAYER_DEFS 를 고치면 따라옵니다. */
+.lsMini{width:126px;flex:0 0 auto;display:flex;flex-direction:column;gap:3px}
+.lsRow{display:flex;align-items:center;gap:7px;padding:5px 7px;
+  border:1px solid rgba(236,231,216,.10);background:rgba(236,231,216,.02);
+  transition:background .45s ease,border-color .45s ease,transform .45s ease}
+.lsBar{width:3px;align-self:stretch;min-height:13px;background:currentColor;opacity:.45;
+  transition:opacity .45s ease}
+.lsNum{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:rgba(236,231,216,.42)}
+.lsName{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;
+  color:rgba(236,231,216,.34);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 점등 — 지금 "깎여 내려가는 중"인 층 */
+.lsRow.on{background:rgba(236,231,216,.07);border-color:currentColor;transform:translateX(3px)}
+.lsRow.on .lsBar{opacity:1}
+.lsRow.on .lsNum{color:currentColor}
+.lsRow.on .lsName{color:rgba(236,231,216,.7)}
+/* 구름바다 — 층이 아니라 탈락 영역이라 점선으로 구분 */
+.lsSea{margin-top:4px;padding:4px 7px;border-top:1px dashed rgba(236,231,216,.18);
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;
+  color:rgba(236,231,216,.3);transition:color .45s ease}
+.lsSea.on{color:#ff5f6d}
+
+/* ── 시놉시스 한 줄씩 낙하 등장 ──────────────────────────────────────
+ * 아래로 밀려 내려오며 나타납니다 — 게임의 하강 구조와 같은 방향입니다.  */
+@keyframes lnDrop{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
+.synopsis .q,.synopsis .ln{opacity:0;animation:lnDrop .5s ease forwards}
+
+/* ── 대기열 현황 ─────────────────────────────────────────────────── */
+.queueLine{margin-top:18px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  color:rgba(236,231,216,.45);display:flex;align-items:center;gap:7px}
+.queueLine .dot{width:5px;height:5px;border-radius:50%;background:rgba(236,231,216,.3);flex:0 0 auto}
+.queueLine.live .dot{background:var(--l3);box-shadow:0 0 6px var(--l3)}
+.queueLine.live{color:rgba(236,231,216,.72)}
+
+/* 연출을 줄여 달라는 설정이면 전부 끕니다 (멀미·주의력 배려) */
+@media (prefers-reduced-motion:reduce){
+  .synopsis .q,.synopsis .ln{animation:none;opacity:1}
+  .lsRow,.lsSea,.lsBar{transition:none}
+}
 .field{margin-top:22px}
 .field label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.45);margin-bottom:6px}
 input[type=text]{
@@ -457,7 +530,15 @@ input[type=text]{
          하드코딩해 두면 LAYER_DEFS / TILE_KINDS 를 고칠 때마다 같이 틀립니다. -->
     <div class="eyebrow" id="joinEyebrow">KIPO SURVIVAL PROTOCOL</div>
     <h1>바닥이 무너지기 전에<br><em>등록결정</em>까지 살아남으세요.</h1>
-    <p class="sub" id="joinRules">심사 규격을 불러오는 중…</p>
+    <div class="synWrap">
+      <!-- 층 스택은 순수 장식이 아니라 구조 설명이지만, 같은 내용이 옆 문장에
+           글로도 있으므로 스크린리더에는 중복입니다. -->
+      <div class="lsMini" id="joinStack" aria-hidden="true"></div>
+      <p class="synopsis" id="joinSynopsis"></p>
+    </div>
+    <button class="rulesToggle" id="btnRules" type="button" aria-expanded="false"
+            aria-controls="joinRules">심사 규격 보기 +</button>
+    <p class="sub" id="joinRules" hidden>심사 규격을 불러오는 중…</p>
     <div class="field">
       <label for="nameInput">출원인 이름</label>
       <input type="text" id="nameInput" maxlength="14" placeholder="예: 김심사" autocomplete="off" />
@@ -468,6 +549,9 @@ input[type=text]{
         <button class="mode sel" data-mode="player">주자로 참가 (최대 4인)</button>
         <button class="mode" data-mode="spectator">관전 + 개입</button>
       </div>
+    </div>
+    <div class="queueLine" id="joinQueue" aria-live="polite">
+      <span class="dot"></span><span id="joinQueueText">대기열 확인 중…</span>
     </div>
     <button class="cta" id="btnJoin">심사 대기열 입장</button>
     <div class="keys">
@@ -1409,10 +1493,35 @@ function rotationAngleNow() {
   return s.baseAngle + s.dir * s.speed * (now - s.epoch) / 1000;
 }
 
-/** 이 층이 회전하는가. 층 번호가 아니라 trait 로만 판정합니다. */
+/**
+ * 이 층이 회전하는가. 층 번호가 아니라 trait 로만 판정합니다.
+ *
+ * ★ 서버 config(LAYERS[].trait)를 봅니다 — 런타임 이벤트 상태가 아닙니다.
+ *   종전에는 G.traits.rotate.layers(= layer_event 로 채워지는 배열)를
+ *   봤는데, 그 배열은 라운드가 시작되고 예열(25초)이 지나 첫 회전 이벤트가
+ *   와야 채워집니다. 그런데 이 함수의 가장 중요한 호출부인 groupForLayer 는
+ *   buildMap 안에서, 즉 init 을 받은 '그 순간' 실행됩니다.
+ *
+ *   결과: 접속 후 첫 라운드에서는 회전층 타일이 전부 tileGroup(고정)으로
+ *   들어가 버리고 다시 옮겨지지 않았습니다. rotGroup 은 텅 빈 채로 돌아
+ *   타일이 눈에 보이게 돌지 않았습니다. 반면 주자를 실어 돌리는 계산과
+ *   착지 판정은 씬 그래프가 아니라 toLayerFrame(질의점을 −θ 회전)으로
+ *   하므로 정상 동작했습니다 — 그래서 '타일은 가만히 있는데 나만 미끄러지는'
+ *   증상이 됐습니다. 2라운드부터는 map_reset 시점에 직전 라운드 값이 남아
+ *   있어 정상이라, 재현이 들쭉날쭉해 찾기 어려운 버그였습니다.
+ *
+ *   어느 층이 회전하는지는 LAYER_DEFS 로 고정된 정적 정보입니다. 이벤트가
+ *   나르는 것은 '지금 몇 도인가'(epoch·baseAngle·dir)뿐이므로, 소속 판정은
+ *   config 에서 직접 읽는 것이 맞습니다. 같은 파일의 accelTrait·darkTrait
+ *   가 이미 isLayerTrait 로 그렇게 하고 있었고, 회전만 예외였습니다.
+ *
+ * ★ 이벤트 도착 전에도 true 가 되지만 부작용이 없습니다. 각도의 출처인
+ *   rotationAngleNow() 는 epoch 이 0 이면 0 을 돌려주고, rotGroup 을 돌리는
+ *   블록과 실어 돌리기(applyRotationCarry)는 둘 다 epoch 을 먼저 확인합니다.
+ *   즉 회전이 시작되기 전에는 항등 변환이라 종전과 완전히 동일합니다.
+ */
 function isRotatingLayer(layerIndex) {
-  const s = G.traits.rotate;
-  return !!s && s.layers.indexOf(layerIndex) >= 0;
+  return isLayerTrait(layerIndex, 'rotate');
 }
 
 /** 이 층 타일이 들어갈 씬 그룹. 회전층만 rotGroup 으로 갑니다. */
@@ -5445,10 +5554,172 @@ function spectateFocus() {
 /* 참가 화면의 규칙 설명을 서버 상수로 만듭니다.
  * 종전에는 "3번 밟으면 무너집니다 / 함정 블록" 이 문장으로 박혀 있었는데,
  * 규칙이 4종 체계로 바뀌면서 그대로 두면 거짓 설명이 됩니다.           */
+/* ── 대기 화면 시놉시스 ───────────────────────────────────────────────
+ * 스토리텔링 기획서(IP_Guardians_Storytelling_Master.html) 1절을 대기
+ * 화면 길이에 맞게 줄인 것입니다.
+ *
+ * ★ 층 수와 층 이름은 문장에 박지 않고 config 에서 꺼냅니다.
+ *   LAYER_DEFS 를 고치면 '5층'과 층 이름이 같이 틀어지는데, 세계관 문장은
+ *   규격 설명과 달리 틀려도 티가 안 나서 오래 방치됩니다.
+ */
+function buildSynopsis(layers) {
+  const el = document.getElementById('joinSynopsis');
+  if (!el) return;
+  const top = layers[0];
+  const bottom = layers[layers.length - 1];
+  const n = layers.length;
+
+  const line = (html) => '<span class="ln">' + html + '</span>';
+  const b = (t) => '<b>' + t + '</b>';
+
+  const html = [
+    '<span class="q">"권리는 위에서 아래로 깎여 내려간다"</span>',
+    line('당신은 방금 특허를 출원했습니다. 지금 서 있는 ' +
+         (n ? b(n + '층 ' + (top.name || '')) : b('최상층')) +
+         ' 은 가장 높고, 가장 빠르고, 가장 위태로운 자리입니다.'),
+    line('발밑이 무너지는 것은 심사관이 당신의 권리를 깎아내는 과정입니다. ' +
+         '한 층 떨어질 때마다 특허는 ' + b('더 좁아지고, 더 늦어집니다') + '.'),
+    line('맨 아래 ' + ((bottom && bottom.name) ? bottom.name + ' 층' : '바닥') +
+         ' 밑 구름바다는 포기와 취하의 영역입니다. 닿는 순간 거절결정이 확정됩니다.'),
+    line('마지막까지 발판 위에 남은 ' + b('단 한 사람') + '만이 등록결정서를 받습니다.')
+  ].join('');
+  el.innerHTML = html;
+  /* 한 줄씩 차례로 떨어뜨립니다. 지연을 CSS 에 못 박지 않고 여기서 주는 이유는
+   * 줄 수가 층 구성에 따라 달라질 수 있기 때문입니다(:nth-child 로 박으면 어긋납니다). */
+  [...el.children].forEach((node, i) => { node.style.animationDelay = (i * 140) + 'ms'; });
+}
+
+/* ── 층 스택 미니 다이어그램 ─────────────────────────────────────────
+ * cfg.LAYERS 를 그대로 그립니다 — 층이 4개로 줄거나 6개로 늘어도, 순서나
+ * 색이 바뀌어도 따라옵니다. 층 번호를 세지 않고 배열 순서대로 그리므로
+ * '위에서 아래로'가 항상 맞습니다 (LAYERS 는 0번이 최상층).
+ */
+let stackTimer = null;
+
+function buildJoinStack(layers) {
+  const box = document.getElementById('joinStack');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const Lx of layers) {
+    const row = document.createElement('div');
+    row.className = 'lsRow';
+    /* color 를 CSS 변수가 아니라 요소의 color 로 둡니다 — .lsBar 가
+     * currentColor 를 쓰므로 막대·번호·테두리가 한 번에 따라옵니다. */
+    row.style.color = Lx.color || '#ece7d8';
+    const bar = document.createElement('span'); bar.className = 'lsBar';
+    const num = document.createElement('span'); num.className = 'lsNum';
+    num.textContent = 'L' + Lx.index;
+    const nm = document.createElement('span'); nm.className = 'lsName';
+    nm.textContent = Lx.short || Lx.name || '';
+    row.append(bar, num, nm);
+    box.appendChild(row);
+  }
+  const sea = document.createElement('div');
+  sea.className = 'lsSea';
+  sea.textContent = '~ 구름바다 · 탈락 ~';
+  box.appendChild(sea);
+
+  startStackLoop();
+}
+
+/* 최상층부터 한 칸씩 내려가며 점등 → 구름바다 → 잠깐 쉬고 반복.
+ * 시놉시스 첫 줄('위에서 아래로 깎여 내려간다')을 그대로 움직임으로 옮긴 것입니다. */
+/** 대기 화면이 아직 떠 있는가.
+ *
+ * ★ 두 연출 타이머(층 스택 점등·대기열 폴링)의 시작 조건입니다.
+ *   입장 핸들러에서 stop 을 부르는 것만으로는 부족했습니다 — 입장은
+ *   connect() 를 부르고, 그 뒤에 도착하는 server_hello 가 buildRulesText()
+ *   를 다시 실행해 타이머를 되살렸습니다. 호출 순서에 기대지 않도록
+ *   '대기 화면이 보일 때만 돈다' 를 시작 지점에서 못박습니다.        */
+function joinScreenVisible() {
+  const js = document.getElementById('joinScreen');
+  return !!js && js.classList.contains('show');
+}
+
+function startStackLoop() {
+  stopStackLoop();
+  if (!joinScreenVisible()) return;
+  const box = document.getElementById('joinStack');
+  if (!box) return;
+  const rows = [...box.querySelectorAll('.lsRow'), box.querySelector('.lsSea')].filter(Boolean);
+  if (!rows.length) return;
+  let i = 0;
+  const step = () => {
+    rows.forEach((r) => r.classList.remove('on'));
+    /* rows.length 번째는 '전부 꺼진 상태' — 다시 최상층으로 돌아가기 전의 쉼입니다.
+     * 이게 없으면 맨 아래에서 맨 위로 점등이 튀어 끊겨 보입니다. */
+    if (i < rows.length) rows[i].classList.add('on');
+    i = (i + 1) % (rows.length + 1);
+  };
+  step();
+  stackTimer = setInterval(step, 900);
+}
+
+function stopStackLoop() {
+  if (stackTimer) { clearInterval(stackTimer); stackTimer = null; }
+}
+
+/* ── 대기열 현황 ─────────────────────────────────────────────────────
+ * 입장 전에는 소켓으로 방 목록을 받을 수 없습니다(join 해야 룸에 들어갑니다).
+ * 그래서 서버가 이미 갖고 있는 GET /api/rooms 를 폴링합니다 — 진단용으로
+ * 만들어 둔 것이지만 phase 와 players 가 그대로 들어 있어 이 용도에 맞습니다.
+ *
+ * ★ 왜 필요한가 — 종전에는 '지금 들어가면 바로 시작되는지'를 알 수 없어서,
+ *   혼자 들어갔다가 대기만 하다 나가는 흐름이 됐습니다.
+ *
+ * ★ 실패해도 조용히 넘어갑니다. 대기열 표시가 안 되는 것보다 대기 화면이
+ *   깨지는 게 훨씬 나쁩니다.
+ */
+let queueTimer = null;
+
+function renderQueue(rooms) {
+  const box = document.getElementById('joinQueue');
+  const txt = document.getElementById('joinQueueText');
+  if (!box || !txt) return;
+  const seats = (G.cfg && G.cfg.MAX_PLAYERS) || G.seats || 4;
+  let waiting = 0, playing = 0;
+  for (const r of rooms || []) {
+    if (r.phase === 'playing' || r.phase === 'countdown') playing++;
+    else waiting += (r.players || 0);
+  }
+  let msg;
+  if (waiting > 0) msg = '심사 대기열 ' + waiting + '/' + seats + ' · 정원이 차면 바로 시작';
+  else if (playing > 0) msg = '진행 중인 심사 ' + playing + '회차 · 지금 들어가면 다음 회차부터';
+  else msg = '대기열이 비어 있습니다 · 먼저 들어가서 기다리게 됩니다';
+  txt.textContent = msg;
+  box.classList.toggle('live', waiting > 0 || playing > 0);
+}
+
+function pollQueue() {
+  fetch('/api/rooms', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((rooms) => { if (rooms) renderQueue(rooms); })
+    .catch(() => {});
+}
+
+function startQueuePoll() {
+  stopQueuePoll();
+  if (!joinScreenVisible()) return;
+  pollQueue();
+  queueTimer = setInterval(pollQueue, 2500);
+}
+
+function stopQueuePoll() {
+  if (queueTimer) { clearInterval(queueTimer); queueTimer = null; }
+}
+
 function buildRulesText() {
   const cfg = G.cfg || {};
   const layers = cfg.LAYERS || [];
   const K = cfg.TILE_KINDS || {};
+
+  buildSynopsis(layers);
+  buildJoinStack(layers);
+  startQueuePoll();
+  /* 좌석 수도 config 파생으로. 종전에는 '최대 4인'이 마크업에 박혀 있어
+   * MAX_PLAYERS 를 바꾸면 버튼만 거짓말을 했습니다. */
+  const pm = document.querySelector('.mode[data-mode="player"]');
+  if (pm && cfg.MAX_PLAYERS) pm.textContent = '주자로 참가 (최대 ' + cfg.MAX_PLAYERS + '인)';
 
   const eb = document.getElementById('joinEyebrow');
   if (eb) eb.textContent = 'KIPO SURVIVAL PROTOCOL · ' + (layers.length || '?') + '-LAYER';
@@ -6908,6 +7179,19 @@ refreshAudioUI();
 /* ============================ 16. boot ================================ */
 
 let joinMode = 'player';
+/* 심사 규격 접기/펼치기. 규격 문구 자체는 buildRulesText 가 이미 채워 두었고
+ * 여기서는 보이기만 토글합니다 — 내용을 여기서 만들면 config 파생이 깨집니다. */
+const btnRules = document.getElementById('btnRules');
+if (btnRules) {
+  btnRules.addEventListener('click', () => {
+    const p = document.getElementById('joinRules');
+    const open = p.hasAttribute('hidden');
+    if (open) p.removeAttribute('hidden'); else p.setAttribute('hidden', '');
+    btnRules.setAttribute('aria-expanded', open ? 'true' : 'false');
+    btnRules.textContent = open ? '심사 규격 접기 −' : '심사 규격 보기 +';
+  });
+}
+
 document.querySelectorAll('.mode').forEach((b) => {
   b.addEventListener('click', () => {
     document.querySelectorAll('.mode').forEach((x) => x.classList.remove('sel'));
@@ -6938,6 +7222,10 @@ dom.btnJoin.addEventListener('click', () => {
   // 브라우저 자동재생 정책상 여기(첫 클릭)에서 오디오를 열어야 합니다
   Sound.unlock();
   Sound.playBgm('lobby');
+  /* 대기 화면 연출은 여기서 끝냅니다 — 라운드가 도는 동안 setInterval 두 개가
+   * 계속 살아 있으면 매 2.5초 fetch 와 매 0.9초 DOM 조작이 프레임에 끼어듭니다. */
+  stopStackLoop();
+  stopQueuePoll();
   dom.joinScreen.classList.remove('show');
   G.role = joinMode;
   connect(name, joinMode);

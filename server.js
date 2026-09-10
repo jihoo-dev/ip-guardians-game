@@ -750,19 +750,34 @@ const LAYER_GAP = parseInt(process.env.LAYER_GAP, 10) || 18;   // 층 간격
 const LAYER_BASE_Y = 0;                                        // 최하층 y
 
 const LAYER_DEFS = [
-  /* ★ 최상층은 일부러 층 특성을 두지 않습니다 (종전 trait:'accel').
-   * 전원이 여기서 시작하므로 이 층이 사실상 학습 구간입니다. 일반 타일로
-   * 걷기를 익히고 신속심사 대시 타일로 "특수 타일은 뭔가 일어난다"를
-   * 배웁니다. 심사 가속은 대응 수단이 없어(어둠엔 검색 타일, 회전엔 이동이
-   * 있지만 가속엔 답이 없습니다) 첫인상을 담당하기에 적절하지 않았습니다.
-   * 되살리려면 'accel' 로 되돌리기만 하면 됩니다 — 규격·훅·연출이 전부
-   * 그대로 남아 있고 LAYER_TRAITS 표가 알아서 다시 돌립니다.          */
+  /* ★ 최상층에 '심사 가속'을 답니다 (스토리텔링 기획서 기준).
+   * 우선심사가 붙은 출원은 심사가 몇 배로 빨라지고 그만큼 대응 시간이
+   * 짧아진다 — 가장 높은 자리가 가장 불안정하다는 것이 이 층의 주제이고,
+   * 붕괴 속도 2배가 그 주제를 그대로 옮긴 것입니다.
+   *
+   * ★ 한때 'none' 으로 빼 두었던 이유도 같이 남깁니다 (되돌릴 근거).
+   *   전원이 여기서 시작하므로 이 층이 사실상 학습 구간인데, 심사 가속은
+   *   대응 수단이 없습니다 — 어둠엔 검색 타일, 회전엔 이동이라는 답이
+   *   있지만 가속엔 답이 없습니다. 첫인상을 담당하기에 부담이라는 판단이
+   *   었습니다. 다시 빼려면 'none' 으로 되돌리기만 하면 됩니다.
+   *
+   *   지금은 EVENT_SCHEDULE.warmupMs(25초)가 그 부담을 줄여 줍니다 —
+   *   라운드 시작 직후에는 발동하지 않으므로 처음 몇 초는 그대로
+   *   학습 구간으로 남습니다. 다만 그만큼 '주자가 아직 최상층에 있는
+   *   동안 가속이 걸릴' 기회 자체가 줄어드니, 이 층에서 가속이 거의
+   *   안 보인다고 느껴지면 warmupMs 를 먼저 의심하세요.              */
   { key: 'fasttrack', name: '우선심사 패스트트랙', short: 'FAST-TRACK',
-    color: '#00ffcc', special: 'accel',  trait: 'none' },
-  { key: 'office',    name: '의견제출통지',       short: 'OFFICE ACTION',
-    color: '#0088ff', special: 'reject', trait: 'rotate' },
+    color: '#00ffcc', special: 'accel',  trait: 'accel' },
+  /* ★ 실체심사가 의견제출통지보다 반드시 위층입니다 (순서를 바꾸지 마세요).
+   * 실무 절차가 그렇습니다 — 심사관이 실체심사에서 선행기술을 조사하고,
+   * 거절이유를 발견했을 때 비로소 의견제출통지서를 발송합니다(특허법 제63조).
+   * 아래로 떨어지는 것이 곧 권리가 깎여 내려가는 것이라는 이 게임의 전제상,
+   * 두 층이 뒤바뀌면 절차를 거꾸로 설명하는 셈이 됩니다.
+   * (종전에는 office 가 위였습니다 — 스토리텔링 기획서 기준으로 교정)   */
   { key: 'exam',      name: '실체심사/선행기술조사', short: 'EXAMINATION',
     color: '#7c5cff', special: 'search', trait: 'dark' },
+  { key: 'office',    name: '의견제출통지',       short: 'OFFICE ACTION',
+    color: '#0088ff', special: 'reject', trait: 'rotate' },
   { key: 'claim',     name: '청구항',             short: 'CLAIM',
     color: '#ff8a3d', special: 'phase',  trait: 'none' },
   { key: 'idea',      name: '아이디어',           short: 'IDEATION',
