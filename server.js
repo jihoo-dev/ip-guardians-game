@@ -167,15 +167,17 @@ const OFFICE_SPECIAL_MIX = { reject: 0.75, amend: 0.25 };
  *
  *   levels  : 만들 종류. [1,2] 면 '한 층 위' / '두 층 위' 두 종류입니다.
  *             여기에 3 을 더하면 세 종류가 되고 색·비율·판정이 다 따라옵니다.
- *   graceMs : 발사 뒤 이동 검증을 면제할 시간. 상승 시간보다 넉넉해야 합니다
- *             (두 층 상승이 약 0.89초이므로 1.2초).
+ *
+ * ★ 면제 시간(grace)은 여기 없습니다 — JUMP_GRACE_MS 로 내려갔습니다.
+ *   상승 시간은 LAYER_GAP 에서 나오는데 LAYER_GAP 은 아직 선언 전이라
+ *   여기서는 계산할 수 없습니다(TDZ). LAYERS 선언 바로 뒤를 보세요.
  *
  * ★ 서버가 플레이어를 직접 옮기지 않습니다.
  *   프롬프트 3(신속심사 대시)에서 만든 player_impulse + grantMoveExemption
  *   구조를 그대로 씁니다. 서버는 '발동 여부·발사 속도·목표'만 정하고,
  *   실제 이동은 클라이언트 물리가 합니다.
  * ------------------------------------------------------------------ */
-const JUMP_TILE = { levels: [1, 2], graceMs: 1200 };
+const JUMP_TILE = { levels: [1, 2] };
 
 /* 점프 타일의 세부 종류는 levels 에서 만듭니다 — 'jump1', 'jump2' …
  * 종류를 손으로 나열하지 않으므로 levels 만 고치면 전부 따라옵니다.  */
@@ -299,6 +301,142 @@ const MOVE_EPS = 0.05;
 function isAccelTile(tile) {
   return !!tile && tile.kind === 'special' && tile.specialType === 'accel';
 }
+
+/* ── 층 특성: 심사 가속 (ACCEL_EVENT) ─────────────────────────────────
+ * LAYER_DEFS 에서 trait:'accel' 인 층에 걸리는 '층 전체 성질'입니다.
+ * 특수 타일(신속심사)과는 다른 축입니다 — 그건 밟은 사람 한 명에게만
+ * 작용하고(special), 이건 그 층의 모든 타일에 한꺼번에 걸립니다(trait).
+ * 그래서 판정도 specialType 이 아니라 layer.trait 로 합니다.
+ *
+ *   intervalMs : 이벤트 사이 간격
+ *   durationMs : 한 번 발동하면 유지되는 시간
+ *   speed      : 파괴 배속. 퓨즈가 1/speed 로 줄어듭니다 (2 → 절반)
+ *
+ * ★ 간격은 '직전 이벤트가 끝난 시각'부터 셉니다(발동 시각 아님).
+ *   발동 시각 기준으로 세면 DEV.fastEvents 에서 간격(4초)이 지속(5초)보다
+ *   짧아져 이벤트가 영영 안 꺼집니다 — 경고가 배경이 되어 관찰이 안 됩니다.
+ *   그래서 한 주기는 항상 durationMs + intervalMs 이고, 어떤 값을 넣어도
+ *   꺼지는 구간이 반드시 생깁니다.
+ *
+ * ★ 타이밍은 전부 서버가 잡습니다.
+ *   클라이언트에는 layer_event 로 '지금 켜짐/꺼짐'만 내려가고, 클라이언트는
+ *   빨간 경고를 켜고 끄기만 합니다. 클라이언트가 자기 시계로 지속 시간을
+ *   세어 끄게 하면 화면마다 다른 시점에 꺼집니다.
+ *
+ * ★ DEV: eventInterval() 이 간격만 1/EVENT_SPEEDUP 로 줄입니다(20초 → 4초).
+ *   지속 시간은 줄이지 않습니다 — 켜져 있는 동안의 연출을 봐야 하니까요.
+ *   dev 는 noFuse 라 파괴 자체는 안 일어나고, 빨간 경고와 문구가 제때
+ *   뜨는지만 확인하는 용도입니다.
+ * ------------------------------------------------------------------ */
+const ACCEL_EVENT = { intervalMs: 20000, durationMs: 5000, speed: 2 };
+
+/* 0 이나 음수가 들어가면 퓨즈를 0 으로 나누게 되므로 여기서 한 번 막습니다. */
+const ACCEL_SPEED = Math.max(1, +ACCEL_EVENT.speed || 1);
+
+/* ── 층 특성: 어둠 (DARK_EVENT) ───────────────────────────────────────
+ * LAYER_DEFS 에서 trait:'dark' 인 층에 걸립니다.
+ * 발동하면 그 층 타일이 '내 주변'만 남고 전부 검게 보입니다.
+ *
+ *   intervalMs : 이벤트 사이 간격 ('직전 종료'부터. ACCEL_EVENT 주석 참고)
+ *   durationMs : 지속 시간
+ *   viewTiles  : 기본 시야 반경(칸). 이 거리에서 완전한 검정이 됩니다.
+ *   clearTiles : 이 안쪽은 감쇠 없이 그대로 보입니다.
+ *                → clearTiles ~ viewTiles 사이가 그라데이션이라
+ *                  "주변 2~3칸만 보인다"가 됩니다.
+ *
+ * ★ 순수 시각 효과입니다.
+ *   타일 붕괴·착지 판정·이동 검증은 어둠과 무관하게 평소 그대로 돕니다.
+ *   서버는 '언제부터 언제까지'만 정하고 아무 판정도 바꾸지 않습니다.
+ *
+ * ★ 가리는 일은 각 클라이언트가 '자기 플레이어 기준'으로 합니다.
+ *   서버가 누가 무엇을 보는지 계산해서 내려주지 않습니다 — 보이는 범위는
+ *   사람마다 다른데 20Hz 스냅샷을 사람마다 다르게 만들면 대역폭도,
+ *   코드 복잡도도 감당이 안 됩니다. 게다가 어둠은 판정에 영향을 주지
+ *   않으므로 클라이언트가 계산해도 공정성 문제가 없습니다.
+ * ------------------------------------------------------------------ */
+const DARK_EVENT = { intervalMs: 25000, durationMs: 6000, viewTiles: 3, clearTiles: 2 };
+
+/* ── 선행기술 검색 타일 (SEARCH_TILE) ─────────────────────────────────
+ * LAYER_DEFS 에서 special:'search' 인 층의 특수 타일입니다.
+ * 밟으면 그 사람의 시야만 잠깐 크게 넓어집니다 (어둠 중에 의미가 있습니다).
+ *
+ *   viewTiles  : 넓어진 시야 반경(칸). 기본 DARK_EVENT.viewTiles 를 대체합니다.
+ *   durationMs : 넓어진 상태를 유지하는 시간
+ *   cooldownMs : 한 번 착지에 여러 번 발동하는 것 방지 (점프 타일과 같은 이유)
+ *
+ * ★ '누가 밟았는지'는 서버가 정해 방 전체에 알립니다(search_pulse).
+ *   시야가 넓어지는 것은 밟은 사람 한 명뿐이지만, 스캔 연출은 모두가
+ *   봅니다 — 어둠 속에서 누군가 조사 중이라는 것이 읽혀야 합니다.
+ * ------------------------------------------------------------------ */
+const SEARCH_TILE = { viewTiles: 8, durationMs: 2000, cooldownMs: 400 };
+
+/* ── 층 특성: 회전 (ROTATE_EVENT) ─────────────────────────────────────
+ * LAYER_DEFS 에서 trait:'rotate' 인 층에 걸립니다.
+ * 그 층 전체가 맵 중심축(월드 원점)을 기준으로 천천히 돌고, 위에 서 있는
+ * 주자도 함께 실려 돕니다.
+ *
+ *   intervalMs : 회전 방향이 반대로 뒤집히는 간격
+ *   speed      : 각속도(rad/s). 0.12 ≈ 6.9°/s — 한 바퀴 약 52초.
+ *                가장자리(4인 기준 반지름 28.8) 접선 속도가 3.5 m/s 로,
+ *                주자 이동 속도 15 의 1/4 이라 "천천히 도는데 확실히
+ *                밀린다"가 됩니다. 맵 반경을 7 → 9 로 넓히며 접선 속도가
+ *                2.7 → 3.5 로 같이 올라갔습니다 — 가장자리에 오래 서
+ *                있기가 그만큼 더 불리해집니다(의도한 방향입니다).
+ *   pulse      : 지속 시간이 없는 '순간 발생' 이벤트라는 표시.
+ *                가속·어둠은 켜졌다 꺼지지만 회전은 항상 켜져 있고 간격마다
+ *                방향만 뒤집힙니다. tickLayerEvents 가 이 플래그로 갈립니다.
+ *
+ * ★ 각도를 매 틱 누적해서 보내지 않습니다.
+ *   회전 상태는 (epoch, baseAngle, dir) 세 값이고, 어느 시점 각도든
+ *       θ(t) = baseAngle + dir × speed × (t − epoch)/1000
+ *   으로 정확히 재현됩니다. 누적 전송은 패킷 하나만 유실돼도 영구히
+ *   어긋나고 재접속자에게 복원할 수도 없습니다. 위상 타일이 phaseEpoch
+ *   하나로 리듬을 맞추는 것과 같은 이유·같은 구조입니다.
+ *
+ * ★ 회전 중심은 월드 원점입니다.
+ *   axialToWorld(0,0) = (0,0) 이고 맵은 그 둘레의 육각 링이라 원점이 곧
+ *   층의 중심입니다. 상수로 따로 두지 않는 이유는, 두면 맵 생성 규칙과
+ *   따로 놀 여지가 생기기 때문입니다.
+ * ------------------------------------------------------------------ */
+const ROTATE_EVENT = { intervalMs: 15000, speed: 0.12, pulse: true };
+
+/* 0 이하가 들어오면 회전이 멈춰 특성이 무의미해지므로 한 번 막습니다. */
+const ROTATE_SPEED = Math.max(0.001, +ROTATE_EVENT.speed || 0.12);
+
+/* ── 층 특성 표 (LAYER_TRAITS) ────────────────────────────────────────
+ * trait 이름 → 주기 이벤트 규격. 여기 등록된 특성만 tickLayerEvents 가
+ * 돌립니다. 새 특성을 만들 때는 상수를 만들고 이 표에 한 줄 더하면 됩니다.
+ *
+ * 공통으로 intervalMs 를 쓰고, 지속형은 durationMs 를, 순간형은 pulse 를
+ * 함께 씁니다. 나머지 값은 특성마다 다르고, 클라이언트로는 TRAIT_HOOKS 의
+ * extra() 가 실어 보냅니다.
+ * ------------------------------------------------------------------ */
+const LAYER_TRAITS = { accel: ACCEL_EVENT, dark: DARK_EVENT, rotate: ROTATE_EVENT };
+
+/* ── 층 이벤트 조정자 (EVENT_SCHEDULE) ────────────────────────────────
+ * 특성별 시계를 그대로 두면 두 가지 문제가 생깁니다.
+ *
+ *   1) 라운드 시작 직후에 첫 이벤트가 옵니다. 전원이 최상층으로 낙하해
+ *      조작을 익히기도 전에 가장 가혹한 것이 나옵니다. 처음 해보는
+ *      사람이 층 하나도 못 보고 끝납니다.
+ *   2) 특성끼리 독립이라 겹칩니다. "빨리 무너지는데 보이지도 않는"
+ *      구간이 의도 없이 생기고, 경고 문구도 함께 겹쳐 뜹니다.
+ *
+ * 그래서 예열 시간과 최소 간격을 둡니다.
+ *
+ *   warmupMs : 라운드 시작 후 이만큼은 층 특성이 발동하지 않습니다.
+ *              최상층이 자연스럽게 '학습 구간'이 됩니다.
+ *   gapMs    : 한 이벤트가 끝나고 다음이 발동하기까지 최소 쉬는 시간.
+ *   retryMs  : 다른 이벤트 때문에 밀렸을 때 다시 확인하는 간격.
+ *              발동을 건너뛰지 않고 미루기만 합니다 — 건너뛰면 특정
+ *              특성이 계속 밀려 한 회차 내내 안 나올 수 있습니다.
+ *
+ * ★ 순간형(회전 반전)은 이 조정을 받지 않습니다.
+ *   지속 구간이 없어 '겹친다'는 개념이 성립하지 않고, 막으면 회전 방향이
+ *   영영 안 바뀝니다. 문구가 겹치는 문제는 클라이언트에서 '내가 있는 층의
+ *   이벤트만 크게 알리는' 방식으로 따로 해결합니다.
+ * ------------------------------------------------------------------ */
+const EVENT_SCHEDULE = { warmupMs: 25000, gapMs: 8000, retryMs: 1000 };
 
 /* ── 거절이유 타일 (REJECT_TILE) ──────────────────────────────────────
  * 의견제출통지 층 특수 타일의 75% 입니다.
@@ -471,19 +609,71 @@ const HEX_THICKNESS = 0.7;      // 타일이 얇아진 비율에 맞춤 (종전 
  * HEX_SIZE 가 여기서 선언되므로 그 전에는 계산할 수 없습니다(TDZ).      */
 /* 점프 정점을 목표 표면보다 이만큼 넘깁니다.
  * 0 이면 정점이 표면과 정확히 같아 수직 속도 0 으로 스치는데, 클라이언트
- * 착지 판정은 '내려오며 표면을 통과할 때' 잡히므로 놓칠 수 있습니다.  */
+ * 착지 판정은 '내려오며 표면을 통과할 때' 잡히므로 놓칠 수 있습니다.
+ *
+ * ★ 이 값은 '실제로 남는 여유'입니다 — 발사 속도를 v=√(2g(dy+M)) 으로
+ *   바로 내면 안 됩니다. 아래 jumpLaunchSpeed 주석을 보세요.          */
 const JUMP_APEX_MARGIN = 0.6;
+
+/* 클라이언트 물리 고정 스텝. public/index.html 의 PHYS.STEP(1/60) 과
+ * 반드시 같아야 합니다 — GRAVITY_MAG 이 PHYS.GRAVITY 와 같아야 하는 것과
+ * 같은 이유입니다. 점프 발사 속도가 이 값에 의존합니다.                */
+const CLIENT_PHYS_STEP = 1 / 60;
+
+/**
+ * 높이차 dy 만큼 올려 보내는 발사 속도.
+ *
+ * ★ √(2·g·(dy + M)) 을 그대로 쓰면 실제로는 M 만큼 못 넘습니다.
+ *   클라이언트는 semi-implicit Euler 로 적분합니다(먼저 v 를 갱신하고
+ *   그 v 로 y 를 옮김). 이 방식의 이산 정점은 해석 정점보다 항상
+ *
+ *       v · dt / 2
+ *
+ *   만큼 낮습니다. 유도: Σ(v − g·k·dt)·dt (k=1..v/(g·dt))
+ *                        = v²/(2g) − v·dt/2.
+ *   dt 는 1/60 로 작지만 계수가 v 라, 층 간격을 올려 v 가 커질수록
+ *   손실이 선형으로 커집니다. LAYER_GAP 12 에서 두 층 점프의 실측 여유는
+ *   0.6 이 아니라 0.14 였고, 15 에서는 0.09 까지 줄었습니다. 이대로
+ *   간격을 더 올리면 20 부근에서 여유가 0 이 되어 '점프 타일을 밟았는데
+ *   목표 층에 안 올라가는' 재현 안 되는 버그가 됩니다.
+ *
+ *   그래서 손실만큼 미리 얹어서 쏩니다. 손실이 v 에 의존하고 v 가 다시
+ *   손실에 의존하므로 한 번만 되풀이하면 충분합니다(오차 5mm 수준).
+ */
+function jumpLaunchSpeed(dy) {
+  const v0 = Math.sqrt(2 * GRAVITY_MAG * (dy + JUMP_APEX_MARGIN));
+  const loss = v0 * CLIENT_PHYS_STEP / 2;
+  return Math.sqrt(2 * GRAVITY_MAG * (dy + JUMP_APEX_MARGIN + loss));
+}
 
 const HEX_NEIGHBOR_STEP = Math.sqrt(3) * HEX_SIZE;
 const DASH_DISTANCE = DASH.tiles * HEX_NEIGHBOR_STEP;
 
 /* 맵 반경은 인원에 맞춰 늘어납니다.
  * 반경 R 의 육각 그리드 타일 수 = 3R² + 3R + 1
- * 타일이 작아진 만큼 1인당 배분을 22 → 38 로 올려 층당 개수를 약 2배로 만듭니다.
- * (4인 기준: 반경 5/91타일 → 반경 7/169타일)                          */
-const TILES_PER_PLAYER = parseInt(process.env.TILES_PER_PLAYER, 10) || 38;
+ *
+ * 1인당 배분을 38 → 60 으로 올렸습니다. 반경 7(169타일) 은 이동 속도 15 로
+ * 가로지르는 데 3초가 채 안 걸려 "달릴 곳이 없다"는 인상이 강했습니다.
+ * 반경 9(271타일) 면 가로지르기 약 3.8초로, 무너진 구역을 피해 돌아가는
+ * 선택지가 생깁니다.  (4인 기준: 반경 7/169타일 → 반경 9/271타일)
+ *
+ * ★ 상·하한이 둘 다 있습니다.
+ *   하한 9  : 인원을 줄여 테스트할 때(탭 2개) 맵까지 같이 작아지면 실제
+ *             플레이와 다른 것을 검증하게 됩니다. 인원과 무관하게 최소
+ *             크기를 실제 4인 맵과 같게 맞춥니다.
+ *   상한 11 : 타일은 아직 타일 하나당 메시·머티리얼 하나입니다(인스턴싱
+ *             전). 5층 × 397타일 ≈ 2000 드로우콜이 사내 노트북 내장
+ *             GPU 에서 버틸 만한 상한선이었습니다. 인스턴싱으로 합치기
+ *             전까지는 여기를 올리지 마세요 — 올려야 한다면 클라이언트
+ *             타일 생성(buildMap)부터 손봐야 합니다.
+ *   둘 다 GRID_RADIUS 환경변수로는 넘길 수 있습니다(검증용).          */
+const TILES_PER_PLAYER = parseInt(process.env.TILES_PER_PLAYER, 10) || 60;
+const GRID_RADIUS_MIN = 9;
+const GRID_RADIUS_MAX = 11;
 const GRID_RADIUS = parseInt(process.env.GRID_RADIUS, 10) ||
-  Math.max(7, Math.round(Math.sqrt(TILES_PER_PLAYER * MAX_PLAYERS / 3)));
+  Math.min(GRID_RADIUS_MAX,
+    Math.max(GRID_RADIUS_MIN,
+      Math.round(Math.sqrt(TILES_PER_PLAYER * MAX_PLAYERS / 3))));
 
 /* ── 대기 발판 ────────────────────────────────────────────────────────
  * 게임 시작 전 각 플레이어가 자기 발판 위에서 대기합니다.
@@ -506,21 +696,73 @@ const THEME_COUNT = 3;          // 배경 맵 개수 (public/assets/bg)
  * 그러니 서버·클라이언트 어디에도 층 번호(3 등)를 직접 쓰지 마세요.
  * 필요하면 TOP_LAYER / BOTTOM_LAYER / LAYERS 를 쓰세요.
  *
- *   special : 그 층 특수 타일의 태그. 지금은 색으로만 구분되고 동작은
- *             일반 타일과 같습니다. 다음 작업에서 하나씩 채웁니다.
- *   trait   : 층 전체에 걸리는 성질. 아직 미사용('none').
+ *   special : 그 층 특수 타일의 태그. 그 타일을 '밟은 사람'에게만 작용합니다.
+ *   trait   : 층 전체에 걸리는 성질. 밟든 안 밟든 그 층의 모든 타일에
+ *             한꺼번에 걸립니다.
+ *               'accel' — 심사 가속. 주기적으로 그 층 퓨즈가 빨라집니다
+ *                         (ACCEL_EVENT 참고)
+ *               'dark'  — 어둠. 주기적으로 그 층이 내 주변만 남고 검게
+ *                         보입니다. 순수 시각 효과 (DARK_EVENT 참고)
+ *               'rotate'— 회전. 층 전체가 중심축을 돌고 위에 선 주자도
+ *                         함께 실려 돕니다 (ROTATE_EVENT 참고)
+ *               'none'  — 없음
+ *             주기 이벤트를 쓰는 특성은 LAYER_TRAITS 표에도 등록해야
+ *             tickLayerEvents 가 돌립니다.
  * ------------------------------------------------------------------ */
-/* LAYER_GAP 은 검증용으로 환경변수도 받습니다: LAYER_GAP=8 npm start */
-const LAYER_GAP = parseInt(process.env.LAYER_GAP, 10) || 12;   // 층 간격
+/* ── 층 간격 (LAYER_GAP) ──────────────────────────────────────────────
+ * 12 → 15 → 18 로 올렸습니다. 결정적인 근거는 '시야'입니다.
+ *
+ * ★ 왜 위층 타일이 화면을 덮는가 — 카메라 높이와 층 간격이 맞붙어서입니다.
+ *   추적 카메라는 주자보다 이만큼 위에 섭니다:
+ *
+ *       카메라 높이 = CAM.HEIGHT(3) + CAM.DIST(24) × sin(pitch)
+ *
+ *   이 값이 LAYER_GAP 을 넘는 순간 카메라가 '천장(위층 판)' 위로 올라가고,
+ *   그 판이 화면을 통째로 덮습니다. gap 15 에서는
+ *     · pitch 0.50 (지상 자동) → 14.5  ≈ 15 … 카메라가 판에 박힘
+ *     · pitch 0.62 (초기값)    → 16.9  > 15 … 화면 전체가 위층
+ *   이라 평상시 시점이 전부 최악 구간에 걸려 있었습니다.
+ *   화면 픽셀 실측: gap 15 는 시점 평균 가림률 63.9% / 최악 100%.
+ *
+ * ★ 그래서 두 가지를 같이 합니다. 간격만으로는 못 고칩니다.
+ *   1) 여기서 gap 을 18 로 올려 평상시 pitch(0.5·0.62)를 안전권으로 뺍니다.
+ *   2) 클라이언트 updateCamera 가 카메라를 천장 아래로 묶습니다.
+ *      (간격만 올리면 낙하 중 자동 pitch 0.92 에서 다시 100% 가 됩니다)
+ *   둘을 합친 실측: 평균 3.3% / 최악 16.5%. 남은 것은 시점을 눕혔을 때
+ *   멀리 위층 밑면이 보이는 정상적인 경우입니다.
+ *
+ * ★ 종전에 적어 둔 '비율' 근거(4×15=60 ≈ 아레나 지름 57.6)는 이제 깨집니다.
+ *   4×18 = 72 로 세로가 더 깁니다. 보기 좋은 비율보다 시야 확보가 우선이라
+ *   판단해 바꿨습니다 — 되돌리려면 이 값만 15 로 내리면 되고, 천장 클램프가
+ *   있으므로 그래도 평균 6.0% / 최악 22.9% 로 종전보다는 훨씬 낫습니다.
+ *
+ * ★ 낙하 연출 정규화 상수(종전 45)는 클라이언트에서 LAYER_GAP 파생으로
+ *   바꿨습니다. 이제 여기를 얼마로 올리든 카메라가 따라옵니다.
+ *
+ * ★ 안 건드려도 되는 것들 (전부 파생입니다):
+ *   구름바다 높이(SEA_Y = 최하층 − SEA_DROP), 점프 타일 발사 속도(실제 층
+ *   y 차이로 계산), 점프 면제 시간(JUMP_GRACE_MS), 클라이언트 지오메트리.
+ *   낙하 속도가 빨라져도 착지 판정은 prevY→nextY 스윕(findLanding)이라
+ *   타일을 뚫고 지나가지 않습니다.
+ *
+ * 검증용으로 환경변수도 받습니다: LAYER_GAP=8 npm start                */
+const LAYER_GAP = parseInt(process.env.LAYER_GAP, 10) || 18;   // 층 간격
 const LAYER_BASE_Y = 0;                                        // 최하층 y
 
 const LAYER_DEFS = [
+  /* ★ 최상층은 일부러 층 특성을 두지 않습니다 (종전 trait:'accel').
+   * 전원이 여기서 시작하므로 이 층이 사실상 학습 구간입니다. 일반 타일로
+   * 걷기를 익히고 신속심사 대시 타일로 "특수 타일은 뭔가 일어난다"를
+   * 배웁니다. 심사 가속은 대응 수단이 없어(어둠엔 검색 타일, 회전엔 이동이
+   * 있지만 가속엔 답이 없습니다) 첫인상을 담당하기에 적절하지 않았습니다.
+   * 되살리려면 'accel' 로 되돌리기만 하면 됩니다 — 규격·훅·연출이 전부
+   * 그대로 남아 있고 LAYER_TRAITS 표가 알아서 다시 돌립니다.          */
   { key: 'fasttrack', name: '우선심사 패스트트랙', short: 'FAST-TRACK',
     color: '#00ffcc', special: 'accel',  trait: 'none' },
   { key: 'office',    name: '의견제출통지',       short: 'OFFICE ACTION',
-    color: '#0088ff', special: 'reject', trait: 'none' },
+    color: '#0088ff', special: 'reject', trait: 'rotate' },
   { key: 'exam',      name: '실체심사/선행기술조사', short: 'EXAMINATION',
-    color: '#7c5cff', special: 'search', trait: 'none' },
+    color: '#7c5cff', special: 'search', trait: 'dark' },
   { key: 'claim',     name: '청구항',             short: 'CLAIM',
     color: '#ff8a3d', special: 'phase',  trait: 'none' },
   { key: 'idea',      name: '아이디어',           short: 'IDEATION',
@@ -542,6 +784,55 @@ const LAYERS = LAYER_DEFS.map((d, i) => ({
 
 const TOP_LAYER = LAYERS[0];
 const BOTTOM_LAYER = LAYERS[LAYERS.length - 1];
+
+/* ── 점프 타일 이동검증 면제 시간 (파생) ─────────────────────────────
+ * 종전에는 JUMP_TILE.graceMs = 1200 이 박혀 있었습니다. 그런데 이 숫자의
+ * 근거는 '두 층 상승 0.89초'였고, 그 0.89초는 LAYER_GAP 에서 나옵니다.
+ * 즉 LAYER_GAP 을 올리면 상승 시간만 늘고 면제 창은 그대로라, 여유가
+ * 조용히 깎이다가 어느 순간 상승 도중에 VALIDATE.MAX_UP_SPEED(34)에
+ * 걸려 state_correction 으로 끌어내려집니다 — 원인을 찾기 아주 어려운
+ * 종류의 버그입니다. 그래서 실제 상승 시간에서 직접 뽑습니다.
+ *
+ *   v = √(2·g·(dy + JUMP_APEX_MARGIN))  →  상승 시간 = v / g
+ *   가장 오래 걸리는 조합(보통 최대 level)에 1.35배 여유를 줍니다.
+ *
+ * ★ 1.35 의 근거: 검증이 실제로 걸리는 구간은 상승 전체가 아니라
+ *   '상승 속도가 MAX_UP_SPEED 아래로 떨어지기 전'까지입니다. 그보다
+ *   훨씬 긴 상승 시간 전체를 덮고도 남게 잡아, 착지 지연·렉까지 흡수합니다.
+ * ------------------------------------------------------------------ */
+const JUMP_GRACE_MS = (() => {
+  let maxRise = 0;
+  for (const from of LAYERS.filter((L) => L.special === 'jump')) {
+    for (const lv of JUMP_TILE.levels) {
+      const to = LAYERS.find((L) => L.index === from.index + lv);
+      if (!to || to.y <= from.y) continue;
+      const v = jumpLaunchSpeed(to.y - from.y);
+      maxRise = Math.max(maxRise, v / GRAVITY_MAG);
+    }
+  }
+  /* 점프 층이 없으면(LAYER_DEFS 에서 빼면) 0 이 나오므로 하한을 둡니다 —
+   * 0 이 흘러가면 grantMoveExemption 이 면제를 안 준 것과 같아집니다. */
+  return Math.max(600, Math.ceil(maxRise * 1.35 * 1000 / 50) * 50);
+})();
+
+/* trait 이름 → 그 특성이 걸린 층 번호들.
+ * 층 번호를 코드에 직접 쓰지 않기 위한 색인입니다. 층 순서가 바뀌거나
+ * 같은 특성을 여러 층에 붙여도 전부 따라옵니다.                       */
+const TRAIT_LAYERS = {};
+for (const L of LAYERS) {
+  if (!L.trait || L.trait === 'none') continue;
+  (TRAIT_LAYERS[L.trait] || (TRAIT_LAYERS[L.trait] = [])).push(L.index);
+}
+
+/* 이번 맵에서 실제로 돌릴 층 특성. 표에는 있는데 그 특성을 쓰는 층이
+ * 하나도 없으면 시계를 돌릴 이유가 없습니다.                          */
+const ACTIVE_TRAITS = Object.keys(LAYER_TRAITS)
+  .filter((t) => (TRAIT_LAYERS[t] || []).length > 0);
+
+/** 이 특성이 걸린 층 번호들 (없으면 빈 배열). */
+function traitLayersOf(trait) {
+  return TRAIT_LAYERS[trait] || [];
+}
 
 /* 구름바다는 최하층에서 이만큼 아래입니다.
  * 예전에는 -16 이 박혀 있어서, 층을 늘리거나 LAYER_GAP 을 바꾸면 바닥층이
@@ -803,6 +1094,14 @@ function createRoom() {
     /* 위상 타일의 기준 시각. 라운드 시작에 찍고, 클라이언트는 이 값만 받아
      * 같은 공식으로 ON/OFF 를 계산합니다 (매 틱 상태를 보내지 않습니다). */
     phaseEpoch: 0,
+    /* 층 특성 이벤트의 진행 상태 (trait 이름 -> 상태).
+     * 타이밍은 전적으로 서버가 잡습니다.
+     *   active / endsAt : 발동 중이면 언제까지
+     *   nextAt          : 다음 발동 예정 시각. 0 이면 예약 없음(라운드 밖) */
+    traits: makeTraitState(0),
+    /* 이 시각까지는 새 층 이벤트를 발동하지 않습니다 (직전 이벤트가 끝난
+     * 뒤의 쉬는 참). EVENT_SCHEDULE.gapMs 로 정해집니다.               */
+    eventBusyUntil: 0,
     winnerId: null,
     timers: new Set(),
     pedestalsActive: true,   // 대기 발판이 아직 떠 있는지
@@ -882,6 +1181,7 @@ function makePlayer(id, name, seat, room) {
     lastMoveAt: 0,
     lastDashAt: 0,
     lastJumpAt: 0,
+    lastSearchAt: 0,
 
     /* 이동 검증 상태 (VALIDATE).
      *   lastGood   : 마지막으로 검증을 통과한 위치. 보정할 때 이 자리로 되돌립니다.
@@ -1045,6 +1345,23 @@ function startRound(room) {
    * 시작 시각을 그대로 기준으로 삼으므로 elapsed 0 → ON 입니다.      */
   room.phaseEpoch = room.roundStartedAt;
 
+  /* 층 특성 이벤트의 첫 발동을 예약합니다.
+   * 라운드 시작과 동시에 터뜨리지 않는 이유: 그 순간 전원이 대기 발판에서
+   * 최상층으로 떨어지는 중이라 아무도 화면을 못 봅니다. 한 간격 뒤부터입니다.
+   * (dev 에서는 eventInterval 이 이 간격을 1/5 로 줄입니다)            */
+  room.traits = makeTraitState(room.roundStartedAt);
+  room.eventBusyUntil = 0;
+
+  /* ★ 새 타임라인을 곧바로 알려야 합니다.
+   * 회전은 라운드 시작과 동시에 돌기 시작하는데(epoch = roundStartedAt),
+   * 이 브로드캐스트가 없으면 클라이언트는 첫 방향 반전(정식 모드 15초)이
+   * 올 때까지 epoch 을 몰라 각도 0 으로 그립니다. 그동안 서버는 이미
+   * 주자를 실어 돌리므로 발밑과 화면이 통째로 어긋납니다.
+   * 지속형(가속·어둠)도 함께 보내 지난 회차 상태를 확실히 끕니다.    */
+  for (const trait of ACTIVE_TRAITS) {
+    io.to(room.id).emit('layer_event', traitSnapshot(room, trait));
+  }
+
   /* 플레이어를 옮기지 않습니다. 이미 각자 대기 발판 위에 서 있으므로,
    * 발판만 치우면 그 자리에서 최상층으로 떨어지며 게임이 시작됩니다. */
   for (const p of room.players.values()) {
@@ -1057,6 +1374,7 @@ function startRound(room) {
     p.lastMoveAt = 0;
     p.lastDashAt = 0;
     p.lastJumpAt = 0;
+    p.lastSearchAt = 0;
     // 대기 중에는 검증을 쉬므로 기준점이 낡아 있습니다. 지금 자리에서 다시 잡습니다.
     resetValidation(p);
     // stale 시계도 지금부터. 안 하면 라운드 시작 직후 곧바로 stale 판정이 납니다.
@@ -1130,6 +1448,10 @@ function endRound(room, winner, reason) {
   room.winnerId = winner ? winner.id : null;
   room.phaseEndsAt = Date.now() + RESET_DELAY_MS;
 
+  /* 발동 중에 라운드가 끝나면 빨간 경고나 어둠이 결과 화면 위에 그대로
+   * 남습니다. tickLayerEvents 는 playing 일 때만 도니까 스스로 못 끕니다. */
+  clearTraitEvents(room);
+
   if (winner) {
     winner.placement = 1;
     winner.wins = (winner.wins || 0) + 1;
@@ -1177,6 +1499,8 @@ function resetRoom(room) {
   room.pedestalsActive = true;
   room.phaseEndsAt = 0;
   room.phaseEpoch = 0;          // 다음 라운드 시작에서 다시 찍습니다
+  // 층 특성 이벤트도 마찬가지입니다. 예약은 startRound 가 다시 겁니다.
+  room.traits = makeTraitState(0);
   room.winnerId = null;
   room.lobbyDeadline = null;
   room.nextEntityId = 1;
@@ -1188,6 +1512,7 @@ function resetRoom(room) {
     p.lastMoveAt = 0;
     p.lastDashAt = 0;
     p.lastJumpAt = 0;
+    p.lastSearchAt = 0;
     // A runner who was eliminated last round got temporary spectator powers.
     // Revoke them now that they are back on the grid.
     room.spectators.delete(p.id);
@@ -1266,12 +1591,17 @@ function scheduleTileBreak(room, tileId, fuseMs, sourceId) {
   if (!st || st.phase !== 'idle') return;
 
   const now = Date.now();
-  const fuse = Math.max(0, fuseMs | 0);
+  const tile = tileById(room.map, tileId);
+
+  /* 심사 가속이 발동 중이면 그 층 타일의 퓨즈가 1/speed 로 줄어듭니다.
+   * 예약하는 이 순간의 상태로 한 번만 곱합니다 — 이미 타들어가던 퓨즈는
+   * 발동 순간에 startAccelEvent 가 따로 앞당깁니다(둘이 겹치지 않습니다). */
+  const fuse = accelScaledMs(room, tile, Math.max(0, fuseMs | 0), now);
+
   st.phase = 'warning';
   st.warnAt = now;
   st.breakAt = now + fuse;
 
-  const tile = tileById(room.map, tileId);
   io.to(room.id).emit('tile_warn', {
     tileId,
     fuse,
@@ -1435,6 +1765,352 @@ function tryReject(room, p, tile) {
  * 걸어두고 phase 는 'idle' 로 두므로, 그 사이 두 번째로 밟히면 더 이른
  * breakAt 으로 덮어써집니다. 두 시계를 따로 굴리지 않아도 됩니다.
  */
+/* ══════════════════════════════════════════════════════════════════════
+ * 층 특성 이벤트 (서버가 타이밍을 전부 소유)
+ * ────────────────────────────────────────────────────────────────────
+ * LAYER_TRAITS 에 등록된 특성마다 같은 시계를 돌립니다.
+ *   대기 → (nextAt) → 발동 → (durationMs) → 해제 → (intervalMs) → 대기
+ * 발동·해제 순간에만 layer_event 를 방 전체에 보냅니다. 모두가 같은
+ * 순간에 같은 신호를 받고, 지속 시간을 클라이언트가 세지 않습니다 —
+ * 세게 하면 화면마다 다른 시점에 꺼집니다.
+ *
+ * 특성마다 다른 부분은 TRAIT_HOOKS 하나로 모읍니다.
+ *   extra()   : 스냅샷에 실을 특성별 값
+ *   onStart() : 발동 순간 서버가 추가로 해야 할 일
+ * ══════════════════════════════════════════════════════════════════ */
+
+/** 지금 이 방에서 그 특성이 발동 중인가. */
+function traitActive(room, trait, now) {
+  const s = room && room.traits && room.traits[trait];
+  return !!(s && s.active && now < s.endsAt);
+}
+
+/** 이 타일이 그 특성이 걸린 층에 있는가. */
+function traitAffects(trait, tile) {
+  return !!tile && traitLayersOf(trait).indexOf(tile.layer) >= 0;
+}
+
+/**
+ * 라운드용 특성 상태를 새로 만듭니다.
+ * startAt 이 0 이면 예약 없음(라운드 밖)이고, 값이 있으면 그 시각을
+ * 기준으로 첫 발동을 예약합니다.
+ */
+function makeTraitState(startAt) {
+  const out = {};
+  for (const t of ACTIVE_TRAITS) {
+    /* 첫 발동은 '자기 간격'과 '예열 시간' 중 늦은 쪽입니다.
+     * 간격이 예열보다 짧은 특성(회전 반전 15초)도 예열이 끝나야 나옵니다. */
+    const s = {
+      active: false,
+      endsAt: 0,
+      nextAt: startAt
+        ? startAt + Math.max(eventInterval(LAYER_TRAITS[t].intervalMs),
+                             eventInterval(EVENT_SCHEDULE.warmupMs))
+        : 0
+    };
+    // 특성별로 더 들고 있어야 할 값(회전의 epoch/각도 등)은 init 훅이 채웁니다
+    const hook = TRAIT_HOOKS[t];
+    if (hook && hook.init) hook.init(s, startAt);
+    out[t] = s;
+  }
+  return out;
+}
+
+/* ── 회전 각도 (서버가 유일한 출처) ───────────────────────────────────
+ * 상태는 (epoch, baseAngle, dir) 세 값뿐이고 각도는 항상 여기서 계산합니다.
+ * 누적 변수를 따로 두면 반전·리셋 때 두 값이 어긋납니다.
+ * ------------------------------------------------------------------ */
+function rotationAngle(room, now) {
+  const s = room && room.traits && room.traits.rotate;
+  if (!s || !s.epoch) return 0;
+  return s.baseAngle + s.dir * ROTATE_SPEED * (now - s.epoch) / 1000;
+}
+
+/**
+ * 월드 좌표 → 그 층의 로컬(회전 전) 좌표.
+ *
+ * 층에 얹히는 개체(관전자 부스터 등)를 층에 고정시킬 때 씁니다. 개체를
+ * 월드 좌표로 들고 있으면 층만 돌아가고 개체는 제자리에 남습니다.
+ * 로컬 좌표로 저장해 두면 클라이언트가 매 프레임 현재 각도로 월드 좌표를
+ * 만들어 주므로 층과 함께 돕니다(맵 타일이 이미 그런 구조입니다 —
+ * map.tiles 의 x/z 도 회전 전 좌표입니다).
+ *
+ * 회전하지 않는 층에서는 항등이라 값이 그대로 돌아갑니다.
+ */
+function toLayerLocalXZ(room, layerIndex, x, z) {
+  if (traitLayersOf('rotate').indexOf(layerIndex) < 0) return { x, z };
+  const a = rotationAngle(room, Date.now());
+  const c = Math.cos(-a), s = Math.sin(-a);
+  return { x: x * c - z * s, z: x * s + z * c };
+}
+
+/** XZ 평면에서 원점 기준 회전. c/s 는 미리 구한 cos/sin (틱당 한 번만 계산). */
+function rotateXZ(o, c, s) {
+  const x = o.x * c - o.z * s;
+  const z = o.x * s + o.z * c;
+  o.x = x; o.z = z;
+}
+
+/**
+ * 회전층 위의 주자를 층과 함께 실어 돌립니다. 20Hz 틱이 매번 부릅니다.
+ *
+ * ★ 왜 서버도 이걸 하는가 (이동은 클라이언트 권위인데)
+ *   클라이언트도 같은 Δθ 를 자기 물리에 적용합니다. 둘이 같은 공식·같은
+ *   타임라인을 쓰므로 클라이언트 보고가 이 값을 덮어써도 어긋나지 않습니다.
+ *   그럼에도 서버가 해야 하는 이유는 두 가지입니다.
+ *     · 보고가 끊긴 주자(백그라운드 탭·렉)도 층에 붙어 계속 돌아야 합니다.
+ *       서버가 안 하면 그 사람만 허공에 남아 층이 밑에서 빠져나갑니다.
+ *     · 20Hz 스냅샷에 '회전이 반영된 좌표'가 담겨야 다른 화면에서도
+ *       보고 사이 구간이 매끄럽습니다.
+ *
+ * ★ lastGood 도 함께 돌립니다.
+ *   안 돌리면 회전분이 이동 검증의 속도 예산을 잠식해서, 회전과 같은
+ *   방향으로 달릴 때만 보정이 걸리는 비대칭 버그가 납니다. 같이 돌리면
+ *   회전분이 검증에 아예 보이지 않습니다.
+ */
+function tickRotateCarry(room, now) {
+  const s = room.traits && room.traits.rotate;
+  if (!s || !s.epoch) return;
+  if (room.phase !== 'playing') return;
+
+  const prev = s.carriedAt || now;
+  s.carriedAt = now;
+  const dt = (now - prev) / 1000;
+  if (dt <= 0) return;
+
+  const dTheta = s.dir * ROTATE_SPEED * dt;
+  const c = Math.cos(dTheta), sn = Math.sin(dTheta);
+  const layers = traitLayersOf('rotate');
+
+  for (const p of room.players.values()) {
+    if (!p.alive) continue;
+    /* 공중에 뜬 사람은 싣지 않습니다 — 발이 닿아 있을 때만 층이 밀어 줍니다.
+     * (공중에서도 돌리면 점프 한 번에 목적지가 통째로 밀려납니다)     */
+    if (!p.grounded) continue;
+    if (layers.indexOf(p.layer) < 0) continue;
+    rotateXZ(p.pos, c, sn);
+    rotateXZ(p.lastGood, c, sn);
+    p.ry += dTheta;
+  }
+}
+
+/**
+ * 심사 가속 발동 시, 이미 타들어가던 퓨즈도 함께 앞당깁니다.
+ *
+ * 붕괴 예약을 setTimeout 이 아니라 breakAt 숫자로 들고 있는 이유가 바로
+ * 이것입니다(scheduleTileBreak 주석 참고) — 남은 시간을 speed 로 나누기만
+ * 하면 됩니다. 클라이언트는 그 타일을 이미 붉게 점멸시키는 중이므로
+ * tile_warn 을 다시 보내면 안 됩니다(연출이 처음부터 다시 시작됩니다).
+ * 대신 '남은 시간'만 보내 진행률을 유지한 채 압축시킵니다.
+ */
+function accelRetimeFuses(room, now) {
+  const retimed = [];
+  for (const [id, st] of room.tileState) {
+    if (st.phase !== 'warning' || !st.breakAt) continue;
+    if (!traitAffects('accel', tileById(room.map, id))) continue;
+    const left = st.breakAt - now;
+    if (left <= 0) continue;
+    st.breakAt = now + Math.max(1, Math.round(left / ACCEL_SPEED));
+    retimed.push({ tileId: id, fuse: st.breakAt - now });
+  }
+  return retimed;
+}
+
+const TRAIT_HOOKS = {
+  accel: {
+    extra: () => ({ speed: ACCEL_SPEED }),
+    onStart: (room, now, payload) => { payload.retimed = accelRetimeFuses(room, now); }
+  },
+  dark: {
+    /* 어둠은 서버가 할 일이 없습니다 — 판정을 하나도 바꾸지 않고,
+     * 가리는 일은 각 클라이언트가 자기 위치 기준으로 합니다.
+     * 시야 반경만 내려보내 클라이언트가 하드코딩하지 않게 합니다.   */
+    extra: () => ({ viewTiles: DARK_EVENT.viewTiles, clearTiles: DARK_EVENT.clearTiles })
+  },
+  rotate: {
+    /* 회전은 항상 켜져 있으므로 라운드 시작과 함께 시계를 출발시킵니다.
+     * startAt 이 0(라운드 밖)이면 epoch 도 0 이라 각도는 0 으로 굳습니다.  */
+    init: (s, startAt) => {
+      s.epoch = startAt || 0;
+      s.baseAngle = 0;
+      s.dir = 1;
+      s.carriedAt = startAt || 0;   // 실어 돌리기 적분의 직전 시각
+    },
+    /* 클라이언트가 같은 공식으로 각도를 계산할 수 있게 타임라인 전체를
+     * 내려보냅니다. angle 은 '이 순간의 값'으로, 클라이언트가 자기 계산을
+     * 검산하는 데 씁니다(위상 타일의 ph 와 같은 역할).                */
+    extra: (room, now) => {
+      const s = (room && room.traits && room.traits.rotate) || {};
+      return {
+        speed: ROTATE_SPEED,
+        dir: s.dir || 1,
+        epoch: s.epoch || 0,
+        baseAngle: s.baseAngle || 0,
+        angle: rotationAngle(room, now)
+      };
+    },
+    /* 방향 반전. 지금 각도를 baseAngle 로 고정한 '뒤에' 부호를 뒤집어야
+     * 각도가 튀지 않고 그 자리에서 반대로 돌기 시작합니다. 순서를 바꾸면
+     * 반전할 때마다 층이 순간이동합니다.                              */
+    onPulse: (room, now) => {
+      const s = room.traits.rotate;
+      s.baseAngle = rotationAngle(room, now);
+      s.epoch = now;
+      s.dir = -s.dir;
+    }
+  }
+};
+
+/**
+ * 클라이언트에 보낼 이벤트 상태.
+ * 브로드캐스트(layer_event)와 중도 참가자의 init 이 같은 모양을 씁니다 —
+ * 두 벌로 두면 한쪽만 고쳐서 어긋납니다.
+ */
+function traitSnapshot(room, trait) {
+  const s = (room && room.traits && room.traits[trait]) || {};
+  const hook = TRAIT_HOOKS[trait];
+  const spec = LAYER_TRAITS[trait] || {};
+  const now = Date.now();
+  const out = {
+    trait: trait,
+    layers: traitLayersOf(trait),   // 어느 층에 걸리는지
+    /* 순간형(pulse)은 켜고 끄는 개념이 없습니다. 라운드 중이면 항상 켜진
+     * 것으로 보내야 클라이언트가 '지금 이 특성이 작동 중'으로 그립니다. */
+    active: spec.pulse ? (room.phase === 'playing') : !!s.active,
+    pulse: !!spec.pulse,
+    endsAt: s.endsAt || 0,          // 남은 시간 표시용 (끄는 것은 서버가 지시)
+    nextAt: s.nextAt || 0,
+    durationMs: spec.durationMs || 0,
+    intervalMs: eventInterval(spec.intervalMs),
+    at: now
+  };
+  return hook && hook.extra ? Object.assign(out, hook.extra(room, now)) : out;
+}
+
+/** 발동. 특성별 추가 작업은 onStart 훅이 합니다. */
+function startTraitEvent(room, trait, now) {
+  const s = room.traits[trait];
+  s.active = true;
+  s.endsAt = now + LAYER_TRAITS[trait].durationMs;
+  s.nextAt = 0;                   // 끝날 때 endTraitEvent 가 다시 잡습니다
+
+  const payload = traitSnapshot(room, trait);
+  const hook = TRAIT_HOOKS[trait];
+  if (hook && hook.onStart) hook.onStart(room, now, payload);
+  io.to(room.id).emit('layer_event', payload);
+}
+
+/** 지속 시간이 끝났습니다 — 끄고 다음 발동을 예약합니다. */
+function endTraitEvent(room, trait, now) {
+  const s = room.traits[trait];
+  s.active = false;
+  s.endsAt = 0;
+  /* 간격은 '끝난 시각'부터 셉니다. 발동 시각부터 세면 dev 에서 간격이
+   * 지속보다 짧아져 이벤트가 겹치고 영영 안 꺼집니다(ACCEL_EVENT 주석). */
+  s.nextAt = now + eventInterval(LAYER_TRAITS[trait].intervalMs);
+  /* 다음 이벤트는 이 시각 이후에만 발동합니다 — 지속형끼리 등을 맞대고
+   * 연달아 나오면 사실상 하나의 긴 이벤트가 됩니다.                   */
+  room.eventBusyUntil = now + eventInterval(EVENT_SCHEDULE.gapMs);
+  io.to(room.id).emit('layer_event', traitSnapshot(room, trait));
+}
+
+/**
+ * 순간형(pulse) 특성의 발생. 켜고 끄는 것이 아니라 '한 번 일어나고'
+ * 곧바로 다음 발생을 예약합니다 (회전 방향 반전이 여기 해당).
+ */
+function pulseTraitEvent(room, trait, now) {
+  const s = room.traits[trait];
+  s.nextAt = now + eventInterval(LAYER_TRAITS[trait].intervalMs);
+
+  const hook = TRAIT_HOOKS[trait];
+  /* 훅이 상태를 먼저 바꾸고, 그 뒤에 스냅샷을 뜹니다. 순서가 반대면
+   * 반전 '직전' 값이 나가서 클라이언트가 한 주기 늦게 방향을 바꿉니다. */
+  if (hook && hook.onPulse) hook.onPulse(room, now);
+  const payload = traitSnapshot(room, trait);
+  payload.fired = true;                      // 이번 패킷이 '발생 순간'임을 표시
+  io.to(room.id).emit('layer_event', payload);
+}
+
+/** 라운드가 끝났습니다 — 발동 중이던 특성을 끄고 예약도 지웁니다. */
+function clearTraitEvents(room) {
+  if (!room.traits) return;
+  for (const trait of ACTIVE_TRAITS) {
+    const s = room.traits[trait];
+    if (!s) continue;
+    const wasActive = s.active;
+    s.active = false;
+    s.endsAt = 0;
+    s.nextAt = 0;
+    if (wasActive) io.to(room.id).emit('layer_event', traitSnapshot(room, trait));
+  }
+}
+
+/**
+ * 층 이벤트 시계. 20Hz 틱이 매번 부릅니다.
+ * 정확도는 틱 간격(50ms)만큼이고, 그 정도 오차는 5~6초 이벤트에서 문제되지
+ * 않습니다. setTimeout 을 쓰지 않는 이유는 타일 붕괴와 같습니다 —
+ * 라운드가 중간에 끝나거나 리셋될 때 정리할 타이머가 늘어납니다.
+ *
+ * 특성끼리는 서로 독립입니다. 심사 가속과 어둠이 겹쳐 발동할 수 있고,
+ * 그건 의도된 동작입니다 (빨리 무너지는데 보이지도 않는 구간).
+ */
+function tickLayerEvents(room, now) {
+  if (room.phase !== 'playing') return;
+  if (!room.traits) return;
+
+  /* 지금 발동 중인 지속형이 있는가. 한 번에 하나만 허용합니다.
+   * (지금은 지속형이 어둠 하나뿐이라 실질적으로 걸릴 일이 없지만, 심사
+   *  가속을 다시 켜거나 특성을 추가했을 때 겹침이 되살아나지 않도록
+   *  조정자를 여기 둡니다 — 그때 다시 만들면 같은 실수를 반복합니다) */
+  let durationBusy = false;
+  for (const t of ACTIVE_TRAITS) {
+    if (LAYER_TRAITS[t].pulse) continue;
+    if (room.traits[t] && room.traits[t].active) { durationBusy = true; break; }
+  }
+
+  for (const trait of ACTIVE_TRAITS) {
+    const s = room.traits[trait];
+    if (!s) continue;
+
+    /* 순간형(회전 반전)은 켜짐/꺼짐 상태가 없습니다 — 간격마다 한 번
+     * 일어나고 곧바로 다음을 예약합니다. 조정자도 받지 않습니다
+     * (EVENT_SCHEDULE 주석 참고).                                     */
+    if (LAYER_TRAITS[trait].pulse) {
+      if (s.nextAt && now >= s.nextAt) pulseTraitEvent(room, trait, now);
+      continue;
+    }
+
+    if (s.active) {
+      if (now >= s.endsAt) endTraitEvent(room, trait, now);
+      continue;
+    }
+    if (s.nextAt && now >= s.nextAt) {
+      /* 다른 이벤트가 진행 중이거나 쉬는 참이면 '미룹니다'.
+       * 건너뛰면 그 특성이 한 회차 내내 안 나올 수 있습니다.          */
+      if (durationBusy || now < (room.eventBusyUntil || 0)) {
+        s.nextAt = now + EVENT_SCHEDULE.retryMs;
+        continue;
+      }
+      startTraitEvent(room, trait, now);
+      durationBusy = true;
+    }
+  }
+
+  /* 회전층 위 주자를 층과 함께 실어 돌립니다. 이벤트 시계 뒤, 타일 붕괴
+   * 앞에 둡니다 — 반전이 일어난 틱에는 바뀐 방향으로 실려야 합니다.  */
+  tickRotateCarry(room, now);
+}
+
+/**
+ * 퓨즈·자동파괴 시간에 심사 가속 배속을 반영합니다.
+ * 해당 층이 아니거나 발동 중이 아니면 원래 값을 그대로 돌려줍니다.
+ */
+function accelScaledMs(room, tile, ms, now) {
+  if (!(ms > 0)) return ms;
+  if (!traitAffects('accel', tile) || !traitActive(room, 'accel', now)) return ms;
+  return Math.max(1, Math.round(ms / ACCEL_SPEED));
+}
+
 function tickTiles(room, now) {
   if (room.phase !== 'playing') return;
   for (const [id, st] of room.tileState) {
@@ -1553,10 +2229,9 @@ function tryJump(room, p, tile) {
   const dy = toLayer.y - fromLayer.y;
   if (!(dy > 0)) return null;
 
-  /* v = √(2·g·h). 그대로 쓰면 정점이 목표 표면과 정확히 같아 '스치듯'
-   * 닿습니다 — 클라이언트 착지 판정은 '내려오면서 표면을 지날 때' 잡히므로
-   * 아주 살짝 넘겨야 확실히 올라탑니다. 그래서 여유 높이를 더합니다.  */
-  const v = Math.sqrt(2 * GRAVITY_MAG * (dy + JUMP_APEX_MARGIN));
+  /* 여유 높이(JUMP_APEX_MARGIN)와 클라이언트 이산 적분 손실을 함께
+   * 반영한 발사 속도입니다. 식과 근거는 jumpLaunchSpeed 주석 참고.   */
+  const v = jumpLaunchSpeed(dy);
 
   /* 목표 지점 — 수평 이동 없이 바로 위입니다(같은 q,r 열).
    * 착지면은 층 y + 타일 두께의 절반으로, 다른 타일과 같은 규칙입니다. */
@@ -1577,7 +2252,7 @@ function tryJump(room, p, tile) {
     else { landed = true; reason = 'ok'; }
   }
 
-  grantMoveExemption(p, JUMP_TILE.graceMs);
+  grantMoveExemption(p, JUMP_GRACE_MS);
   p.lastJumpAt = now;
 
   const payload = {
@@ -1586,7 +2261,7 @@ function tryJump(room, p, tile) {
     level: level,
     to: [+p.pos.x.toFixed(4), +targetSurface.toFixed(4), +p.pos.z.toFixed(4)],
     vel: [0, +v.toFixed(4), 0],
-    graceMs: JUMP_TILE.graceMs,
+    graceMs: JUMP_GRACE_MS,
     fromLayer: fromLayer.index,
     toLayer: toLayer.index,
     targetTileId: targetTile ? targetTile.id : null,
@@ -1597,6 +2272,51 @@ function tryJump(room, p, tile) {
 
   // 대시와 같은 이유로 방 전체에 보냅니다 (원격 보간 허용 오차 확대)
   io.to(room.id).emit('player_impulse', payload);
+  return payload;
+}
+
+/** 이 타일이 선행기술 검색 타일인가. 층 번호가 아니라 태그로만 판정합니다. */
+function isSearchTile(tile) {
+  return !!tile && tile.kind === 'special' && tile.specialType === 'search';
+}
+
+/**
+ * 선행기술 검색 타일을 밟았습니다 — 그 사람의 시야를 잠깐 넓힙니다.
+ *
+ * 서버가 정하는 것: 발동 여부, 얼마나 넓어지는지, 얼마나 오래 가는지.
+ * 서버가 하지 않는 것: 실제로 무엇이 보이는지 — 시야는 순전히 클라이언트
+ * 렌더링이고 어떤 판정에도 영향을 주지 않습니다(DARK_EVENT 주석 참고).
+ *
+ * 시야가 넓어지는 것은 밟은 사람뿐이지만 방 전체에 보냅니다 — 어둠 속에서
+ * 누가 조사 중인지 스캔 연출로 읽혀야 하기 때문입니다. 클라이언트가
+ * id 를 보고 '내 것이면 시야, 남의 것이면 연출만'으로 가릅니다.
+ *
+ * ★ DEV.noFuse 여도 발동합니다. 타일이 안 무너지는 것과 검색 발동은
+ *   별개이고, dev 에서 관찰해야 하는 대상입니다 (대시·점프와 같은 이유).
+ *
+ * @returns 발동했으면 페이로드, 아니면 null
+ */
+function trySearch(room, p, tile) {
+  if (!isSearchTile(tile)) return null;
+  if (!p || !p.alive || room.phase !== 'playing') return null;
+
+  const now = Date.now();
+  // 한 번 착지에 여러 번 발동하는 것 방지 (점프 타일과 같은 이유)
+  if (p.lastSearchAt && now - p.lastSearchAt < SEARCH_TILE.cooldownMs) return null;
+  p.lastSearchAt = now;
+
+  const payload = {
+    id: p.id,
+    name: p.name,
+    tileId: tile.id,
+    // 스캔 연출의 중심. 밟은 타일 위치를 씁니다 — 플레이어 좌표는 20Hz
+    // 보고라 조금 뒤처져 있고, 연출은 타일에 붙어 있어야 자연스럽습니다.
+    pos: [tile.x, tile.y, tile.z],
+    viewTiles: SEARCH_TILE.viewTiles,
+    durationMs: SEARCH_TILE.durationMs,
+    at: now
+  };
+  io.to(room.id).emit('search_pulse', payload);
   return payload;
 }
 
@@ -1645,7 +2365,11 @@ function requestTileBreak(room, tileId, sourceId, reason) {
   /* 강화 타일: 첫 밟기에 자동 파괴 시계를 겁니다.
    * 아무도 두 번째로 밟지 않아도 autoMs 뒤에 무너집니다. phase 는 'idle'
    * 그대로라 그 사이 누가 밟으면 아래 분기가 더 이른 breakAt 으로 덮습니다. */
-  if (tile.autoMs > 0 && st.hits === 1) st.breakAt = now + tile.autoMs;
+  /* 심사 가속 중이면 이 자동 파괴 시계도 절반으로 줄입니다 — '그 층
+   * 타일의 파괴가 빨라진다'는 규칙이 종류마다 달라지면 안 됩니다.    */
+  if (tile.autoMs > 0 && st.hits === 1) {
+    st.breakAt = now + accelScaledMs(room, tile, tile.autoMs, now);
+  }
 
   if (st.hits < maxHits) {
     // 아직 버팁니다 — 마모 단계만 올려서 알립니다 (강화 타일의 '금이 감')
@@ -1745,6 +2469,30 @@ function publicConfig() {
      * 지오메트리와 HUD 를 만들고 아무것도 하드코딩하지 않습니다.     */
     SEA_Y, LAYERS, LAYER_GAP, LAYER_BASE_Y,
     TILE_MIX, TILE_KINDS, PHASE_TILE, DASH, REJECT_TILE, OFFICE_SPECIAL_MIX, JUMP_TILE,
+    /* 심사 가속. effectiveIntervalMs 는 dev 에서 줄어든 '실제' 간격입니다 —
+     * 규칙 안내문이 원래 값을 그대로 쓰면 dev 에서 설명과 화면이 어긋납니다. */
+    ACCEL_EVENT: {
+      intervalMs: ACCEL_EVENT.intervalMs,
+      durationMs: ACCEL_EVENT.durationMs,
+      speed: ACCEL_SPEED,
+      effectiveIntervalMs: eventInterval(ACCEL_EVENT.intervalMs)
+    },
+    /* 어둠. 시야 반경(칸)을 클라이언트가 하드코딩하지 않도록 내려줍니다. */
+    DARK_EVENT: {
+      intervalMs: DARK_EVENT.intervalMs,
+      durationMs: DARK_EVENT.durationMs,
+      viewTiles: DARK_EVENT.viewTiles,
+      clearTiles: DARK_EVENT.clearTiles,
+      effectiveIntervalMs: eventInterval(DARK_EVENT.intervalMs)
+    },
+    SEARCH_TILE,
+    /* 회전. speed 로 클라이언트가 같은 공식을 돌립니다(각도를 받아 쓰는 게
+     * 아니라 같이 계산합니다 — ROTATE_EVENT 주석 참고).                */
+    ROTATE_EVENT: {
+      intervalMs: ROTATE_EVENT.intervalMs,
+      speed: ROTATE_SPEED,
+      effectiveIntervalMs: eventInterval(ROTATE_EVENT.intervalMs)
+    },
     PEDESTAL_RISE, PEDESTAL_SCALE,
     BOOSTER_TTL_MS, OBSTACLE_FALL_MS,
     BOOSTER_COOLDOWN_MS, OBSTACLE_COOLDOWN_MS
@@ -1827,6 +2575,11 @@ io.on('connection', (socket) => {
       map: room.map,
       pedestalsActive: room.pedestalsActive,
       brokenTiles: tileProgress(room),
+      /* 라운드 중 들어온 사람도 지금 걸려 있는 층 특성을 곧바로 봐야
+       * 합니다 — 안 그러면 왜 발밑이 빨리 무너지는지, 왜 갑자기 밝아지는지
+       * 모른 채 떨어집니다. 발동 중인 것만이 아니라 전부 보냅니다
+       * (어느 층에 무슨 특성이 있는지도 여기서 알려 줍니다).          */
+      layerEvents: ACTIVE_TRAITS.map((t) => traitSnapshot(room, t)),
       players: [...room.players.values()].map(publicPlayer),
       meta: roomSnapshotMeta(room),
       serverTime: Date.now()
@@ -1965,6 +2718,7 @@ io.on('connection', (socket) => {
       tryReject(room, p, tile);
       tryAmend(room, p, tile);
       tryJump(room, p, tile);
+      trySearch(room, p, tile);
     }
   });
 
@@ -2032,12 +2786,21 @@ io.on('connection', (socket) => {
     if (!target) return;
 
     spec.boosterAt = now;
+
+    /* ★ x/z 는 '층 로컬' 좌표입니다 (월드 좌표가 아닙니다).
+     * 회전층 위에 지원된 발판이 층과 함께 돌아야 하기 때문입니다 —
+     * 월드 좌표로 보내면 발판만 제자리에 남아, 실려 도는 주자가 그
+     * 위에서 미끄러져 떨어집니다. 회전하지 않는 층에서는 변환이
+     * 항등이라 종전과 값이 같습니다 (toLayerLocalXZ 참고).          */
+    const bLayer = target.layer || TOP_LAYER.index;
+    const bLocal = toLayerLocalXZ(room, bLayer, target.pos.x, target.pos.z);
     const entity = {
       id: 'BST' + (room.nextEntityId++),
       targetId: target.id,
-      x: target.pos.x,
+      layer: bLayer,
+      x: bLocal.x,
       y: target.pos.y - 1.6,
-      z: target.pos.z,
+      z: bLocal.z,
       ttl: BOOSTER_TTL_MS,
       by: spec.name,
       at: now
@@ -2090,9 +2853,14 @@ io.on('connection', (socket) => {
     const tile = pool[Math.floor(Math.random() * pool.length)];
     spec.obstacleAt = now;
 
+    /* tile.x/z 는 맵 생성 시점의 좌표, 즉 이미 '층 로컬' 좌표입니다.
+     * 그래서 여기서는 변환할 것이 없고 층 번호만 함께 보내면 됩니다.
+     * 클라이언트가 이 좌표를 현재 각도로 돌려 낙하 지점을 잡습니다 —
+     * 그래야 1.4초 낙하 도중 층이 돌아도 목표 타일 위에 떨어집니다.   */
     const entity = {
       id: 'OBS' + (room.nextEntityId++),
       tileId: tile.id,
+      layer: tile.layer,
       x: tile.x,
       y: tile.y,
       z: tile.z,
@@ -2167,6 +2935,10 @@ setInterval(() => {
     /* 예약된 타일 붕괴를 여기서 실행합니다 (종전 setTimeout 대체).
      * 스냅샷보다 먼저 돌려야, 이번 틱에 무너진 타일을 클라이언트가
      * 같은 프레임의 위치 갱신과 함께 받습니다.                        */
+    /* 층 이벤트(심사 가속)를 타일 붕괴보다 먼저 돌립니다.
+     * 순서가 바뀌면 발동과 동시에 무너져야 할 타일이 한 틱(50ms) 늦습니다. */
+    tickLayerEvents(room, now);
+
     tickTiles(room, now);
 
     /* ── 보고가 끊긴 플레이어 처리 (STALE) ──────────────────────────
@@ -2225,10 +2997,16 @@ setInterval(() => {
     /* ph: 위상 타일이 지금 켜져 있는가 (1/0).
      * 클라이언트는 평소 자기 공식으로 계산하고, 이 값은 검산용입니다 —
      * 계산이 어긋난 것을 발견하면 그때만 서버 값으로 넘어갑니다.      */
+    /* rt: 회전층의 현재 각도(rad).
+     * 클라이언트는 평소 자기 공식으로 60fps 계산하고, 이 값은 검산용입니다 —
+     * 어긋난 것을 발견하면 그때만 서버 값으로 스냅합니다. 위상 타일의 ph 와
+     * 완전히 같은 역할입니다. 각도를 '누적'해서 보내는 게 아니라 '현재값'을
+     * 보내므로 패킷이 유실돼도 다음 스냅샷에서 저절로 복구됩니다.      */
     io.to(room.id).emit('state', {
       t: now,
       players,
-      ph: phaseTilesOn(room, now) ? 1 : 0
+      ph: phaseTilesOn(room, now) ? 1 : 0,
+      rt: +rotationAngle(room, now).toFixed(4)
     });
   }
 }, TICK_MS);
@@ -2273,9 +3051,13 @@ server.listen(PORT, HOST, () => {
       JUMP_TILE.levels.map((lv) => {
         const from = jumpLayers[0], to = LAYERS.find((L) => L.index === from.index + lv);
         if (!to) return lv + '층↑ 불가';
-        const v = Math.sqrt(2 * GRAVITY_MAG * (to.y - from.y + JUMP_APEX_MARGIN));
-        return lv + '층↑ v=' + v.toFixed(1) + ' 상승 ' + (v / GRAVITY_MAG).toFixed(2) + 's';
-      }).join(' / ') + ', grace ' + JUMP_TILE.graceMs + 'ms)'
+        const v = jumpLaunchSpeed(to.y - from.y);
+        /* 정점 여유 = 이산 적분까지 반영한 실제 여유. 0 에 가까워지면
+         * 점프 타일이 목표 층에 못 닿기 시작합니다 (경고용 출력).    */
+        const apex = v * v / (2 * GRAVITY_MAG) - v * CLIENT_PHYS_STEP / 2;
+        return lv + '층↑ v=' + v.toFixed(1) + ' 상승 ' + (v / GRAVITY_MAG).toFixed(2) +
+          's 정점여유 ' + (apex - (to.y - from.y)).toFixed(2);
+      }).join(' / ') + ', grace ' + JUMP_GRACE_MS + 'ms)'
     : '없음'));
   const accelLayers = LAYERS.filter((L) => L.special === 'accel');
   console.log(' 신속심사 타일: ' + (accelLayers.length
@@ -2283,6 +3065,43 @@ server.listen(PORT, HOST, () => {
       '  (' + DASH.tiles + '칸 = ' + DASH_DISTANCE.toFixed(2) +
       ' 유닛 / speed ' + DASH.speed + ' → ' +
       Math.round(DASH_DISTANCE / DASH.speed * 1000) + 'ms, grace ' + DASH.graceMs + 'ms)'
+    : '없음'));
+  /* 층 특성(trait)은 특수 타일(special)과 다른 축이라 따로 찍습니다.
+   * 표(LAYER_TRAITS)를 그대로 돌므로 특성이 늘면 줄도 저절로 늘어납니다. */
+  const traitLabel = { accel: '심사 가속', dark: '어둠      ', rotate: '회전      ' };
+  const traitDetail = {
+    accel: () => '퓨즈 ×1/' + ACCEL_SPEED,
+    dark: () => '시야 ' + DARK_EVENT.clearTiles + '~' + DARK_EVENT.viewTiles + '칸 · 시각 효과만',
+    rotate: () => ROTATE_SPEED.toFixed(3) + ' rad/s (' +
+      (ROTATE_SPEED * 180 / Math.PI).toFixed(1) + '°/s · 한 바퀴 ' +
+      (2 * Math.PI / ROTATE_SPEED).toFixed(0) + '초 · 가장자리 ' +
+      (ROTATE_SPEED * HEX_SIZE * 1.5 * GRID_RADIUS).toFixed(1) + ' m/s)'
+  };
+  for (const trait of Object.keys(LAYER_TRAITS)) {
+    const spec = LAYER_TRAITS[trait];
+    const on = traitLayersOf(trait);
+    console.log(' ' + (traitLabel[trait] || trait) + ' : ' + (on.length
+      ? on.map((i) => {
+          const L = LAYERS.find((x) => x.index === i);
+          return 'LAYER ' + i + ' ' + (L ? L.name : '');
+        }).join(', ') +
+        '  (' + (eventInterval(spec.intervalMs) / 1000).toFixed(1) + '초 ' +
+        (spec.pulse ? '마다 방향 반전' : '간격 · ' + (spec.durationMs / 1000).toFixed(1) + '초 지속') +
+        ' · ' + (traitDetail[trait] ? traitDetail[trait]() : '') +
+        (DEV.fastEvents
+          ? '  ← dev 단축 (원래 ' + (spec.intervalMs / 1000).toFixed(0) + '초)'
+          : '') + ')'
+      : '없음 (LAYER_DEFS 에 trait:\'' + trait + '\' 인 층이 없습니다)'));
+  }
+  console.log(' 이벤트 조정  : 예열 ' + (eventInterval(EVENT_SCHEDULE.warmupMs) / 1000).toFixed(1) +
+    '초 · 이벤트 간 최소 간격 ' + (eventInterval(EVENT_SCHEDULE.gapMs) / 1000).toFixed(1) +
+    '초 · 지속형 동시 발동 금지' +
+    (DEV.fastEvents ? '  ← dev 단축 (원래 예열 ' + (EVENT_SCHEDULE.warmupMs / 1000).toFixed(0) + '초)' : ''));
+  const searchLayers = LAYERS.filter((L) => L.special === 'search');
+  console.log(' 검색 타일    : ' + (searchLayers.length
+    ? searchLayers.map((L) => 'LAYER ' + L.index + ' ' + L.name).join(', ') +
+      '  (밟으면 시야 ' + DARK_EVENT.viewTiles + '칸 → ' + SEARCH_TILE.viewTiles +
+      '칸, ' + (SEARCH_TILE.durationMs / 1000).toFixed(1) + '초)'
     : '없음'));
   const phaseLayers = LAYERS.filter((L) => L.special === 'phase');
   console.log(' 위상 타일: ' + (phaseLayers.length

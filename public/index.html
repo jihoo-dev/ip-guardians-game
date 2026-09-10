@@ -256,6 +256,91 @@ input[type=text]{
 #deadFlash{position:absolute;inset:0;background:radial-gradient(circle at 50% 60%,transparent 20%,rgba(255,58,18,.5));opacity:0;pointer-events:none;transition:opacity .35s;z-index:12}
 #deadFlash.on{opacity:1}
 
+/* ── 심사 가속 경보 (층 특성) ──────────────────────────────────────
+ * 켜고 끄는 것은 전적으로 서버 layer_event 입니다. 여기 애니메이션은
+ * 깜빡임만 담당하고 지속 시간은 모릅니다 — CSS 로 시간을 세면 서버가
+ * 끄기 전에 화면에서 먼저 사라집니다.
+ * deadFlash(z-index 12) 위, 카운트다운(15) 아래에 둡니다.          */
+#accelAlert{position:absolute;inset:0;display:none;pointer-events:none;z-index:13}
+#accelAlert.on{display:block}
+#accelAlert .vig{
+  position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 50%,transparent 42%,rgba(255,38,26,.52) 100%);
+  animation:accelPulse .62s ease-in-out infinite
+}
+#accelAlert .tag{
+  position:absolute;top:88px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+  font-family:var(--mono);text-align:center;animation:accelPulse .62s ease-in-out infinite
+}
+#accelAlert .tag b{
+  font-size:30px;font-weight:700;letter-spacing:.3em;text-indent:.3em;color:#ff5140;
+  text-shadow:0 0 30px rgba(255,58,18,.9),0 0 4px rgba(0,0,0,.8)
+}
+#accelAlert .tag i{font-style:normal;font-size:10px;letter-spacing:.26em;color:rgba(255,196,186,.85)}
+#accelAlert .bar{
+  position:absolute;left:0;right:0;height:3px;background:#ff2a1a;
+  box-shadow:0 0 22px 3px rgba(255,42,26,.85);animation:accelPulse .62s ease-in-out infinite
+}
+#accelAlert .bar.t{top:0} #accelAlert .bar.b{bottom:0}
+@keyframes accelPulse{0%,100%{opacity:.22}50%{opacity:1}}
+/* 왼쪽 층 목록에서 지금 가속이 걸린 층을 함께 표시합니다 */
+.doc.accel{border-color:#ff2a1a;box-shadow:-3px 0 0 #ff2a1a,0 0 26px -6px #ff2a1a}
+.doc.accel .no{color:#ff8a7a;animation:accelPulse .62s ease-in-out infinite}
+
+/* ── 어둠 경보 (층 특성) ───────────────────────────────────────────
+ * 실제로 '가리는' 것은 3D 쪽(updateTiles)이 각자 자기 위치 기준으로
+ * 합니다. 여기 오버레이는 화면 가장자리를 눌러 주는 분위기와 문구만
+ * 담당합니다 — 이것만으로 가리면 타일이 아니라 화면을 가리게 되어
+ * 자기 주변만 보이는 규칙이 성립하지 않습니다.
+ * accelAlert(13) 와 같은 층위에 두되 그 아래로 깔립니다.            */
+#darkAlert{position:absolute;inset:0;display:none;pointer-events:none;z-index:13}
+#darkAlert.on{display:block}
+#darkAlert .vig{
+  position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 56%,transparent 26%,rgba(2,3,8,.72) 78%);
+  opacity:0;transition:opacity .8s ease
+}
+#darkAlert.on .vig{opacity:1}
+#darkAlert .tag{
+  position:absolute;top:88px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;
+  opacity:0;transition:opacity .5s ease .1s
+}
+#darkAlert.on .tag{opacity:1}
+#darkAlert .tag b{
+  font-size:17px;font-weight:700;letter-spacing:.04em;color:#dcd6ff;
+  text-shadow:0 0 24px rgba(124,92,255,.9),0 2px 6px rgba(0,0,0,.9)
+}
+#darkAlert .tag i{
+  font-style:normal;font-family:var(--mono);font-size:10px;letter-spacing:.26em;
+  color:rgba(190,178,255,.75)
+}
+/* 왼쪽 층 목록 — 어둠이 걸린 층 */
+.doc.dark{border-color:#7c5cff;box-shadow:-3px 0 0 #7c5cff,0 0 26px -6px #7c5cff}
+.doc.dark .no{color:#b9a8ff}
+
+/* ── 회전 방향 반전 배너 ───────────────────────────────────────────
+ * 회전 자체는 3D 쪽에서 계속 돌고 있고, 이 배너는 '방향이 바뀐 순간'만
+ * 잠깐 알립니다. 계속 띄우면 정보가 아니라 배경이 됩니다.           */
+#rotAlert{
+  position:absolute;top:88px;left:50%;transform:translateX(-50%) translateY(-8px);
+  display:flex;align-items:center;gap:10px;padding:10px 18px;
+  background:rgba(12,4,4,.9);border:1px solid #ff6a3d;border-left:4px solid #ff6a3d;
+  font-size:14px;font-weight:700;letter-spacing:.02em;color:#ffd9cc;white-space:nowrap;
+  opacity:0;pointer-events:none;z-index:14;transition:opacity .25s ease,transform .25s ease
+}
+#rotAlert.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#rotAlert .ico{font-size:17px;animation:accelPulse .5s ease-in-out infinite}
+/* 왼쪽 층 목록 — 회전하는 층 */
+.doc.rotate{border-color:#0088ff;box-shadow:-3px 0 0 #0088ff,0 0 26px -6px #0088ff}
+.doc.rotate .no{color:#7cc4ff}
+/* 회전 방향 표시. 반복되는 반전 배너 대신 여기서 조용히 읽힙니다. */
+.rotmark{
+  position:absolute;right:11px;bottom:9px;font-size:15px;line-height:1;
+  color:#7cc4ff;text-shadow:0 0 10px rgba(0,136,255,.9)
+}
+
 #diag{
   position:absolute;left:18px;bottom:18px;display:none;min-width:270px;
   background:rgba(5,6,10,.94);border:1px solid var(--rule);border-left:3px solid var(--stamp);
@@ -301,6 +386,19 @@ input[type=text]{
 
 <div id="stage"></div>
 <div id="deadFlash"></div>
+<div id="accelAlert">
+  <div class="vig"></div>
+  <div class="bar t"></div><div class="bar b"></div>
+  <div class="tag"><b>심사 가속</b><i id="accelSub">EXAMINATION ACCELERATION</i></div>
+</div>
+<div id="darkAlert">
+  <div class="vig"></div>
+  <div class="tag">
+    <b>무엇이 있는지 알 수 없다. 조사하고 판단해야 한다.</b>
+    <i id="darkSub">PRIOR ART SEARCH</i>
+  </div>
+</div>
+<div id="rotAlert"><span class="ico">⚠️</span><span>거절이유 발생, 심사관 검토 방향 변경</span></div>
 
 <div id="hud">
   <div id="topbar">
@@ -512,6 +610,8 @@ const dom = {
   result: $('result'), resultTitle: $('resultTitle'), resultSub: $('resultSub'),
   resultRank: $('resultRank'), resultEyebrow: $('resultEyebrow'),
   deadFlash: $('deadFlash'), hint: $('hint'),
+  accelAlert: $('accelAlert'), accelSub: $('accelSub'),
+  darkAlert: $('darkAlert'), darkSub: $('darkSub'), rotAlert: $('rotAlert'),
   /* 층 안내문은 서버 층 수만큼 동적으로 만들어집니다.
    * buildLayerStack() 이 만든 뒤 여기를 다시 채웁니다.               */
   docs: []
@@ -527,7 +627,9 @@ function toast(text, kind) {
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 400);
   }, 3600);
-  while (dom.toasts.children.length > 4) dom.toasts.firstChild.remove();
+  /* 동시 표시 2개. 종전 4개는 층 특성 3종이 겹치던 시절의 값이라
+   * 화면 위쪽이 문구로 덮였습니다. 겹치면 읽히지 않으므로 줄입니다. */
+  while (dom.toasts.children.length > 2) dom.toasts.firstChild.remove();
 }
 
 /* ============================ 2. game state ============================= */
@@ -571,6 +673,40 @@ const G = {
   phaseEpoch: 0,
   phaseOn: true,
   phaseTrust: true,
+
+  /* ── 층 특성 이벤트 (trait 이름 -> 상태) ──────────────────────────
+   * 전부 서버 layer_event 가 채웁니다. 여기 값으로 '언제 끝나는지'를
+   * 스스로 판단해 끄지 않습니다 — 끄라는 신호도 서버가 보냅니다.
+   *   active : 지금 발동 중인가
+   *   layers : 그 특성이 걸린 층 번호들
+   *   endsAt : 서버 시각 기준 종료 예정. 표시용이고 판단에는 안 씁니다.
+   * 특성별 추가 값(accel 의 speed, dark 의 viewTiles 등)도 그대로 담깁니다.
+   * ---------------------------------------------------------------- */
+  traits: {
+    accel: { active: false, layers: [], endsAt: 0, speed: 2 },
+    dark: { active: false, layers: [], endsAt: 0, viewTiles: 3, clearTiles: 2 },
+    /* 회전은 켜짐/꺼짐이 아니라 타임라인입니다. 서버가 준 (epoch, baseAngle,
+     * dir) 로 우리가 직접 각도를 계산합니다 — 각도를 받아서 쓰는 게 아닙니다.
+     * angle 은 매 프레임 우리가 계산해 넣는 현재값입니다.               */
+    rotate: { active: false, layers: [], epoch: 0, baseAngle: 0, dir: 1, speed: 0.12, angle: 0 }
+  },
+
+  /* 회전 각도가 서버와 맞고 있는가. 위상 타일의 phaseTrust 와 같은 역할로,
+   * 어긋나면 false 가 되고 20Hz 스냅샷의 rt 값을 그대로 씁니다.         */
+  rotTrust: true,
+
+  /* 이번 회차에 회전 반전을 이미 안내했는가.
+   * 반전은 15초마다 반복되는데 매번 배너를 띄우면 곧 배경이 됩니다.
+   * 회차당 한 번만 알리고, 그 뒤로는 층 목록의 방향 표시로만 읽습니다. */
+  rotFlipTold: false,
+
+  /* ── 내 시야 (어둠 + 선행기술 검색) ───────────────────────────────
+   * 어둠을 실제로 '가리는' 일은 각 클라이언트가 자기 위치 기준으로 합니다.
+   * 서버는 언제부터 언제까지인지만 알려줍니다(DARK_EVENT 주석 참고).
+   *   searchUntil : 검색 타일로 넓어진 시야가 끝나는 시각(performance.now 기준)
+   *   searchTiles : 그동안의 시야 반경(칸). 서버가 정해 보냅니다.
+   * ---------------------------------------------------------------- */
+  view: { searchUntil: 0, searchTiles: 8 },
   serverOffset: 0,
   rtt: 0,
   specTarget: null,
@@ -648,6 +784,12 @@ scene.add(bounceLight);
 /* --- world groups ------------------------------------------------------- */
 const worldGroup = new THREE.Group(); scene.add(worldGroup);
 const tileGroup = new THREE.Group(); worldGroup.add(tileGroup);
+/* 회전층(trait:'rotate') 타일 전용 그룹.
+ * 타일 845장의 좌표를 매 프레임 고치는 대신 이 그룹의 rotation.y 하나만
+ * 갱신합니다(드로우콜·CPU 비용 0). 타일 메시의 position 은 이미 층 로컬
+ * 좌표라 그대로 맞고, 충돌 판정은 반대로 '질의점'을 돌립니다
+ * (toLayerFrame 참고). 회전하지 않는 층 타일은 그냥 tileGroup 에 둡니다. */
+const rotGroup = new THREE.Group(); worldGroup.add(rotGroup);
 const actorGroup = new THREE.Group(); worldGroup.add(actorGroup);
 const fxGroup = new THREE.Group(); worldGroup.add(fxGroup);
 
@@ -1222,6 +1364,126 @@ function layerColorOf(layerIndex) {
   return c === undefined ? 0xffffff : c;
 }
 
+/** 층 번호 → 층 이름. 서버 config.LAYERS 가 유일한 출처입니다. */
+function layerNameOf(layerIndex) {
+  const L = (G.cfg && G.cfg.LAYERS || []).find((x) => x.index === layerIndex);
+  return L ? L.name : '';
+}
+
+/** 이 층에 그 특성이 걸려 있는가 (지금 발동 중인지가 아니라 '자격'). */
+function isLayerTrait(layerIndex, trait) {
+  const L = (G.cfg && G.cfg.LAYERS || []).find((x) => x.index === layerIndex);
+  return !!L && L.trait === trait;
+}
+
+/** 육각 이웃 중심거리 = 1칸. 시야 반경을 칸에서 월드 단위로 바꿀 때 씁니다. */
+function tileStepUnit() {
+  return Math.sqrt(3) * (G.hexSize || 3.2 / 1.5);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+ * 층 회전 (trait:'rotate')
+ * ────────────────────────────────────────────────────────────────────
+ * 회전 상태의 유일한 출처는 서버입니다. 서버가 (epoch, baseAngle, dir) 를
+ * 주면 우리는 같은 공식으로 매 프레임 각도를 계산합니다 — 각도를 20Hz 로
+ * 받아 쓰면 초당 20번만 갱신돼 층이 끊겨 보입니다.
+ *
+ *     θ(t) = baseAngle + dir × speed × (t − epoch)/1000
+ *
+ * 시각은 서버 시각 기준이므로 RTT 보정값(G.serverOffset)을 더해 씁니다.
+ * 그래도 어긋날 수 있어 20Hz 스냅샷의 rt 로 검산합니다(위상 타일과 동일).
+ *
+ * 회전 중심은 월드 원점(0,0)입니다 — 맵이 원점 둘레의 육각 링이라 그렇습니다.
+ * ══════════════════════════════════════════════════════════════════ */
+
+/* 내 계산과 서버 각도가 이만큼(rad) 넘게 벌어지면 서버 값으로 넘어갑니다.
+ * 0.03 rad ≈ 1.7°. 시계 지터 수십 ms × 각속도(0.12)보다는 넉넉하고,
+ * 눈에 띄는 어긋남보다는 작습니다.                                    */
+const ROT_TRUST_EPS = 0.03;
+
+/** 지금 회전 각도(rad). 회전층이 없거나 라운드 밖이면 0. */
+function rotationAngleNow() {
+  const s = G.traits.rotate;
+  if (!s || !s.epoch) return 0;
+  const now = Date.now() + G.serverOffset;
+  return s.baseAngle + s.dir * s.speed * (now - s.epoch) / 1000;
+}
+
+/** 이 층이 회전하는가. 층 번호가 아니라 trait 로만 판정합니다. */
+function isRotatingLayer(layerIndex) {
+  const s = G.traits.rotate;
+  return !!s && s.layers.indexOf(layerIndex) >= 0;
+}
+
+/** 이 층 타일이 들어갈 씬 그룹. 회전층만 rotGroup 으로 갑니다. */
+function groupForLayer(layerIndex) {
+  return isRotatingLayer(layerIndex) ? rotGroup : tileGroup;
+}
+
+/* 씬에서 떼어낼 때 부모를 직접 찾습니다.
+ * tileGroup.remove(x) 로 고정해 두면 회전층 타일(부모가 rotGroup)이
+ * 조용히 안 지워져 유령 메시로 남습니다.                              */
+function detach(obj) {
+  if (obj && obj.parent) obj.parent.remove(obj);
+}
+
+/** 이 층의 현재 각도. 회전하지 않는 층은 0 이라 변환이 항등이 됩니다. */
+function layerAngleOf(layerIndex) {
+  return isRotatingLayer(layerIndex) ? G.traits.rotate.angle : 0;
+}
+
+/* 좌표계 변환용 임시 객체. 매 프레임 타일마다 부르는 경로라
+ * 새 객체를 만들면 GC 압력이 생깁니다.                                */
+const _framePt = { x: 0, z: 0 };
+
+/**
+ * 월드 좌표 → 그 층의 로컬(회전 전) 좌표.
+ *
+ * ★ 이 게임에서 회전 충돌 판정의 핵심입니다.
+ *   타일 845장을 매 프레임 회전시키는 대신, '질의점 하나'를 −θ 회전시켜
+ *   정적인 타일 좌표와 비교합니다. 강체 회전이라 결과가 수학적으로 같고,
+ *   pointInXZ / AABB / 육각 판정 코드는 한 줄도 바뀌지 않습니다.
+ *   회전하지 않는 층에서는 항등 변환이라 비용이 사실상 0 입니다.
+ */
+function toLayerFrame(px, pz, layerIndex) {
+  const a = layerAngleOf(layerIndex);
+  if (!a) { _framePt.x = px; _framePt.z = pz; return _framePt; }
+  const c = Math.cos(-a), s = Math.sin(-a);
+  _framePt.x = px * c - pz * s;
+  _framePt.z = px * s + pz * c;
+  return _framePt;
+}
+
+/**
+ * 층에 얹힌 개체(관전자 부스터·투하 서류)의 월드 좌표를 층 회전에 맞춥니다.
+ *
+ * 서버가 보내는 x/z 는 '층 로컬' 좌표이고(server.js toLayerLocalXZ 참고),
+ * 월드 좌표는 매 프레임 여기서 만듭니다. 이렇게 두면 착지 판정(findLanding ·
+ * supportAt · groundYUnder)과 렌더링이 함께 쓰는 ent.x/ent.z 가 항상 지금
+ * 층 위치와 일치합니다 — 개체가 층과 함께 돕니다.
+ *
+ * 회전하지 않는 층이면 각도가 0 이라 로컬 = 월드 이고 비용도 거의 없습니다.
+ */
+function syncEntityToLayer(ent) {
+  const a = layerAngleOf(ent.layer);
+  if (!a) { ent.x = ent.lx; ent.z = ent.lz; return ent; }
+  const c = Math.cos(a), s = Math.sin(a);
+  ent.x = ent.lx * c - ent.lz * s;
+  ent.z = ent.lx * s + ent.lz * c;
+  return ent;
+}
+
+/** 타일의 현재 월드 좌표 (파편·이펙트를 제자리에 터뜨릴 때 씁니다). */
+function tileWorldXZ(rec, out) {
+  const a = layerAngleOf(rec.layer);
+  out = out || {};
+  if (!a) { out.x = rec.x; out.z = rec.z; return out; }
+  const c = Math.cos(a), s = Math.sin(a);
+  out.x = rec.x * c - rec.z * s;
+  out.z = rec.x * s + rec.z * c;
+  return out;
+}
+
 /* ── 위상 타일 (phase tile) ───────────────────────────────────────────
  * 서버 LAYER_DEFS 에서 special:'phase' 인 층의 특수 타일입니다.
  * 켜졌다 꺼졌다 하며, 꺼진 동안에는 지지력이 없어 밟으면 빠집니다.
@@ -1503,11 +1765,11 @@ function buildMap(map, cfg) {
   for (const rec of G.tiles.values()) {
     releaseCrack(rec);            // 균열 오버레이도 같이 떼어냅니다 (안 하면 tileGroup 에 그대로 남습니다)
     if (rec.phaseRing) {          // 위상 타일 윤곽선도 함께 (지오메트리는 공유라 두고 재질만 버립니다)
-      tileGroup.remove(rec.phaseRing);
+      detach(rec.phaseRing);
       rec.phaseRing.material.dispose();
       rec.phaseRing = null;
     }
-    tileGroup.remove(rec.mesh);
+    detach(rec.mesh);
     rec.mesh.geometry = null;
     rec.mesh.material.dispose();
   }
@@ -1516,6 +1778,13 @@ function buildMap(map, cfg) {
   G.hexSize = cfg.HEX_SIZE;
   G.hexThick = cfg.HEX_THICKNESS;
   G.seaY = cfg.SEA_Y;
+  /* 낙하 연출(updateCamera 의 auto pitch)을 정규화할 기준 속도.
+   * '한 층 떨어졌을 때의 착지 직전 속도' = √(2·g·LAYER_GAP) 입니다.
+   * 종전에는 45 가 박혀 있었는데 그 숫자의 근거가 바로 이 식이었고,
+   * LAYER_GAP 을 바꾸면 어긋납니다 — gap 12 면 38.6 이라 카메라가 끝까지
+   * 안 젖혀지고, gap 18 이면 47.2 라 낙하 초반에 이미 최대로 젖혀져
+   * 높이 차가 연출로 안 읽힙니다. 그래서 서버 값에서 직접 뽑습니다. */
+  G.fallNorm = Math.sqrt(2 * Math.abs(PHYS.GRAVITY) * (cfg.LAYER_GAP || 15));
   bounceLight.position.y = cfg.SEA_Y + 6;
   if (currentTheme >= 0) buildCloudSea(THEMES[currentTheme]);
 
@@ -1597,7 +1866,8 @@ function buildMap(map, cfg) {
     mesh.position.set(t.x, t.y, t.z);
     mesh.receiveShadow = true;
     mesh.castShadow = false;
-    tileGroup.add(mesh);
+    // 회전층 타일은 회전 그룹으로 들어갑니다 (groupForLayer 참고)
+    groupForLayer(t.layer).add(mesh);
 
     const rec = {
       id: t.id, layer: t.layer,
@@ -1613,6 +1883,14 @@ function buildMap(map, cfg) {
        * 않으므로, 타일에는 '여기서 튀어나간다'는 강조만 두고 실제 방향
        * 화살표는 내가 올라선 타일 위에 하나만 띄웁니다(dashArrow).   */
       accelTile: kind === 'special' && t.specialType === 'accel',
+      /* 층 특성 '심사 가속'이 걸린 층의 타일인가.
+       * 위 accelTile(특수 타일 한 칸)과는 다른 축입니다 — 이건 그 층
+       * 전체가 대상입니다. 매 프레임 층을 되찾지 않도록 여기서 접어 둡니다. */
+      accelTrait: isLayerTrait(t.layer, 'accel'),
+      /* 층 특성 '어둠'이 걸린 층의 타일인가.
+       * 어둠은 이 층 타일만 가립니다 — 층 특성이므로 다른 층까지 덮으면
+       * 위층에 서 있는 사람의 발밑까지 캄캄해져 규칙이 뒤집힙니다.    */
+      darkTrait: isLayerTrait(t.layer, 'dark'),
       /* 거절이유 타일. 평소엔 일반 타일과 똑같이 보이고, 밟혀서 서버가
        * tile_reject 를 보내야 비로소 색이 변하기 시작합니다.
        * (미리 티가 나면 밟지 않고 피할 수 있어 함정이 성립하지 않습니다) */
@@ -1667,7 +1945,7 @@ function buildMap(map, cfg) {
       ring.position.set(t.x, t.y + G.hexThick / 2 + 0.03, t.z);
       ring.renderOrder = 3;
       ring.visible = false;
-      tileGroup.add(ring);
+      groupForLayer(t.layer).add(ring);
       rec.phaseRing = ring;
     }
 
@@ -2069,19 +2347,78 @@ Sound.load();
  * 두 경로 모두 동일한 인터페이스를 노출하므로 나머지 코드는 신경 쓰지 않습니다.
  * ======================================================================== */
 
-function makeNameplate(text, colorHex) {
+/* 색의 상대 휘도 (WCAG). 이름표 글자색을 흑/백 중 무엇으로 할지 정합니다. */
+function relLuminance(hex) {
+  const c = new THREE.Color(hex);
+  const f = (v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+}
+
+/* 배경색 위에 흑·백 중 어느 글자가 더 잘 읽히는지 — 대비비를 직접 재서
+ * 큰 쪽을 돌려줍니다.
+ *
+ * ★ '휘도가 절반보다 밝으면 검정' 같은 감으로 잡은 임계값을 쓰면 안 됩니다.
+ *   실제로 처음에 0.42 로 잡았다가 핑크(#ff5599, 휘도 0.30)에 흰 글자가
+ *   붙었는데, 그 조합은 대비 3.0:1 인 반면 검정이면 7.0:1 이었습니다.
+ *   경계는 0.5 근처가 아니라 √(1.05×0.05)−0.05 ≈ 0.179 이고, 이건
+ *   외우는 것보다 두 값을 재서 비교하는 편이 안전합니다.
+ *   (WCAG 대비비 = (밝은휘도+0.05) / (어두운휘도+0.05))               */
+function inkOn(hex) {
+  const L = relLuminance(hex);
+  const vsWhite = 1.05 / (L + 0.05);      // 흰 글자를 올렸을 때
+  const vsBlack = (L + 0.05) / 0.05;      // 검정 글자를 올렸을 때
+  return vsBlack >= vsWhite ? '#0a0c10' : '#ffffff';
+}
+
+/* ── 이름표 ───────────────────────────────────────────────────────────
+ * ★ 종전에는 배경이 전부 검정이고 왼쪽 5px 만 좌석 색이었습니다.
+ *   이름표는 원거리에서 캐릭터보다 크게 보이는 유일한 요소인데, 320px 중
+ *   1.5% 만 구분에 쓰고 있었던 셈입니다. 배경 전체를 좌석 색으로 칠하면
+ *   이름 글자를 못 읽는 거리에서도 '색 덩어리'로 누군지 알 수 있습니다.
+ *
+ * ★ 좌석 번호 칩을 함께 답니다.
+ *   색만으로 가면 적록색약에서 노랑(#ffcc00)과 연두(#66ff66)가 붙습니다.
+ *   숫자는 색이 안 보여도 읽히므로, 발밑 링 모양(makeColorRing)과 함께
+ *   '색에 의존하지 않는 구분 수단' 두 겹을 만듭니다.
+ *
+ * ★ 어두운 테두리는 필수입니다. 배경(하늘)이 밝은 테마에서 밝은 좌석 색
+ *   이름표를 그대로 두면 하늘에 녹아 사라집니다.
+ * ------------------------------------------------------------------ */
+function makeNameplate(text, colorHex, seat) {
+  const W = 320, H = 84, TOP = 16, BH = 52;
   const c = document.createElement('canvas');
-  c.width = 320; c.height = 84;
+  c.width = W; c.height = H;
   const g = c.getContext('2d');
-  g.fillStyle = 'rgba(5,6,10,0.78)';
-  g.fillRect(0, 18, 320, 48);
+
+  const ink = inkOn(colorHex);   // 흑/백 중 대비가 큰 쪽 (inkOn 주석 참고)
+
+  // 바깥 어두운 테두리 → 밝은 하늘에서도 윤곽이 남습니다
+  g.fillStyle = 'rgba(5,6,10,0.85)';
+  g.fillRect(0, TOP - 3, W, BH + 6);
+  // 본체 = 좌석 색
   g.fillStyle = colorHex;
-  g.fillRect(0, 18, 5, 48);
+  g.fillRect(3, TOP, W - 6, BH);
+
+  // 좌석 번호 칩 (좌석이 없으면 = 관전자 등 생략)
+  let textLeft = 3;
+  if (seat !== undefined && seat !== null) {
+    const CW = 52;
+    g.fillStyle = 'rgba(5,6,10,0.86)';
+    g.fillRect(3, TOP, CW, BH);
+    g.font = '800 34px "Noto Sans KR", sans-serif';
+    g.fillStyle = colorHex;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(String(seat + 1), 3 + CW / 2, TOP + BH / 2 + 1);
+    textLeft = 3 + CW;
+  }
+
   g.font = '700 30px "Noto Sans KR", sans-serif';
-  g.fillStyle = '#ece7d8';
+  g.fillStyle = ink;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText(text, 164, 43);
+  g.fillText(text, textLeft + (W - 3 - textLeft) / 2, TOP + BH / 2 + 1);
+
   const tex = new THREE.CanvasTexture(c);
   tex.encoding = THREE.sRGBEncoding;
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
@@ -2344,22 +2681,26 @@ function rebuildAllAvatars() {
   for (const rec of G.players.values()) {
     if (!rec || !rec.avatar || !rec.avatar.group) continue;
     actorGroup.remove(rec.avatar.group);
-    rec.avatar = buildAvatar(rec.color, rec.name);
+    rec.avatar = buildAvatar(rec.color, rec.name, rec.seat);
     actorGroup.add(rec.avatar.group);
   }
   if (typeof local !== 'undefined' && local && local.avatar) {
     actorGroup.remove(local.avatar.group);
-    local.avatar = buildAvatar(local.color, G.name || '나');
+    local.avatar = buildAvatar(local.color, G.name || '나', local.seat);
     actorGroup.add(local.avatar.group);
   }
 }
 
-function buildAvatar(colorHex, name) {
-  return CHAR.ready ? buildModelAvatar(colorHex, name)
-                    : buildProceduralAvatar(colorHex, name);
+/* seat 은 '몇 번 좌석인가'입니다 (0-based). 색과 별개로 링 모양과 이름표
+ * 번호 칩을 정합니다 — 색각이상에서도 구분되게 하려는 것이라, 색을 넘기는
+ * 곳에는 반드시 seat 도 같이 넘겨야 합니다. 관전자처럼 좌석이 없으면
+ * undefined 를 넘기면 되고, 그때는 기본 모양(실선)에 번호 칩이 빠집니다. */
+function buildAvatar(colorHex, name, seat) {
+  return CHAR.ready ? buildModelAvatar(colorHex, name, seat)
+                    : buildProceduralAvatar(colorHex, name, seat);
 }
 
-function buildModelAvatar(colorHex, name) {
+function buildModelAvatar(colorHex, name, seat) {
   const group = new THREE.Group();
   const col = new THREE.Color(colorHex);
 
@@ -2374,19 +2715,22 @@ function buildModelAvatar(colorHex, name) {
   group.add(holder);
   fitAvatarScale(holder);
 
-  /* 머티리얼을 인스턴스마다 복제해 플레이어 색을 입힙니다.
-   * 원본 텍스처는 그대로 두고 발광만 물들여 4인을 구분합니다.
-   * 머티리얼 이름에 'accent' 가 들어 있으면 완전히 플레이어 색으로 칠합니다. */
+  /* 머티리얼을 인스턴스마다 복제해 좌석 색을 입힙니다.
+   * 분류는 tintKindOf 규칙이고, 상의는 100%, 하의·신발은 옅게 칠합니다. */
   const skinMats = [];
+  let strongHits = 0, weakHits = 0;
+  const tintable = [];        // 폴백용 — 피부/얼굴/눈/머리가 아닌 것들
   model.traverse((o) => {
     if (!o.isMesh && !o.isSkinnedMesh) return;
     const src = Array.isArray(o.material) ? o.material : [o.material];
     const cloned = src.map((m) => {
       if (!m) return m;
       const c = m.clone();
-      const nm = (c.name || '').toLowerCase();
-      if (nm.includes('accent') || nm.includes('suit')) {
-        if (c.color) c.color.copy(col);
+      const kind = tintKindOf(c.name);
+      if (c.color) {
+        if (kind === 'strong') { c.color.copy(col); strongHits++; }
+        else if (kind === 'weak') { c.color.copy(col).lerp(WHITE_C, 0.55); weakHits++; }
+        if (kind !== 'never') tintable.push(c);
       }
       if (c.emissive) {
         c.emissive.copy(col).multiplyScalar(0.16);
@@ -2398,13 +2742,29 @@ function buildModelAvatar(colorHex, name) {
     o.material = Array.isArray(o.material) ? cloned : cloned[0];
   });
 
-  const ring = makeColorRing(col);
+  /* ★ 폴백 — 이게 이 블록의 존재 이유입니다.
+   * 종전 규칙은 'accent'|'suit' 였는데 character.glb 의 머티리얼 이름은
+   * VRoid 규칙(N00_007_01_Tops_01_CLOTH …)이라 13개 중 0개가 맞았습니다.
+   * 즉 좌석 색이 몸에 전혀 안 칠해지는데 아무 데도 티가 안 났습니다.
+   * 모델을 갈아끼울 때 같은 일이 반복되므로, 아무것도 못 맞히면 경고를
+   * 찍고 피부/얼굴/눈/머리를 뺀 나머지를 옅게라도 칠해 둡니다.        */
+  if (strongHits === 0 && weakHits === 0) {
+    for (const c of tintable) c.color.copy(col).lerp(WHITE_C, 0.5);
+    if (!tintWarned) {
+      tintWarned = true;
+      console.warn('[IPG] 좌석 색을 칠할 옷 머티리얼을 못 찾았습니다 — ' +
+        '모델 머티리얼 이름: ' + skinMats.map((m) => m.name || '(무명)').join(', ') +
+        ' · index.html 의 TINT_STRONG / TINT_WEAK 규칙을 이 이름에 맞추세요.');
+    }
+  }
+
+  const ring = makeColorRing(col, seat);
   group.add(ring);
 
   const blob = makeShadowBlob();
   group.add(blob);
 
-  const plate = makeNameplate(name, colorHex);
+  const plate = makeNameplate(name, colorHex, seat);
   plate.position.y = MODEL_HEIGHT + 0.85;
   group.add(plate);
 
@@ -2489,15 +2849,87 @@ function crossFadeTo(av, key, dur) {
 /* ---------------------------------------------------------------------------
  * 공통 부속: 플레이어 색 링 + 접지 그림자
  * ------------------------------------------------------------------------- */
-function makeColorRing(col) {
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.72, 1.00, 32),
-    new THREE.MeshBasicMaterial({
-      color: col, transparent: true, opacity: 0.85,
-      side: THREE.DoubleSide, depthWrite: false, toneMapped: false
-    })
-  );
-  ring.rotation.x = -Math.PI / 2;
+/* ── 좌석 색을 어느 머티리얼에 칠할지 ────────────────────────────────
+ * 이름 규칙으로 고릅니다. 모델러가 붙인 이름을 그대로 읽으므로 모델을
+ * 바꾸면 여기를 손봐야 합니다 — 못 맞히면 buildModelAvatar 가 콘솔에
+ * 경고를 찍습니다(조용히 죽지 않게 하는 것이 요점입니다).
+ *
+ *   never  : 절대 칠하지 않음. 피부·얼굴·눈·머리를 물들이면 사람이
+ *            아니라 색덩어리가 됩니다. 가장 먼저 걸러야 합니다.
+ *   strong : 상의. 100% 좌석 색 — 원거리에서 이걸로 구분합니다.
+ *   weak   : 하의·신발. 옅게만 — 전신을 같은 색으로 칠하면 촌스럽고,
+ *            상의의 '유니폼' 느낌이 죽습니다.
+ *
+ * ★ 순서가 중요합니다. VRoid 이름 N00_007_01_Tops_01_CLOTH 는 tops 와
+ *   _cloth 를 둘 다 갖고 있어서, weak 를 먼저 보면 상의가 옅어집니다.
+ * ------------------------------------------------------------------ */
+const TINT_NEVER  = /(_skin|_face|_eye|hair|brow|eyeline|mouth|iris|highlight)/;
+const TINT_STRONG = /(tops|shirt|jacket|jersey|torso|accent|suit)/;
+const TINT_WEAK   = /(bottoms|pants|skirt|shoes|boots|_cloth)/;
+let tintWarned = false;      // 경고는 방 전체에서 한 번만
+
+function tintKindOf(name) {
+  const nm = (name || '').toLowerCase();
+  if (TINT_NEVER.test(nm)) return 'never';
+  if (TINT_STRONG.test(nm)) return 'strong';
+  if (TINT_WEAK.test(nm)) return 'weak';
+  return 'none';
+}
+
+/* ── 발밑 좌석 링 ─────────────────────────────────────────────────────
+ * ★ 색이 아니라 '모양'으로도 갈립니다.
+ *   좌석 색만으로 구분하면 적록색약(남성 약 8%)에서 노랑(#ffcc00)과
+ *   연두(#66ff66)가 거의 붙습니다. 모양은 색각과 무관하게 읽히므로
+ *   이름표의 좌석 번호 칩과 함께 '색에 의존하지 않는' 두 번째 단서입니다.
+ *
+ * ★ 왜 하필 발밑인가 — 이 게임은 내려다보는 시점이라 링이 항상 타일
+ *   위에 평평하게 깔려 보입니다. 캐릭터 뒷모습·역광·어둠 층에서도
+ *   가려지지 않는 거의 유일한 자리입니다.
+ *
+ * 좌석이 늘어도(MAX_PLAYERS 변경) seat % 4 로 순환하므로 터지지 않습니다.
+ * 이때 모양이 겹치는 두 사람은 색으로 갈립니다.
+ * ------------------------------------------------------------------ */
+
+/* 좌석별 링 지오메트리는 아바타마다 새로 만들지 않고 공유합니다
+ * (아바타는 라운드마다 재생성되는데 지오메트리는 그대로 써도 됩니다) */
+const ringGeoCache = new Map();
+
+function ringGeosFor(shape) {
+  let arr = ringGeoCache.get(shape);
+  if (arr) return arr;
+  const R = THREE.RingGeometry;
+  const TAU = Math.PI * 2;
+  if (shape === 1) {
+    arr = [new R(0.58, 0.70, 32), new R(0.86, 1.00, 32)];              // 이중선
+  } else if (shape === 2) {
+    arr = [];                                                          // 점선 8토막
+    for (let i = 0; i < 8; i++) arr.push(new R(0.72, 1.00, 6, 1, (i / 8) * TAU, TAU / 16));
+  } else if (shape === 3) {
+    arr = [new R(0.72, 0.96, 32)];                                     // 실선 + 삼각 마커
+    for (let i = 0; i < 3; i++) arr.push(new R(1.02, 1.34, 3, 1, (i / 3) * TAU, TAU / 14));
+  } else {
+    arr = [new R(0.72, 1.00, 32)];                                     // 실선 (종전과 동일)
+  }
+  ringGeoCache.set(shape, arr);
+  return arr;
+}
+
+function makeColorRing(col, seat) {
+  const shape = ((seat === undefined || seat === null) ? 0 : seat) % 4;
+  /* 머티리얼은 아바타마다 하나만 만들어 조각들이 공유합니다 —
+   * 조각 수만큼 만들면 dispose 대상이 흩어져 새는 지점이 됩니다. */
+  const mat = new THREE.MeshBasicMaterial({
+    color: col, transparent: true, opacity: 0.85,
+    side: THREE.DoubleSide, depthWrite: false, toneMapped: false
+  });
+  /* Group 으로 돌려줍니다. 호출부(animateAvatar)는 position.y / scale /
+   * visible 만 건드리므로 Mesh 든 Group 이든 동일하게 동작합니다.     */
+  const ring = new THREE.Group();
+  for (const g of ringGeosFor(shape)) {
+    const m = new THREE.Mesh(g, mat);
+    m.rotation.x = -Math.PI / 2;
+    ring.add(m);
+  }
   ring.position.y = 0.07;
   return ring;
 }
@@ -2562,7 +2994,7 @@ THREE.CapsuleLikeGeometry = function (rad, len) {
   return new THREE.CylinderGeometry(rad, rad * 0.94, len, 12);
 };
 
-function buildProceduralAvatar(colorHex, name) {
+function buildProceduralAvatar(colorHex, name, seat) {
   const group = new THREE.Group();
   const col = new THREE.Color(colorHex);
   const C = CHIBI;
@@ -2698,11 +3130,11 @@ function buildProceduralAvatar(colorHex, name) {
 
   group.add(armL, armR, legL, legR);
 
-  const ring = makeColorRing(col);
+  const ring = makeColorRing(col, seat);
   group.add(ring);
   const blob = makeShadowBlob();
   group.add(blob);
-  const plate = makeNameplate(name, colorHex);
+  const plate = makeNameplate(name, colorHex, seat);
   plate.position.y = C.height + 0.85;
   group.add(plate);
 
@@ -2947,13 +3379,17 @@ function findLanding(px, pz, prevY, nextY) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (prevY < surf - 0.02) continue;      // already below this floor
     if (nextY > surf) continue;             // haven't reached it yet
+    /* 회전층이면 질의점을 그 층의 로컬 프레임으로 옮겨 놓고 봅니다.
+     * (toLayerFrame 주석 참고 — 타일이 아니라 점을 돌립니다) */
+    const q = toLayerFrame(px, pz, L);
+    const qx = q.x, qz = q.z;
     let owner = null, ownerD = Infinity;
     for (const rec of G.layerTiles[L]) {
       if (rec.state === 'gone') continue;
       // 위상 타일이 꺼져 있으면 없는 것으로 봅니다 (착지 판정 1/3)
       if (rec.phaseTile && !G.phaseOn) continue;
-      if (!pointInXZ(px, pz, rec)) continue;
-      const d = (px - rec.x) * (px - rec.x) + (pz - rec.z) * (pz - rec.z);
+      if (!pointInXZ(qx, qz, rec)) continue;
+      const d = (qx - rec.x) * (qx - rec.x) + (qz - rec.z) * (qz - rec.z);
       if (d < ownerD) { ownerD = d; owner = rec; }
     }
     if (owner && (!best || surf > best.surf)) best = { surf, tile: owner, layer: L };
@@ -2987,14 +3423,17 @@ function supportAt(px, pz, feetY) {
   for (const L of G.layerOrder) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (Math.abs(feetY - surf) > 0.12) continue;
+    // 회전층이면 질의점을 로컬 프레임으로 (착지 판정 3곳 모두 같은 처리)
+    const q = toLayerFrame(px, pz, L);
+    const qx = q.x, qz = q.z;
     let owner = null, ownerD = Infinity;
     for (const rec of G.layerTiles[L]) {
       if (rec.state === 'gone') continue;
       // 위상 타일이 꺼져 있으면 없는 것으로 봅니다 (착지 판정 2/3)
       // 여기가 빠지면 OFF 가 되어도 그 위에 계속 서 있게 됩니다.
       if (rec.phaseTile && !G.phaseOn) continue;
-      if (!pointInXZ(px, pz, rec)) continue;
-      const d = (px - rec.x) * (px - rec.x) + (pz - rec.z) * (pz - rec.z);
+      if (!pointInXZ(qx, qz, rec)) continue;
+      const d = (qx - rec.x) * (qx - rec.x) + (qz - rec.z) * (qz - rec.z);
       if (d < ownerD) { ownerD = d; owner = rec; }
     }
     if (owner) return { tile: owner, layer: L, surf };
@@ -3023,12 +3462,15 @@ function groundYUnder(px, pz, fromY) {
   for (const L of G.layerOrder) {
     const surf = G.layerY[L] + G.hexThick / 2;
     if (surf > fromY + 0.05) continue;
+    // 회전층이면 질의점을 로컬 프레임으로 (착지 판정 3곳 모두 같은 처리)
+    const q = toLayerFrame(px, pz, L);
+    const qx = q.x, qz = q.z;
     for (const rec of G.layerTiles[L]) {
       if (rec.state === 'gone') continue;
       // 위상 타일이 꺼져 있으면 없는 것으로 봅니다 (착지 판정 3/3)
       // 여기가 빠지면 그림자만 OFF 타일 위에 남아 높이가 어긋나 보입니다.
       if (rec.phaseTile && !G.phaseOn) continue;
-      if (!pointInXZ(px, pz, rec)) continue;
+      if (!pointInXZ(qx, qz, rec)) continue;
       if (surf > best) best = surf;
       break;
     }
@@ -3228,8 +3670,47 @@ function applyJumpImpulse(d) {
   spawnJumpFx(local.pos.x, local.pos.y, local.pos.z, d.level || 1);
 }
 
+/* ── 회전층에 실려 돌기 ───────────────────────────────────────────────
+ * 물리 스텝 맨 앞에서, 회전층에 '발을 붙이고' 있으면 내 좌표를 중심 기준
+ * Δθ 만큼 돌립니다. 그 위에 아래의 입력·중력이 평소대로 더해지므로
+ * "이동 입력은 회전과 별개로 더해진다"가 그대로 성립합니다.
+ *
+ * ★ 공중에서는 싣지 않습니다. 발이 닿아 있을 때만 층이 밀어 줍니다 —
+ *   공중에서도 돌리면 점프 한 번에 목적지가 통째로 밀려나 조작이 됩니다.
+ *   서버 tickRotateCarry 도 같은 조건(grounded)을 씁니다.
+ *
+ * ★ 서버와 같은 Δθ 를 씁니다.
+ *   양쪽이 같은 타임라인·같은 공식을 쓰므로, 내 보고가 서버 좌표를
+ *   덮어써도 어긋나지 않습니다. 이게 '이동은 클라이언트 권위'를 유지한 채
+ *   층 회전을 서버가 소유하는 방법입니다.
+ * ------------------------------------------------------------------ */
+let lastCarryAngle = null;
+
+function applyRotationCarry() {
+  const s = G.traits.rotate;
+  if (!s || !s.epoch) { lastCarryAngle = null; return; }
+
+  const a = s.angle;
+  if (lastCarryAngle === null) { lastCarryAngle = a; return; }
+  const dTheta = a - lastCarryAngle;
+  lastCarryAngle = a;
+  if (!dTheta) return;
+
+  if (!local.grounded || !isRotatingLayer(local.layer)) return;
+
+  const c = Math.cos(dTheta), sn = Math.sin(dTheta);
+  const x = local.pos.x * c - local.pos.z * sn;
+  const z = local.pos.x * sn + local.pos.z * c;
+  local.pos.x = x;
+  local.pos.z = z;
+  // 몸도 같이 돌아야 발밑과 어긋나지 않습니다 (제자리에서 미끄러져 보임)
+  local.ry += dTheta;
+}
+
 function stepPhysics(dt) {
   if (!local.alive) return;
+
+  applyRotationCarry();
 
   const wasGrounded = local.grounded;   // 아래 '발판을 잃는 순간' 판정용
 
@@ -3884,7 +4365,9 @@ function attachCrack(rec) {
   mesh.renderOrder = 2;
   mesh.position.set(rec.x, rec.mesh.position.y + G.hexThick / 2 + 0.02, rec.z);
   mesh.scale.setScalar(rec.mesh.scale.x * 0.55);
-  tileGroup.add(mesh);
+  /* 반드시 타일과 같은 그룹에 붙입니다. tileGroup 으로 고정하면 회전층
+   * 타일의 균열만 제자리에 남아 층이 그 밑에서 돌아가 버립니다.      */
+  groupForLayer(rec.layer).add(mesh);
   rec.crack = { mesh, mat, born: performance.now() };
   crackStats.live++;
   if (crackStats.live > crackStats.peak) crackStats.peak = crackStats.live;
@@ -3893,7 +4376,7 @@ function attachCrack(rec) {
 /** 오버레이를 떼어냅니다. crackGeo·텍스처는 공유 자원이라 dispose 하지 않습니다. */
 function releaseCrack(rec) {
   if (!rec.crack) return;
-  tileGroup.remove(rec.crack.mesh);
+  detach(rec.crack.mesh);
   rec.crack.mat.dispose();
   rec.crack = null;
   crackStats.live = Math.max(0, crackStats.live - 1);
@@ -3901,6 +4384,9 @@ function releaseCrack(rec) {
 
 const WEAR_WHITE = new THREE.Color(0xffffff);
 const WEAR_GREY = new THREE.Color(0x9aa0aa);
+/* 심사 가속이 걸린 층을 물들이는 빨강. 붕괴 경고(0xff2d2d)보다 조금 어둡게
+ * 잡아, 같은 층에서 '가속 중'과 '지금 무너지는 중'이 구분되게 합니다. */
+const ACCEL_RED = new THREE.Color(0xd41f16);
 
 /** 서버가 알려준 hits 를 재질에 반영합니다. */
 function applyTileWear(rec) {
@@ -3959,6 +4445,27 @@ function startWarn(rec, fuse) {
   rec.state = 'warn';
   rec.warnStart = performance.now();
   rec.fuse = fuse;
+}
+
+/**
+ * 이미 붉게 점멸 중인 타일의 '남은 시간'만 바꿉니다 (심사 가속 발동).
+ *
+ * startWarn 을 다시 부르면 안 됩니다 — 그 함수는 이미 warn 인 타일을
+ * 그냥 무시하고(중복 방지), 무시하지 않도록 고치면 이번엔 연출이 처음부터
+ * 다시 시작돼 거의 빨갛던 타일이 노랗게 되돌아갑니다.
+ *
+ * 그래서 진행률 p 를 그대로 유지한 채 남은 구간만 압축합니다.
+ *   p 는 (now - warnStart) / fuse 이므로,
+ *   새 fuse = remain / (1 - p) 로 두고 warnStart 를 그만큼 과거로 밀면
+ *   지금 프레임의 p 는 변하지 않고 남은 시간만 remain 이 됩니다.
+ */
+function retimeWarn(rec, remainMs) {
+  if (!rec || rec.state !== 'warn') return;
+  const now = performance.now();
+  const p = Math.min(0.98, Math.max(0, (now - rec.warnStart) / Math.max(1, rec.fuse)));
+  const fuse = Math.max(1, remainMs) / (1 - p);
+  rec.fuse = fuse;
+  rec.warnStart = now - p * fuse;
 }
 
 /* 복구 연출 길이. 아래에서 솟아오르는 데 걸리는 시간(ms). */
@@ -4044,6 +4551,59 @@ function spawnJumpFx(x, y, z, level) {
   }
 }
 
+/* ── 선행기술 검색 스캔 ───────────────────────────────────────────────
+ * 밟은 자리에서 바깥으로 훑고 지나가는 링입니다. 시야가 넓어지는 것과
+ * 같은 속도로 퍼져 나가야 "이 스캔이 주변을 드러냈다"로 읽힙니다.
+ *
+ * 시야 확장 자체는 밟은 사람만 받지만(search_pulse 의 id 로 가름), 이
+ * 연출은 모두에게 보입니다 — 어둠 속에서 누가 조사 중인지 알려 줍니다.
+ * ------------------------------------------------------------------ */
+const searchRings = [];
+
+function spawnSearchFx(x, y, z, viewTiles, durationMs) {
+  const S = G.hexSize || 3.2 / 1.5;
+  if (!dashTrailGeo) dashTrailGeo = new THREE.RingGeometry(S * 0.35, S * 0.62, 18);
+
+  // 링 지오메트리의 바깥 반지름(S*0.62)을 목표 반경까지 키웁니다
+  const goal = (viewTiles || 8) * tileStepUnit() / (S * 0.62);
+  const rings = 3;
+  for (let i = 0; i < rings; i++) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x9d7bff, transparent: true, opacity: 0.9,
+      side: THREE.DoubleSide, depthWrite: false, toneMapped: false
+    });
+    const m = new THREE.Mesh(dashTrailGeo, mat);
+    m.position.set(x, y + 0.35, z);
+    m.rotation.x = -Math.PI / 2;
+    m.scale.setScalar(0.35);
+    fxGroup.add(m);
+    /* 링마다 조금씩 늦게 출발시켜 한 겹이 아니라 '훑고 지나간다'로 보이게
+     * 합니다. 지속은 서버가 준 durationMs 를 따릅니다 — 연출이 시야보다
+     * 먼저 끝나거나 늦게까지 남으면 둘이 따로 노는 것처럼 보입니다.  */
+    searchRings.push({
+      mesh: m, mat, goal,
+      delay: i * 0.12,
+      life: 0,
+      span: Math.max(0.4, (durationMs || 2000) / 1000 * 0.55)
+    });
+  }
+}
+
+function updateSearchFx(dt) {
+  for (let i = searchRings.length - 1; i >= 0; i--) {
+    const r = searchRings[i];
+    r.life += dt;
+    const t = (r.life - r.delay) / r.span;
+    if (t < 0) { r.mat.opacity = 0; continue; }
+    if (t >= 1) {
+      fxGroup.remove(r.mesh); r.mat.dispose(); searchRings.splice(i, 1); continue;
+    }
+    const e = 1 - Math.pow(1 - t, 2);              // 빠르게 퍼졌다 끝에서 감속
+    r.mesh.scale.setScalar(0.35 + (r.goal - 0.35) * e);
+    r.mat.opacity = 0.9 * (1 - t) * (1 - t);
+  }
+}
+
 /* 대시할 때 발밑에 남기는 잔상. 파편(debris)과 같은 풀을 쓰지 않고
  * 따로 둔 이유는 수명·중력이 달라서입니다 (잔상은 안 떨어집니다).   */
 const dashTrails = [];
@@ -4084,6 +4644,9 @@ const debrisGeo = new THREE.TetrahedronGeometry(0.38);   // 타일 축소에 맞
  * @param scale 1 = 평범한 붕괴. 폭발처럼 크게 보여야 할 때 올립니다
  *              (개수·흩어지는 범위·튀는 속도가 함께 커집니다).
  */
+/* 파편 위치 계산용 임시 객체 (프레임당 여러 번 불려 GC 압력을 피합니다) */
+const _debrisAt = { x: 0, z: 0 };
+
 function spawnDebris(rec, scale) {
   const k = scale || 1;
   const count = Math.round(6 * k);
@@ -4092,7 +4655,11 @@ function spawnDebris(rec, scale) {
       color: rec.baseColor, emissive: rec.baseColor, emissiveIntensity: 0.6, transparent: true
     }));
     const spread = (G.hexSize || 3.2 / 1.5) * FX.DEBRIS_SPREAD * k;
-    m.position.set(rec.x + (Math.random() - 0.5) * spread, rec.y, rec.z + (Math.random() - 0.5) * spread);
+    /* 파편은 회전하지 않는 fxGroup 에 들어가므로 회전이 반영된 월드
+     * 좌표에서 터뜨려야 합니다. 안 그러면 회전층 타일이 부서질 때
+     * 파편만 엉뚱한 자리에서 튑니다.                                 */
+    const w = tileWorldXZ(rec, _debrisAt);
+    m.position.set(w.x + (Math.random() - 0.5) * spread, rec.y, w.z + (Math.random() - 0.5) * spread);
     fxGroup.add(m);
     debris.push({
       mesh: m,
@@ -4122,7 +4689,48 @@ function updateDebris(dt) {
   }
 }
 
+/* ── 어둠: 무엇이 얼마나 보이는가 ─────────────────────────────────────
+ * 서버는 '언제부터 언제까지'만 알려주고, 실제로 가리는 일은 각 클라이언트가
+ * 자기 플레이어 위치를 기준으로 합니다 (server.js DARK_EVENT 주석 참고).
+ *
+ * 매 프레임 타일마다 부르는 함수라 프레임 앞에서 기준점을 한 번만 잡고
+ * (beginDarkPass) 타일별로는 거리 계산만 합니다.
+ *
+ * 관전자는 어둠에서 제외합니다 — 볼 기준이 되는 '내 위치'가 없고,
+ * 카메라를 기준으로 삼으면 시점을 돌리는 것만으로 시야가 달라집니다.
+ * ------------------------------------------------------------------ */
+const darkPass = { on: false, x: 0, z: 0, inner: 0, outer: 0 };
+
+function beginDarkPass() {
+  const st = G.traits.dark;
+  darkPass.on = false;
+  if (!st || !st.active) return;
+  // 내 위치가 기준입니다. 주자가 아니거나 죽었으면 가리지 않습니다.
+  if (G.role !== 'player' || !local.alive) return;
+
+  const step = tileStepUnit();
+  const clear = st.clearTiles !== undefined ? st.clearTiles : 2;
+  const view = currentViewTiles();
+  darkPass.on = true;
+  darkPass.x = local.pos.x;
+  darkPass.z = local.pos.z;
+  darkPass.inner = clear * step;                       // 여기까지는 그대로 보임
+  darkPass.outer = Math.max(clear + 0.5, view) * step; // 여기부터 완전한 검정
+}
+
+/** 이 타일을 얼마나 밝게 그릴 것인가 (1 = 그대로, 0 = 완전한 검정). */
+function darkFactorFor(rec) {
+  if (!darkPass.on || !rec.darkTrait) return 1;
+  const d = Math.hypot(rec.x - darkPass.x, rec.z - darkPass.z);
+  if (d <= darkPass.inner) return 1;
+  if (d >= darkPass.outer) return 0;
+  const t = (d - darkPass.inner) / (darkPass.outer - darkPass.inner);
+  // 가장자리에서 뚝 끊기지 않도록 부드럽게 떨어뜨립니다
+  return (1 - t) * (1 - t);
+}
+
 function updateTiles(dt, now) {
+  beginDarkPass();
   for (const rec of G.tiles.values()) {
     const mesh = rec.mesh;
 
@@ -4207,6 +4815,18 @@ function updateTiles(dt, now) {
         rec.mat.emissiveIntensity = glow * (1 + rec.jumpLevel * 0.15);
       }
 
+      /* ── 심사 가속이 발동 중인 층 ─────────────────────────────────
+       * 화면 가장자리 경보만으로는 '어느 층이' 위험한지 모릅니다.
+       * 아직 안 밟힌 타일도 붉게 물들여 층 자체를 위험 지대로 읽히게 합니다.
+       * 밟혀서 warn 으로 넘어간 타일은 이 분기에 오지 않으므로(위쪽
+       * else-if) 붕괴 경고 연출을 덮어쓸 걱정은 없습니다.
+       * 발동 여부는 서버 layer_event 로만 바뀝니다 — 여기서 시간을 세지 않습니다. */
+      if (rec.accelTrait && G.traits.accel.active) {
+        const beat = Math.sin(now * 0.010) * 0.5 + 0.5;
+        rec.mat.color.lerp(ACCEL_RED, 0.28 + beat * 0.24);
+        rec.mat.emissiveIntensity = glow * (1.1 + beat * 0.9);
+      }
+
       /* 금이 간 직후 아주 짧게 흔듭니다. 균열이 소리 없이 슬며시 나타나면
        * "밟혔다"가 아니라 "원래 그랬다"로 읽혀서 타격감이 죽습니다.
        * 남은 시간에 비례해 진폭을 줄여야 끝에서 뚝 끊기지 않습니다.    */
@@ -4253,6 +4873,23 @@ function updateTiles(dt, now) {
       }
     }
 
+    /* ── 어둠 ─────────────────────────────────────────────────────
+     * 모든 상태 분기가 색을 정한 '뒤에' 곱합니다. 분기마다 넣으면
+     * 경고 중인 타일만 어둠을 무시하는 식으로 반드시 어긋납니다.
+     *
+     * 투명하게 만들지 않고 검게 만드는 이유: 투명하면 뒤의 하늘과
+     * 아래층이 비쳐서 오히려 정보가 더 드러납니다. "완전히 검게"가
+     * 규칙이므로 색과 발광을 0 으로 눌러야 맞습니다.
+     *
+     * 붕괴 중(gone)인 타일은 위에서 continue 로 빠져 여기 오지 않습니다.
+     * 420ms 짜리 낙하 연출이라 그대로 두는 편이 자연스럽습니다.      */
+    const darkK = darkFactorFor(rec);
+    if (darkK < 1) {
+      rec.mat.color.multiplyScalar(darkK);
+      rec.mat.emissiveIntensity *= darkK;
+      if (rec.phaseRing) rec.phaseRing.material.opacity *= darkK;
+    }
+
     /* 층 반투명 × 위상 OFF 반투명. 둘을 곱하는 이유는 tileAlphaFor 참고. */
     const wantAlpha = tileAlphaFor(rec);
     rec.mat.opacity += (wantAlpha - rec.mat.opacity) * Math.min(1, dt * 6);
@@ -4264,8 +4901,9 @@ function updateTiles(dt, now) {
     if (rec.crack) {
       const c = rec.crack;
       const t = Math.min(1, (now - c.born) / CRACK_GROW_MS);
-      // 위층이 반투명해지면 균열도 같이 흐려져야 합니다
-      const baseAlpha = tileAlphaFor(rec) * 0.9;
+      // 위층이 반투명해지면 균열도 같이 흐려져야 합니다.
+      // 어둠에 잠긴 타일의 균열만 하얗게 떠 있으면 안 되므로 함께 지웁니다.
+      const baseAlpha = tileAlphaFor(rec) * 0.9 * darkK;
       c.mesh.position.set(rec.x, mesh.position.y + G.hexThick / 2 + 0.02, rec.z);
       c.mesh.scale.setScalar(mesh.scale.x * (0.55 + 0.45 * t));   // 툭 튀어나오지 않게 퍼짐
       c.mesh.rotation.x = -Math.PI / 2;
@@ -4338,12 +4976,19 @@ function getBoosterGeo() {
 }
 
 function spawnBooster(e) {
+  /* 서버 x/z 는 층 로컬 좌표입니다. 지금 층 각도로 월드 좌표를 냅니다.
+   * (구 서버는 layer 를 안 보내므로 y 로 층을 추정합니다)            */
+  const anchor = syncEntityToLayer({
+    lx: e.x, lz: e.z,
+    layer: e.layer !== undefined ? e.layer : currentLayerOf(e.y)
+  });
+
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffcc00, emissive: 0xffaa00, emissiveIntensity: 1.5,
     metalness: 0.7, roughness: 0.25, transparent: true, opacity: 0.95
   });
   const mesh = new THREE.Mesh(getBoosterGeo(), mat);
-  mesh.position.set(e.x, e.y, e.z);
+  mesh.position.set(anchor.x, e.y, anchor.z);
   mesh.castShadow = true;
   fxGroup.add(mesh);
 
@@ -4353,12 +4998,16 @@ function spawnBooster(e) {
     new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false })
   );
   ring.rotation.x = -Math.PI / 2;
-  ring.position.set(e.x, e.y + 0.6, e.z);
+  ring.position.set(anchor.x, e.y + 0.6, anchor.z);
   fxGroup.add(ring);
 
   G.boosters.set(e.id, {
-    id: e.id, x: e.x, y: e.y, z: e.z, mesh, ring, mat,
-    layer: currentLayerOf(e.y), born: performance.now(), ttl: e.ttl || 7000
+    id: e.id,
+    /* lx/lz = 층 로컬(회전 전) 좌표 — 이게 원본입니다.
+     * x/z  = 그것을 현재 각도로 돌린 월드 좌표 — 매 프레임 갱신됩니다.  */
+    lx: e.x, lz: e.z, x: anchor.x, z: anchor.z, y: e.y,
+    mesh, ring, mat,
+    layer: anchor.layer, born: performance.now(), ttl: e.ttl || 7000
   });
 }
 
@@ -4372,6 +5021,12 @@ function removeBooster(id) {
 
 function updateBoosters(dt, now) {
   for (const b of G.boosters.values()) {
+    /* 회전층에 지원된 발판은 층과 함께 돕니다. 착지 판정도 여기서 갱신한
+     * b.x/b.z 를 그대로 보므로 발판과 판정이 어긋나지 않습니다.       */
+    syncEntityToLayer(b);
+    b.mesh.position.x = b.x; b.mesh.position.z = b.z;
+    b.ring.position.x = b.x; b.ring.position.z = b.z;
+
     const age = now - b.born;
     const left = b.ttl - age;
     b.mesh.rotation.y += dt * 1.1;
@@ -4398,11 +5053,19 @@ function getObsGeo() {
 }
 
 function spawnObstacle(e) {
+  /* 서버가 보내는 x/z 는 목표 타일의 층 로컬 좌표입니다.
+   * 낙하에 1.4초가 걸리므로 그 사이 층이 돌면 착탄 지점도 따라가야
+   * 합니다 — 그래서 로컬 좌표를 들고 매 프레임 월드로 바꿉니다.      */
+  const anchor = syncEntityToLayer({
+    lx: e.x, lz: e.z,
+    layer: e.layer !== undefined ? e.layer : currentLayerOf(e.y)
+  });
+
   const mat = new THREE.MeshStandardMaterial({
     color: 0xece7d8, emissive: 0xff2d2d, emissiveIntensity: 0.35, roughness: 0.85
   });
   const mesh = new THREE.Mesh(getObsGeo(), mat);
-  mesh.position.set(e.x, e.fromY, e.z);
+  mesh.position.set(anchor.x, e.fromY, anchor.z);
   mesh.rotation.y = Math.random() * 3.14;
   mesh.castShadow = true;
   fxGroup.add(mesh);
@@ -4413,18 +5076,26 @@ function spawnObstacle(e) {
     new THREE.MeshBasicMaterial({ color: 0xff2d2d, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false })
   );
   marker.rotation.x = -Math.PI / 2;
-  marker.position.set(e.x, e.y + 0.7, e.z);
+  marker.position.set(anchor.x, e.y + 0.7, anchor.z);
   fxGroup.add(marker);
 
   G.obstacles.set(e.id, {
     id: e.id, mesh, marker, mat,
-    x: e.x, y: e.y, z: e.z, fromY: e.fromY,
+    // lx/lz = 층 로컬 원본, x/z = 매 프레임 갱신되는 월드 좌표 (부스터와 동일)
+    lx: e.x, lz: e.z, x: anchor.x, z: anchor.z, y: e.y,
+    layer: anchor.layer, fromY: e.fromY,
     born: performance.now(), duration: e.durationMs || 1400, impacted: false
   });
 }
 
 function updateObstacles(dt, now) {
   for (const o of G.obstacles.values()) {
+    /* 낙하 중에도 목표 타일을 따라갑니다 — 회전층이면 착탄 지점이
+     * 1.4초 사이에 움직이므로, 안 따라가면 엉뚱한 자리에 떨어집니다. */
+    syncEntityToLayer(o);
+    o.mesh.position.x = o.x; o.mesh.position.z = o.z;
+    o.marker.position.x = o.x; o.marker.position.z = o.z;
+
     const p = Math.min(1, (now - o.born) / o.duration);
     o.mesh.position.y = o.fromY + (o.y + 1.2 - o.fromY) * (p * p);
     o.mesh.rotation.z = Math.sin(p * 9) * 0.3;
@@ -4468,7 +5139,12 @@ function removeObstacle(id) {
 const netStats = { snaps: 0, lastErr: 0, corrections: 0, lastCorrectionToast: -Infinity,
   phaseFixes: 0,     // 위상 타일 계산이 서버와 어긋나 서버 값으로 넘어간 횟수
   dashes: 0,         // 신속심사 타일로 대시한 횟수
-  jumps: 0 };        // 점프 타일로 발사된 횟수
+  jumps: 0,          // 점프 타일로 발사된 횟수
+  accels: 0,         // 심사 가속이 발동된 횟수 (서버 layer_event 기준)
+  darks: 0,          // 어둠이 발동된 횟수
+  searches: 0,       // 내가 선행기술 검색 타일을 밟은 횟수
+  rotFlips: 0,       // 회전 방향이 반전된 횟수
+  rotFixes: 0 };     // 회전 각도를 서버 값으로 되맞춘 횟수 (평상시 0)
 
 const UP_AXIS = new THREE.Vector3(0, 1, 0);   // slerp 회전축 (공용 상수)
 
@@ -4495,7 +5171,7 @@ class RemoteRunner {
     this.snaps = 0;                        // 이 주자에게 걸린 강제 스냅 횟수 (진단용)
     this._qCur = new THREE.Quaternion();    // slerp 작업용 — 프레임마다 새로 만들지 않습니다
     this._qTarget = new THREE.Quaternion();
-    this.avatar = buildAvatar(meta.color, meta.name);
+    this.avatar = buildAvatar(meta.color, meta.name, meta.seat);
     this.avatar.group.position.copy(this.render);
     actorGroup.add(this.avatar.group);
   }
@@ -4654,6 +5330,23 @@ function lerpAngle(a, b, k) {
 const camTarget = new THREE.Vector3();
 const camDesired = new THREE.Vector3();
 
+/* 천장(위층 판) 밑면과 카메라 사이에 남길 여유. 0 이면 카메라가 판에
+ * 스치듯 붙어 근평면에 타일이 잘려 들어옵니다.                        */
+const CAM_CEIL_CLEARANCE = 1.25;
+/* 지금 서 있는 층을 천장으로 잘못 잡지 않기 위한 여유.
+ * 발밑 층은 focus.y 보다 아래이므로 이 정도면 충분히 갈립니다.        */
+const CAM_CEIL_EPS = 1.0;
+
+/** focus.y 보다 위에 있는 층들 중 가장 낮은 층의 y. 없으면 null(=최상층). */
+function ceilingYAbove(y) {
+  let best = null;
+  for (const Lx of G.layerOrder) {
+    const ly = G.layerY[Lx];
+    if (ly > y + CAM_CEIL_EPS && (best === null || ly < best)) best = ly;
+  }
+  return best;
+}
+
 function updateCamera(dt) {
   // 탈락 연출 중에는 카메라를 캐릭터에 붙여 둡니다.
   // 곧바로 관전 시점으로 튀면 무슨 일이 일어났는지 알 수 없습니다.
@@ -4666,7 +5359,8 @@ function updateCamera(dt) {
 
   // Auto pitch: ease the camera up while the runner is plummeting so the
   // landing zone below stays framed, and pull it down on the top layer.
-  const falling = THREE.MathUtils.clamp(-local.vel.y / 45, 0, 1);
+  // 45 였던 정규화 기준은 LAYER_GAP 파생(G.fallNorm)으로 바뀌었습니다.
+  const falling = THREE.MathUtils.clamp(-local.vel.y / (G.fallNorm || 45), 0, 1);
   const autoPitch = 0.5 + falling * 0.42;
   cam.pitch = THREE.MathUtils.lerp(cam.pitch, THREE.MathUtils.clamp(cam.pitch, 0.08, 1.36), 1);
   const usedPitch = cam.dragging ? cam.pitch : THREE.MathUtils.lerp(cam.pitch, autoPitch, dt * 0.9);
@@ -4680,6 +5374,30 @@ function updateCamera(dt) {
     camTarget.y + Math.sin(cam.pitch) * cam.dist,
     camTarget.z + Math.cos(cam.yaw) * horiz
   );
+
+  /* ── 천장 클램프 ──────────────────────────────────────────────────
+   * 카메라가 '내 위층 판' 위로 올라가지 못하게 막습니다.
+   *
+   * ★ 이게 없으면 위층 타일이 화면을 덮습니다. 카메라 높이는
+   *     CAM.HEIGHT(3) + CAM.DIST(24)×sin(pitch)
+   *   라서 pitch 가 조금만 서도 LAYER_GAP 을 넘어갑니다. 넘는 순간
+   *   위층 판을 위에서 내려다보게 되어 시야가 통째로 막힙니다.
+   *   실측(가운데 층·시점 9종 평균): 클램프 없음 47.6% → 있음 3.3%.
+   *
+   * ★ 목표점(camTarget)은 건드리지 않고 카메라 높이만 낮춥니다.
+   *   그래서 시선은 그대로 주자를 향하고, 시점이 조금 눕을 뿐입니다.
+   *   pitch 자체를 깎으면 사용자의 드래그 입력과 싸우게 됩니다.
+   *
+   * ★ 최상층에는 천장이 없으므로 제한이 걸리지 않습니다. 낙하 중에는
+   *   방금 떠난 층이 천장이 되어, 내려가는 동안 아래가 계속 보입니다.
+   * --------------------------------------------------------------- */
+  const ceilY = ceilingYAbove(focus.y);
+  if (ceilY !== null) {
+    const limit = ceilY - G.hexThick / 2 - CAM_CEIL_CLEARANCE;
+    // 주자보다 아래로 내려가 버리면 밑에서 올려다보는 이상한 그림이 됩니다
+    camDesired.y = Math.max(camTarget.y + 1.0, Math.min(camDesired.y, limit));
+  }
+
   camera.position.lerp(camDesired, Math.min(1, dt * 9));
   camera.lookAt(camTarget);
 
@@ -4755,6 +5473,36 @@ function buildRulesText() {
       '밟으면 진행 방향으로 ' + cfg.DASH.tiles + '칸 튀어나갑니다. ' +
       '앞이 비어 있으면 그대로 떨어집니다.');
   }
+  /* 층 특성(trait)은 특수 타일과 다른 축이라 따로 안내합니다.
+   * 간격은 dev 에서 줄어든 실제 값(effectiveIntervalMs)을 씁니다.    */
+  const accelTraitLayer = layers.find((L) => L.trait === 'accel');
+  if (accelTraitLayer && cfg.ACCEL_EVENT) {
+    const A = cfg.ACCEL_EVENT;
+    parts.push(accelTraitLayer.name + ' 층에는 심사 가속이 걸립니다 — ' +
+      sec(A.effectiveIntervalMs || A.intervalMs) + '마다 ' + sec(A.durationMs) +
+      ' 동안 그 층 타일의 붕괴가 ' + A.speed + '배로 빨라집니다. ' +
+      '발동되면 화면이 붉게 깜빡입니다.');
+  }
+  const darkLayer = layers.find((L) => L.trait === 'dark');
+  if (darkLayer && cfg.DARK_EVENT) {
+    const D = cfg.DARK_EVENT;
+    parts.push(darkLayer.name + ' 층에는 어둠이 내립니다 — ' +
+      sec(D.effectiveIntervalMs || D.intervalMs) + '마다 ' + sec(D.durationMs) +
+      ' 동안 내 주변 ' + D.clearTiles + '~' + D.viewTiles +
+      '칸 밖이 보이지 않습니다. 타일은 평소처럼 무너지므로 보이지 않을 뿐입니다.');
+  }
+  if (darkLayer && cfg.SEARCH_TILE) {
+    const S = cfg.SEARCH_TILE;
+    parts.push('같은 층의 선행기술 검색 타일을 밟으면 ' + sec(S.durationMs) +
+      ' 동안 시야가 ' + S.viewTiles + '칸까지 넓어집니다.');
+  }
+  const rotLayer = layers.find((L) => L.trait === 'rotate');
+  if (rotLayer && cfg.ROTATE_EVENT) {
+    const R = cfg.ROTATE_EVENT;
+    parts.push(rotLayer.name + ' 층은 중심축을 기준으로 천천히 회전합니다 — ' +
+      '위에 서 있으면 함께 실려 돌고, ' + sec(R.effectiveIntervalMs || R.intervalMs) +
+      '마다 회전 방향이 반대로 바뀝니다.');
+  }
   const rejectLayer = layers.find((L) => L.special === 'reject');
   if (rejectLayer) {
     parts.push('같은 층의 보정 타일을 밟으면 주변에서 무너진 타일 하나가 되살아납니다.');
@@ -4825,13 +5573,197 @@ function buildLayerStack() {
     alt.className = 'alt';
     alt.textContent = L.short || '';
 
-    d.appendChild(no); d.appendChild(nm); d.appendChild(alt);
+    /* 회전 방향 표시 자리. 반복되는 반전 배너를 대신하는 조용한 표시라
+     * 평소엔 비어 있고 회전이 걸린 층에서만 ↻/↺ 가 들어갑니다.        */
+    const rotm = document.createElement('div');
+    rotm.className = 'rotmark';
+
+    d.appendChild(no); d.appendChild(nm); d.appendChild(alt); d.appendChild(rotm);
     box.appendChild(d);
   }
 
   dom.docs = Array.from(box.querySelectorAll('.doc'));
   // 여백까지 다 그려진 뒤에야 넘치는지 알 수 있습니다
   if (box.scrollHeight > box.clientHeight + 1) box.classList.add('scroll');
+}
+
+/* ── 층 특성 이벤트 연출 ──────────────────────────────────────────────
+ * 서버 layer_event 가 켜라/꺼라를 보내면 그대로 따릅니다.
+ * 특성이 여러 개이므로 d.trait 로 갈라서 각자의 상태에 담습니다.
+ *
+ * ★ 지속 시간을 클라이언트가 세지 않습니다.
+ *   endsAt 을 받아 두긴 하지만 그걸로 스스로 끄지 않습니다 — 화면마다
+ *   시계가 조금씩 달라 어떤 사람은 이미 꺼졌는데 서버 퓨즈는 아직
+ *   빨라져 있는 구간이 생깁니다. 끄는 신호도 서버가 보냅니다.
+ *
+ * ★ 타일 색은 여기서 칠하지 않습니다.
+ *   updateTiles 가 매 프레임 G.traits 를 보고 칠합니다. 여기서 한 번
+ *   칠해 봐야 다음 프레임에 idle 분기가 원래 색으로 덮어씁니다.
+ * ------------------------------------------------------------------ */
+/* ── 경고는 '내가 서 있는 층의 것'만 크게 ─────────────────────────────
+ * 층 특성은 그 층에서만 작동하는데, 종전에는 어느 층에 있든 모든 특성의
+ * 배너와 문구가 떴습니다. 5층에서 걷고 있는데 3층 어둠 문구가 뜨는 식이라
+ * 정보가 아니라 소음이었습니다.
+ *
+ * 이제 큰 배너와 토스트는 내가 그 층에 있을 때만 나오고, 다른 층 상황은
+ * 왼쪽 층 목록의 색 표시로만 읽습니다. 내려서면 그 순간 배너가 뜨므로
+ * '필요한 때에 필요한 것만' 알려 주는 형태가 됩니다.
+ *
+ * 관전자에게는 큰 배너를 띄우지 않습니다 — 기준이 되는 '내 위치'가 없고,
+ * 관전 화면은 층 목록과 토스트로 충분히 읽힙니다.
+ * ------------------------------------------------------------------ */
+function onTraitLayer(trait) {
+  const st = G.traits[trait];
+  if (!st || G.role !== 'player') return false;
+  return st.layers.indexOf(local.layer) >= 0;
+}
+
+/* 배너 표시 여부는 이벤트가 올 때가 아니라 '매 프레임' 정합니다.
+ * 이벤트 발동 시점에 한 번만 정하면, 어둠이 켜진 뒤 내가 그 층으로
+ * 내려가도 배너가 안 뜹니다(반대로 올라가도 안 꺼집니다).            */
+function refreshTraitBanners() {
+  const a = G.traits.accel, dk = G.traits.dark;
+  if (dom.accelAlert) {
+    dom.accelAlert.classList.toggle('on', !!(a && a.active) && onTraitLayer('accel'));
+  }
+  if (dom.darkAlert) {
+    dom.darkAlert.classList.toggle('on', !!(dk && dk.active) && onTraitLayer('dark'));
+  }
+}
+
+/* 왼쪽 층 목록의 회전 방향 표시(↻/↺).
+ * 반복되는 반전 배너를 대신하는 '조용한' 표시입니다.                 */
+function updateRotMark() {
+  const st = G.traits.rotate;
+  for (const el of (dom.docs || [])) {
+    const mark = el.querySelector('.rotmark');
+    if (!mark) continue;
+    const on = !!(st && st.active) && st.layers.indexOf(+el.dataset.l) >= 0;
+    mark.textContent = on ? (st.dir > 0 ? '↻' : '↺') : '';
+  }
+}
+
+function applyLayerEvent(d) {
+  if (!d) return;
+  const trait = d.trait || 'accel';               // 구 서버 호환 (trait 없이 오던 시절)
+  const st = G.traits[trait] || (G.traits[trait] = { active: false, layers: [], endsAt: 0 });
+  const wasActive = st.active;
+
+  st.active = !!d.active;
+  if (Array.isArray(d.layers)) st.layers = d.layers.slice();
+  st.endsAt = d.endsAt || 0;
+  /* 특성별 값을 그대로 받습니다.
+   *   accel  : speed
+   *   dark   : viewTiles · clearTiles
+   *   rotate : epoch · baseAngle · dir · speed  ← 각도 타임라인 자체
+   * 회전은 '각도'가 아니라 '각도를 만드는 값들'을 받는 것이 핵심입니다. */
+  for (const k of ['speed', 'viewTiles', 'clearTiles', 'durationMs',
+                   'epoch', 'baseAngle', 'dir', 'intervalMs']) {
+    if (d[k] !== undefined) st[k] = d[k];
+  }
+  if (trait === 'rotate') {
+    // 타임라인이 새로 왔으니 내 공식으로 다시 계산합니다 (검산 상태도 초기화)
+    G.rotTrust = true;
+    st.angle = rotationAngleNow();
+    /* 실어 돌리기 기준값을 지금 각도로 다시 잡습니다.
+     * 안 그러면 반전 순간의 각도 차이가 한 프레임에 몰아서 적용돼
+     * 서 있던 주자가 순간이동합니다.                                  */
+    lastCarryAngle = st.angle;
+  }
+
+  /* 진행 중이던 붕괴를 서버가 앞당겼습니다 (심사 가속).
+   * 붕괴 시각의 단일 진실 원천은 서버이므로 '남은 시간'만 받아 씁니다. */
+  for (const r of (d.retimed || [])) retimeWarn(G.tiles.get(r.tileId), r.fuse);
+
+  const names = st.layers.map(layerNameOf).filter(Boolean);
+
+  /* 왼쪽 층 목록 — 그 특성이 걸린 층에 표시를 켭니다.
+   * 클래스 이름을 trait 이름으로 그대로 쓰므로 특성이 늘면 CSS 한 줄만
+   * 추가하면 됩니다 (.doc.accel / .doc.dark).                        */
+  for (const el of (dom.docs || [])) {
+    el.classList.toggle(trait, st.active && st.layers.indexOf(+el.dataset.l) >= 0);
+  }
+
+  /* 배너는 refreshTraitBanners 가 매 프레임 정합니다. 여기서는 부제 문구와
+   * '새로 켜진 순간'의 알림만 다룹니다.                                */
+  refreshTraitBanners();
+
+  if (trait === 'accel') {
+    if (dom.accelSub) {
+      dom.accelSub.textContent = names.length
+        ? names.join(' · ') + ' 층 붕괴 ' + (st.speed || 2) + '배속'
+        : 'EXAMINATION ACCELERATION';
+    }
+    // 새로 켜진 순간에만, 그리고 내가 그 층에 있을 때만 알립니다
+    if (st.active && !wasActive) {
+      netStats.accels++;
+      if (onTraitLayer('accel')) {
+        toast('심사 가속 — 이 층이 ' + (st.speed || 2) + '배로 무너집니다', 'kill');
+        Sound.sfx('obstacle', { rate: 1.35, volume: 0.85 });
+      }
+    }
+  } else if (trait === 'dark') {
+    if (dom.darkSub) {
+      dom.darkSub.textContent = names.length
+        ? names.join(' · ') + ' 층 시야 ' + (st.clearTiles || 2) + '~' + (st.viewTiles || 3) + '칸'
+        : 'PRIOR ART SEARCH';
+    }
+    if (st.active && !wasActive) {
+      netStats.darks++;
+      if (onTraitLayer('dark')) {
+        toast('어둠 — 주변 ' + (st.viewTiles || 3) + '칸 밖은 보이지 않습니다. 검색 타일을 찾으세요', 'obstacle');
+        Sound.sfx('obstacle', { rate: 0.55, volume: 0.7 });
+      }
+    }
+  } else if (trait === 'rotate') {
+    for (const el of (dom.docs || [])) {
+      el.classList.toggle('rotate', st.active && st.layers.indexOf(+el.dataset.l) >= 0);
+    }
+    updateRotMark();
+    /* fired 는 '이번 패킷이 방향 반전 순간'이라는 표시입니다.
+     * 라운드 시작·중도 참가 때도 같은 이벤트가 오는데, 그때까지 문구를
+     * 띄우면 접속하자마자 경고가 뜹니다.
+     *
+     * 반전은 15초마다 반복되므로 회차당 한 번만, 그것도 그 층에 실제로
+     * 서 있는 사람에게만 알립니다. 그 뒤로는 층 목록의 ↻/↺ 로만 읽습니다. */
+    if (d.fired) {
+      netStats.rotFlips++;
+      if (!G.rotFlipTold && onTraitLayer('rotate')) {
+        G.rotFlipTold = true;
+        toast('⚠️ 거절이유 발생, 심사관 검토 방향 변경', 'kill');
+        Sound.sfx('obstacle', { rate: 0.9, volume: 0.85 });
+        if (dom.rotAlert) {
+          dom.rotAlert.classList.add('on');
+          clearTimeout(rotAlertTimer);
+          rotAlertTimer = setTimeout(() => dom.rotAlert.classList.remove('on'), 2200);
+        }
+      }
+    }
+  }
+}
+
+/* 방향 반전 배너를 잠깐 띄웠다 지우는 타이머 (연속 반전 시 겹치지 않게) */
+let rotAlertTimer = 0;
+
+/* ── 지금 내 시야 반경(칸) ────────────────────────────────────────────
+ * 평소에는 어둠 규격의 기본값(3칸)이고, 선행기술 검색 타일을 밟은 동안만
+ * 서버가 정한 값(8칸)으로 넓어집니다.
+ *
+ * 넓어질 때는 즉시, 돌아올 때는 마지막 SEARCH_FADE_MS 동안 서서히입니다.
+ * 뚝 끊기면 8칸이 3칸으로 한 프레임에 무너져 "꺼졌다"가 아니라 "버그"로
+ * 읽힙니다.
+ * ------------------------------------------------------------------ */
+const SEARCH_FADE_MS = 600;
+
+function currentViewTiles() {
+  const dark = G.traits.dark || {};
+  const base = dark.viewTiles ||
+    (G.cfg && G.cfg.DARK_EVENT && G.cfg.DARK_EVENT.viewTiles) || 3;
+  const now = performance.now();
+  if (now >= G.view.searchUntil) return base;
+  const left = G.view.searchUntil - now;
+  const k = Math.min(1, left / SEARCH_FADE_MS);      // 남은 시간이 짧아지면 0 으로
+  return base + (G.view.searchTiles - base) * k;
 }
 
 function updateLayerStack(layer) {
@@ -5059,6 +5991,13 @@ function connect(name, mode) {
       }
     }
 
+    /* 라운드 중 들어왔는데 마침 층 특성이 걸려 있을 수 있습니다.
+     * 타일 복원(brokenTiles) 뒤에 적용해야 이미 복원한 퓨즈에 얹힙니다.
+     * (구 서버는 layerEvent 하나만 보냈습니다 — 둘 다 받아 줍니다)     */
+    for (const ev of (d.layerEvents || (d.layerEvent ? [d.layerEvent] : []))) {
+      applyLayerEvent(ev);
+    }
+
     syncPlayers(d.players);
     applyMeta(d.meta);
 
@@ -5074,7 +6013,7 @@ function connect(name, mode) {
       local.alive = true;
       G.selfAlive = true;
       if (!local.avatar) {
-        local.avatar = buildAvatar(local.color, d.name);
+        local.avatar = buildAvatar(local.color, d.name, local.seat);
         actorGroup.add(local.avatar.group);
       }
     }
@@ -5099,6 +6038,8 @@ function connect(name, mode) {
     if (d.phaseEpoch) G.phaseEpoch = d.phaseEpoch;
     G.phaseTrust = true;
     G.phaseOn = true;
+    // 회전 반전 안내는 회차당 한 번이므로 새 회차에서 다시 열어 줍니다
+    G.rotFlipTold = false;
     // 지난 회차의 밀림 기록이 새 회차 사인으로 넘어오지 않게 지웁니다
     lastBump.id = null; lastBump.name = ''; lastBump.at = -Infinity;
     local.deathBy = null; local.deathByName = '';
@@ -5134,6 +6075,13 @@ function connect(name, mode) {
     for (const id of [...G.boosters.keys()]) removeBooster(id);
     for (const id of [...G.obstacles.keys()]) removeObstacle(id);
     resetTileWear();
+    /* 새 맵이므로 이벤트 상태도 초기화합니다. 서버도 resetRoom 에서
+     * 같이 끄지만, 발동 중이 아니었으면 신호를 안 보내므로 여기서 한 번
+     * 더 지웁니다 (층 목록의 표시가 다음 판까지 남는 것 방지).        */
+    for (const trait of Object.keys(G.traits)) {
+      applyLayerEvent({ trait, active: false, layers: G.traits[trait].layers });
+    }
+    G.view.searchUntil = 0;      // 넓어진 시야도 회차를 넘기지 않습니다
     G.map = d.map;
     applyTheme(d.theme || 0);
     buildMap(d.map, mapCfg());
@@ -5155,7 +6103,7 @@ function connect(name, mode) {
       local.jumped = false;
       local.lastGroundY = local.pos.y;
       if (!local.avatar) {
-        local.avatar = buildAvatar(local.color, safeName(mine.name, G.name));
+        local.avatar = buildAvatar(local.color, safeName(mine.name, G.name), local.seat);
         actorGroup.add(local.avatar.group);
       }
       local.avatar.group.rotation.set(0, 0, 0);
@@ -5209,6 +6157,29 @@ function connect(name, mode) {
       }
       // 공식을 못 믿는 동안에는 서버 값을 그대로 씁니다
       if (!G.phaseTrust) G.phaseOn = serverOn;
+    }
+
+    /* ── 회전 각도 검산 ──────────────────────────────────────────
+     * 위상 타일과 같은 구조입니다. 서버가 스냅샷을 만든 시각(snap.t)의
+     * 각도를 rt 로 보내므로, 나도 '그 시각'의 각도를 계산해 비교합니다.
+     * 지금 시각과 비교하면 패킷 지연만큼 늘 어긋나 보입니다.
+     *
+     * 각도는 계속 커지는 값이라 절대 비교가 아니라 차이를 봅니다.
+     * 임계값 ROT_TRUST_EPS 는 시계 지터(수십 ms) × 각속도보다 넉넉하고,
+     * 눈에 띄는 어긋남(약 1.7°)보다는 작게 잡았습니다.               */
+    if (snap.rt !== undefined && G.traits.rotate.epoch) {
+      const s = G.traits.rotate;
+      const mine = s.baseAngle + s.dir * s.speed * (snap.t - s.epoch) / 1000;
+      if (Math.abs(mine - snap.rt) > ROT_TRUST_EPS) {
+        if (G.rotTrust) { G.rotTrust = false; netStats.rotFixes++; }
+      } else if (!G.rotTrust) {
+        G.rotTrust = true;        // 다시 맞기 시작했습니다 — 공식으로 복귀
+      }
+      /* 공식을 못 믿는 동안에는 서버 값을 그대로 씁니다.
+       * 스냅샷 시각의 값이므로 지금까지 흐른 만큼만 앞으로 굴려 줍니다. */
+      if (!G.rotTrust) {
+        s.angle = snap.rt + s.dir * s.speed * (Date.now() + G.serverOffset - snap.t) / 1000;
+      }
     }
 
     const now = performance.now();
@@ -5279,6 +6250,31 @@ function connect(name, mode) {
   });
 
   /* 아직 안 무너진 타격 — 마모 단계만 올라갑니다 (일반 타일 1·2회차). */
+  /* 층 특성 이벤트(지금은 '심사 가속' 하나).
+   * 언제 켜지고 언제 꺼지는지, 진행 중이던 퓨즈를 얼마나 앞당길지는
+   * 전부 서버가 정해서 보냅니다. 우리는 그리기만 합니다.            */
+  socket.on('layer_event', (d) => applyLayerEvent(d));
+
+  /* 선행기술 검색 타일을 누군가 밟았습니다.
+   * 시야가 넓어지는 것은 밟은 사람 한 명뿐이고(내 것인지 id 로 가름),
+   * 스캔 연출은 모두가 봅니다 — 어둠 속에서 누가 조사 중인지 읽혀야 합니다.
+   * 얼마나·얼마 동안 넓어지는지는 서버가 정합니다.                    */
+  socket.on('search_pulse', (d) => {
+    if (!d) return;
+    const p = Array.isArray(d.pos) ? d.pos : [0, 0, 0];
+    spawnSearchFx(p[0], p[1], p[2], d.viewTiles, d.durationMs);
+    Sound.sfx('booster', { pos: { x: p[0], y: p[1], z: p[2] }, rate: 1.45, volume: 0.75 });
+
+    if (d.id === G.selfId) {
+      G.view.searchUntil = performance.now() + (d.durationMs || 2000);
+      G.view.searchTiles = d.viewTiles || 8;
+      netStats.searches++;
+      toast('선행기술 검색 — ' + (d.viewTiles || 8) + '칸까지 조사했습니다', 'cheer');
+    } else if (d.name && G.traits.dark.active) {
+      toast(safeName(d.name) + ' 님이 선행기술을 조사합니다', 'obstacle');
+    }
+  });
+
   socket.on('tile_hit', (d) => {
     const rec = G.tiles.get(d.tileId);
     if (!rec) return;
@@ -5551,6 +6547,24 @@ function simulate(dt, now) {
     }
   }
 
+  /* ── 회전 각도도 프레임당 한 번만 정합니다 ──────────────────────
+   * 위상 타일과 같은 이유입니다. 착지 판정 3곳과 그리기, 그리고 나를
+   * 실어 돌리는 계산이 전부 이 값을 봅니다. 각자 계산하면 프레임 안에서
+   * 시각이 미세하게 달라져 발밑이 어긋납니다.
+   *
+   * rotTrust 가 false 면 내 공식이 서버와 어긋난 것이므로 계산하지 않고,
+   * state 핸들러가 넣어 준 서버 각도를 그대로 씁니다.                */
+  if (G.traits.rotate.epoch) {
+    if (G.rotTrust) G.traits.rotate.angle = rotationAngleNow();
+    // 타일 845장이 아니라 그룹 하나만 돌립니다
+    rotGroup.rotation.y = G.traits.rotate.angle;
+  }
+
+  /* 층 특성 배너는 '내가 지금 어느 층에 있는지'에 따라 달라지므로
+   * 이벤트가 올 때가 아니라 매 프레임 정합니다 (refreshTraitBanners 주석).
+   * classList.toggle 두 번이라 값이 그대로면 렌더링 비용이 없습니다.  */
+  refreshTraitBanners();
+
   /* --- fixed-step physics for the local runner --- */
   if (local.dying) {
     updateFallOut(dt);
@@ -5618,6 +6632,7 @@ function renderFrame(dt, now) {
   updateTiles(dt, now);
   updateDebris(dt);
   updateDashTrails(dt);
+  updateSearchFx(dt);
   updateDashArrow();
   updateBoosters(dt, now);
   updateObstacles(dt, now);
@@ -5744,6 +6759,49 @@ function renderDiag() {
         ' · ' + (G.phaseTrust ? '공식계산' : '서버값 사용') +
         ' · 보정 ' + netStats.phaseFixes + '회' +
         ' · 경과 ' + (G.phaseEpoch ? Math.round(Date.now() + G.serverOffset - G.phaseEpoch) : 0) + 'ms') +
+    /* 층 특성 '심사 가속'. dev 에서 "제때 뜨는지"를 여기 숫자로 확인합니다.
+     * 발동/해제는 서버가 보내므로, 이 값이 안 늘면 클라이언트가 아니라
+     * 서버 tickLayerEvents 를 의심하면 됩니다.                        */
+    row('심사가속', true,
+        (G.traits.accel.layers.length === 0 ? '꺼짐 (이 층 특성 없음) · ' : '') +
+        (G.traits.accel.active ? '발동 중' : '대기') + ' · ' + netStats.accels + '회' +
+        (G.traits.accel.active && G.traits.accel.endsAt
+          ? ' · 남은 ' + Math.max(0,
+              Math.round((G.traits.accel.endsAt - (Date.now() + G.serverOffset)) / 100) / 10) + 's'
+          : '') +
+        (G.cfg && G.cfg.ACCEL_EVENT
+          ? ' · ×' + G.cfg.ACCEL_EVENT.speed +
+            ' · 간격 ' + Math.round((G.cfg.ACCEL_EVENT.effectiveIntervalMs ||
+                                      G.cfg.ACCEL_EVENT.intervalMs) / 1000) + 's'
+          : '')) +
+    /* 어둠 + 지금 내 시야. "제때 뜨는지"와 "검색으로 넓어졌는지"를
+     * 숫자로 바로 볼 수 있어야 합니다. 시야는 내 기준이라 탭마다 다릅니다. */
+    row('어둠', true,
+        (G.traits.dark.active ? '발동 중' : '대기') + ' · ' + netStats.darks + '회' +
+        (G.traits.dark.active && G.traits.dark.endsAt
+          ? ' · 남은 ' + Math.max(0,
+              Math.round((G.traits.dark.endsAt - (Date.now() + G.serverOffset)) / 100) / 10) + 's'
+          : '') +
+        (G.cfg && G.cfg.DARK_EVENT
+          ? ' · 간격 ' + Math.round((G.cfg.DARK_EVENT.effectiveIntervalMs ||
+                                      G.cfg.DARK_EVENT.intervalMs) / 1000) + 's'
+          : '')) +
+    /* 회전. 각도가 서버와 맞는지(rotTrust)가 핵심 지표입니다 — 보정
+     * 횟수가 계속 늘면 시계 동기(G.serverOffset)를 의심하면 됩니다. */
+    row('회전', G.rotTrust,
+        (G.traits.rotate.epoch
+          ? (G.traits.rotate.angle * 180 / Math.PI).toFixed(1) + '° · ' +
+            (G.traits.rotate.dir > 0 ? '시계' : '반시계') +
+            ' · 반전 ' + netStats.rotFlips + '회'
+          : '없음') +
+        ' · ' + (G.rotTrust ? '공식계산' : '서버값 사용') +
+        ' · 보정 ' + netStats.rotFixes + '회' +
+        (isRotatingLayer(local.layer) && local.grounded ? ' · 실려 도는 중' : '')) +
+    row('시야', true,
+        currentViewTiles().toFixed(1) + '칸' +
+        (performance.now() < G.view.searchUntil ? ' (검색 중)' : '') +
+        ' · 검색 ' + netStats.searches + '회' +
+        (darkPass.on ? ' · 가리는 중' : '')) +
     row('타일종류', null, Object.keys(G.kindCount).length
         ? Object.keys(G.kindCount).map((k) =>
             k.slice(0, 4) + ' ' + G.kindCount[k] + '(' +
@@ -5774,10 +6832,11 @@ function renderDiag() {
         (DEV.serverOn && !DEV.on ? ' · 서버는 dev (?dev=1 로 켜기)' : '')) +
     row('타일크기', null, (G.hexSize || 0).toFixed(2) + '  카메라 x' + (cam.scale || 1).toFixed(2)) +
     /* 균열 오버레이는 타일당 드로우콜 1개입니다.
-     * 4인 라운드 실측 최대 53개 (평균 31개) — 타일 본체가 이미 507 드로우콜
-     * 이라 10% 남짓이고, 부하로 잡힌 적은 없습니다. 다만 인원이나 GRID_RADIUS
-     * 를 크게 올린 뒤 이 값이 80 을 넘기 시작하면 인스턴싱/아틀라스로 합치는
-     * 걸 검토하세요.                                                    */
+     * 4인 라운드 실측 최대 53개 (평균 31개) — 타일 본체가 이미 1355 드로우콜
+     * (5층 × 반경 9/271타일) 이라 비중이 작고, 부하로 잡힌 적은 없습니다.
+     * 다만 인원이나 GRID_RADIUS 를 더 올린 뒤 이 값이 80 을 넘기 시작하면
+     * 인스턴싱/아틀라스로 합치는 걸 검토하세요. 서버 GRID_RADIUS 상한 11 도
+     * 같은 이유로 걸려 있습니다.                                                    */
     row('균열 오버레이', crackStats.peak <= 80,
         crackStats.live + '개 (최대 ' + crackStats.peak + ')');
 }
