@@ -292,6 +292,36 @@ h1 em{font-style:normal;color:var(--l3)}
 .queueLine.live .dot{background:var(--l3);box-shadow:0 0 6px var(--l3)}
 .queueLine.live{color:rgba(236,231,216,.72)}
 
+/* ── 낙하 속도선 ─────────────────────────────────────────────────────
+ * 화면 가장자리에서 중심 밖으로 뻗는 방사형 줄기입니다.
+ *
+ * ★ 캔버스가 아니라 CSS 한 겹입니다. repeating-conic-gradient 로 줄기를
+ *   만들고 radial-gradient 마스크로 가운데를 비웁니다 — 주자와 착지 지점을
+ *   가리면 안 되기 때문입니다. 매 프레임 바뀌는 것은 opacity 하나뿐이라
+ *   합성만으로 처리되고 그리기 비용이 없습니다.
+ *
+ * ★ inset 을 음수로 둔 이유: .on 상태에서 확대 애니메이션이 도는데,
+ *   0 이면 확대될 때 가장자리가 안쪽으로 밀려 빈 테두리가 보입니다.  */
+#speedLines{
+  position:absolute;inset:-12%;pointer-events:none;z-index:6;opacity:0;
+  background:repeating-conic-gradient(from 0deg at 50% 50%,
+    rgba(255,255,255,.62) 0deg .28deg, rgba(255,255,255,0) .28deg 2.6deg);
+  -webkit-mask-image:radial-gradient(circle at 50% 50%, transparent 24%, #000 70%);
+          mask-image:radial-gradient(circle at 50% 50%, transparent 24%, #000 70%);
+  will-change:opacity,transform
+}
+#speedLines.on{animation:rush .45s linear infinite}
+@keyframes rush{from{transform:scale(1)}to{transform:scale(1.22)}}
+@media (prefers-reduced-motion:reduce){#speedLines{display:none}}
+
+/* ── 대기 화면 배경: 무너지는 육각 타일 ──────────────────────────────
+ * .screen 의 그라디언트 위에 깔립니다. 카드(.card)는 z-index 로 그 위에 둡니다.
+ * WebGL 씬이 아니라 Canvas 2D 인 이유는 buildMap 이 돌기 전이라 씬에 아무것도
+ * 없고, 여기서 three 객체를 만들면 나중에 정리할 대상만 늘기 때문입니다.  */
+#joinBg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
+  opacity:.55;z-index:0}
+#joinScreen .card{position:relative;z-index:1}
+
 /* 연출을 줄여 달라는 설정이면 전부 끕니다 (멀미·주의력 배려) */
 @media (prefers-reduced-motion:reduce){
   .synopsis .q,.synopsis .ln{animation:none;opacity:1}
@@ -524,7 +554,12 @@ input[type=text]{
 
 <div id="countdown"><div id="cdNum">5</div><div id="cdLabel">심사 착수까지</div></div>
 
+<!-- 낙하 속도선. 캔버스 위, 화면 오버레이(.screen z-index 20) 아래입니다. -->
+<div id="speedLines"></div>
+
 <div class="screen show" id="joinScreen">
+  <!-- 무너지는 육각 타일 배경. 순수 장식이라 보조기기에서는 숨깁니다. -->
+  <canvas id="joinBg" aria-hidden="true"></canvas>
   <div class="card">
     <!-- 층 수와 타일 규칙 문구는 서버 config 로 채웁니다 (buildRulesText).
          하드코딩해 두면 LAYER_DEFS / TILE_KINDS 를 고칠 때마다 같이 틀립니다. -->
@@ -1226,7 +1261,117 @@ function applyTheme(index) {
 }
 
 /* 하늘의 별 반짝임과 구름/소품의 느린 흐름 */
+/* ══════════════════════════════════════════════════════════════════════
+ * 하늘 균열 (카운트다운 배경 연출)
+ * ────────────────────────────────────────────────────────────────────
+ * ★ 스카이돔 셰이더를 건드리지 않고 별도 판 하나로 만듭니다.
+ *   배경 테마가 3종이고 각자 셰이더 유니폼을 쓰는데, 거기에 균열을
+ *   끼워 넣으면 테마를 추가할 때마다 같이 손봐야 합니다. 판 하나면
+ *   테마와 무관하게 얹힙니다.
+ *
+ * ★ 항상 카메라를 향하게 Y축만 돌립니다(빌보드). 균열은 '하늘에 난 틈'
+ *   이라 어느 방향에서 보든 정면으로 보여야 하는데, 완전 빌보드로 하면
+ *   위아래로도 돌아 지평선과 어긋납니다.
+ *
+ * ★ 카운트다운에만 보입니다. 대기 내내 떠 있으면 배경이 아니라 소품이
+ *   되어 버리고, '곧 시작한다'는 신호로 안 읽힙니다.
+ * ══════════════════════════════════════════════════════════════════════ */
+let skyRift = null;
+
+function makeRiftTexture() {
+  const W = 512, H = 128;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  /* 가운데가 가장 밝고 위아래·좌우로 사그라지는 틈. 가장자리를 완전히
+   * 0 으로 떨어뜨려야 판의 네모난 경계가 안 보입니다. */
+  const grd = g.createLinearGradient(0, 0, 0, H);
+  grd.addColorStop(0.00, 'rgba(255,255,255,0)');
+  grd.addColorStop(0.42, 'rgba(255,255,255,0.10)');
+  grd.addColorStop(0.50, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.58, 'rgba(255,255,255,0.10)');
+  grd.addColorStop(1.00, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, W, H);
+  /* 좌우 끝을 지웁니다 — 균열은 끝이 뾰족해야 갈라진 것으로 읽힙니다. */
+  const fade = g.createLinearGradient(0, 0, W, 0);
+  fade.addColorStop(0.00, 'rgba(0,0,0,1)');
+  fade.addColorStop(0.18, 'rgba(0,0,0,0)');
+  fade.addColorStop(0.82, 'rgba(0,0,0,0)');
+  fade.addColorStop(1.00, 'rgba(0,0,0,1)');
+  g.globalCompositeOperation = 'destination-out';
+  g.fillStyle = fade;
+  g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = 'source-over';
+  /* 들쭉날쭉한 가지. 매끈한 띠는 '빛줄기'로 보이고, 가지가 있어야 '균열'이 됩니다. */
+  g.strokeStyle = 'rgba(255,255,255,0.55)';
+  let seed = 20260911;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let i = 0; i < 26; i++) {
+    const x = W * (0.2 + rnd() * 0.6);
+    const len = 8 + rnd() * 26;
+    const dir = rnd() < 0.5 ? -1 : 1;
+    g.lineWidth = 0.8 + rnd() * 1.4;
+    g.beginPath();
+    g.moveTo(x, H / 2);
+    g.lineTo(x + (rnd() - 0.5) * 30, H / 2 + dir * len);
+    g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.encoding = THREE.sRGBEncoding;
+  return tex;
+}
+
+function ensureSkyRift() {
+  if (skyRift) return skyRift;
+  const mat = new THREE.MeshBasicMaterial({
+    map: makeRiftTexture(), color: 0xbfe9ff, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    depthWrite: false, depthTest: false, toneMapped: false
+  });
+  skyRift = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  skyRift.renderOrder = 3;
+  skyRift.visible = false;
+  scene.add(skyRift);
+  return skyRift;
+}
+
+function updateSkyRift(dt) {
+  const rift = ensureSkyRift();
+  let heat = 0;
+  if (G.phase === 'countdown' && G.phaseEndsAt) {
+    const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
+    heat = THREE.MathUtils.clamp(1 - left / 5000, 0, 1);
+  }
+  /* 라운드가 막 시작된 직후 잠깐 더 타오르게 둡니다 — 0 에서 바로 꺼지면
+   * '열렸다'가 아니라 '사라졌다'로 보입니다. */
+  if (G.phase === 'playing' && riftAfterglow > 0) {
+    riftAfterglow = Math.max(0, riftAfterglow - dt / 0.9);
+    heat = riftAfterglow;
+  }
+  if (heat <= 0.001) { rift.visible = false; return; }
+  rift.visible = true;
+
+  /* 카메라 쪽을 향하되 Y축만 돌립니다. 위치도 카메라 기준이라 어느
+   * 발판에 서 있든 같은 크기로 보입니다. */
+  const d = 260;
+  rift.position.set(
+    camera.position.x + Math.sin(cam.yaw) * -d,
+    camera.position.y + 95,
+    camera.position.z + Math.cos(cam.yaw) * -d
+  );
+  rift.rotation.set(0, cam.yaw, 0);
+  /* 갈라지듯 가로로 먼저 벌어지고, 뒤늦게 두께가 붙습니다. */
+  const wide = 120 + heat * 300;
+  const tall = 6 + heat * heat * 46;
+  rift.scale.set(wide, tall, 1);
+  rift.material.opacity = Math.min(0.72, 0.08 + heat * 0.52);
+}
+
+let riftAfterglow = 0;
+
 function updateSky(dt, now) {
+  updateSkyRift(dt);
   if (skyUniforms) skyUniforms.uTime.value = now * 0.001;
   if (cloudGroup) cloudGroup.rotation.y += dt * 0.0045;
   if (propGroup) {
@@ -1925,7 +2070,10 @@ function buildMap(map, cfg) {
   if (hexGeos && geoHexSize !== G.hexSize) {
     for (const g of hexGeos.values()) g.dispose();
     hexGeos = null;
-    if (pedGeo) { pedGeo.dispose(); pedRingGeo.dispose(); pedGeo = pedRingGeo = null; }
+    if (pedDoorA) {
+      pedDoorA.dispose(); pedDoorB.dispose(); pedRingGeo.dispose();
+      pedDoorA = pedDoorB = pedRingGeo = null;
+    }
   }
   if (!hexGeos) {
     geoHexSize = G.hexSize;
@@ -2070,11 +2218,16 @@ function buildMap(map, cfg) {
  * 게임 시작 전, 각 플레이어가 최상층 위 공중에 뜬 자기 발판에서 대기합니다.
  * 정원이 차면 발판이 사라지고 다 같이 최상층으로 떨어지며 시작됩니다.
  * ---------------------------------------------------------------------- */
-let pedGeo = null;
+/* 발판은 '한 장'이 아니라 좌우로 갈라지는 두 짝입니다 (접수 게이트).
+ * 반쪽은 CylinderGeometry 의 thetaLength 를 π 로 주면 그대로 나옵니다 —
+ * radialSegments 를 3 으로 두면 60도씩 끊겨 육각형 절반과 정확히 맞습니다. */
+let pedDoorA = null;   // +z 쪽 반쪽
+let pedDoorB = null;   // -z 쪽 반쪽
 let pedRingGeo = null;
 
 function buildPedestals(map, cfg) {
   for (const rec of G.pedestals.values()) {
+    if (rec.gate) { detach(rec.gate.group); }
     tileGroup.remove(rec.mesh);
     rec.mat.dispose();
     if (rec.ring) { tileGroup.remove(rec.ring); rec.ring.material.dispose(); }
@@ -2084,10 +2237,16 @@ function buildPedestals(map, cfg) {
 
   const scale = map.pedestalScale || 1.45;
   const R = G.hexSize * scale;
-  if (!pedGeo) {
-    // 발판도 타일과 같은 flat-top 방향으로 맞춥니다 (30도 교정)
-    pedGeo = new THREE.CylinderGeometry(
-      R * 0.97, R * 0.86, G.hexThick * 1.3, 6, 1, false, HEX_THETA, Math.PI * 2);
+  if (!pedDoorA) {
+    /* 육각형을 X 축으로 반 갈라 두 짝을 만듭니다.
+     * three.js 는 각도 θ 를 (x = r·sinθ, z = r·cosθ) 로 씁니다. 그래서
+     *   1.5π 에서 π 만큼  → (-r,0) → z>0 → (r,0)  : +z 쪽 반쪽
+     *   0.5π 에서 π 만큼  → (r,0) → z<0 → (-r,0)  : -z 쪽 반쪽
+     * 이 됩니다. 이음선이 X 축과 나란하므로 경첩도 그냥 rotation.x 입니다 —
+     * 다른 각도로 자르면 축을 맞추려고 그룹을 한 겹 더 씌워야 합니다. */
+    const th = G.hexThick * 1.3;
+    pedDoorA = new THREE.CylinderGeometry(R * 0.97, R * 0.86, th, 3, 1, false, Math.PI * 1.5, Math.PI);
+    pedDoorB = new THREE.CylinderGeometry(R * 0.97, R * 0.86, th, 3, 1, false, Math.PI * 0.5, Math.PI);
     // RingGeometry 는 thetaStart 가 7번째 인자입니다 (phiSegments 다음)
     pedRingGeo = new THREE.RingGeometry(R * 1.02, R * 1.16, 6, 1, HEX_THETA, Math.PI * 2);
   }
@@ -2107,11 +2266,37 @@ function buildPedestals(map, cfg) {
       transparent: true,
       opacity: 1
     });
-    const mesh = new THREE.Mesh(pedGeo, mat);
+    /* mesh 는 이제 Group 입니다. 바깥 코드는 position.y / visible 만 만지므로
+     * Mesh 였을 때와 똑같이 동작합니다(위아래 부유, 착지면 계산 전부 그대로). */
+    const mesh = new THREE.Group();
     mesh.position.set(p.x, p.y, p.z);
-    mesh.receiveShadow = true;
-    mesh.castShadow = true;
+
+    /* 경첩은 각 문짝의 바깥 모서리에 둡니다. 문짝 메시를 그만큼 반대로
+     * 밀어 두었으므로 닫힌 상태의 위치는 종전 한 장짜리와 동일합니다. */
+    const hz = halfZ * 0.97;
+    const doorA = new THREE.Mesh(pedDoorA, mat);
+    doorA.position.z = -hz;
+    doorA.receiveShadow = true; doorA.castShadow = true;
+    const hingeA = new THREE.Group();
+    hingeA.position.z = hz;
+    hingeA.add(doorA);
+
+    const doorB = new THREE.Mesh(pedDoorB, mat);
+    doorB.position.z = hz;
+    doorB.receiveShadow = true; doorB.castShadow = true;
+    const hingeB = new THREE.Group();
+    hingeB.position.z = -hz;
+    hingeB.add(doorB);
+
+    mesh.add(hingeA, hingeB);
     tileGroup.add(mesh);
+
+    /* 관문은 tileGroup 이 아니라 fxGroup 에 둡니다 — 층 반투명 처리
+     * (applyLayerTransparency)가 타일 재질을 훑는데, 거기 섞이면 관문까지
+     * 같이 흐려집니다. */
+    const gate = makeGate(R, 0x88ccff);
+    gate.group.position.set(p.x, p.y, p.z);
+    fxGroup.add(gate.group);
 
     const ring = new THREE.Mesh(pedRingGeo, new THREE.MeshBasicMaterial({
       color: 0x88ccff, transparent: true, opacity: 0.55,
@@ -2128,7 +2313,10 @@ function buildPedestals(map, cfg) {
       hexR: R,           // 발판은 자기 반지름으로 판정 (타일보다 큼)
       minX: p.x - halfX, maxX: p.x + halfX,
       minZ: p.z - halfZ, maxZ: p.z + halfZ,
-      mesh, mat, ring, baseY: p.y,
+      mesh, mat, ring, hingeA, hingeB, gate, baseY: p.y,
+      /* 카운트다운 맥동이 되돌아갈 기준 불투명도. 좌석 색이 정해지면
+       * 아래 좌석 색 갱신 루프가 이 값을 다시 씁니다. */
+      ringBase: 0.55,
       state: 'idle', clearAt: 0, phase: Math.random() * 6.28
     });
   }
@@ -2155,30 +2343,132 @@ function tintPedestals() {
       rec.mat.color.set(c).lerp(new THREE.Color(0xffffff), 0.45);
       rec.mat.emissive.set(c);
       rec.mat.emissiveIntensity = 0.5;
+      rec.emiBase = 0.5;
       rec.ring.material.color.set(c);
       rec.ring.material.opacity = 0.75;
+      rec.ringBase = 0.75;
     } else {
       rec.mat.color.setHex(0xf2f7ff);
       rec.mat.emissive.setHex(0x88ccff);
       rec.mat.emissiveIntensity = 0.28;
+      rec.emiBase = 0.28;
       rec.ring.material.color.setHex(0x88ccff);
       rec.ring.material.opacity = 0.35;
+      rec.ringBase = 0.35;
     }
     rec.mat.needsUpdate = true;
   }
 }
 
-/* 게임 시작 — 발판이 아래로 떨어지며 사라집니다 */
+/* 접수 게이트가 열리는 데 걸리는 시간과 젖혀지는 각도.
+ * 1.9 rad ≈ 109도 — 수직(90도)을 넘겨야 문짝이 아래로 늘어져 보입니다. */
+const PED_OPEN_MS = 360;
+const PED_OPEN_RAD = 1.9;
+
+/* ══════════════════════════════════════════════════════════════════════
+ * 빛의 관문 (대기 발판 연출)
+ * ────────────────────────────────────────────────────────────────────
+ * ★ 이 게임에는 블룸(후처리)이 없습니다. 그래서 '빛남'은 가산 블렌딩으로
+ *   만듭니다 — 겹칠수록 밝아지므로 링을 두세 겹 포개면 중심이 하얗게
+ *   타오르는 것처럼 보입니다. depthWrite 를 끄는 것도 필수입니다.
+ *   켜두면 투명한 링끼리 서로를 가려 겹침이 사라집니다.
+ *
+ * ★ 텍스처는 파일이 아니라 캔버스로 그립니다. 이 저장소 규칙대로 에셋이
+ *   없어도 게임이 돌아야 하기 때문입니다.
+ * ══════════════════════════════════════════════════════════════════════ */
+let glowTex = null;
+
+function makeGlowTexture() {
+  if (glowTex) return glowTex;
+  const N = 128;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = N;
+  const g = cv.getContext('2d');
+  const grd = g.createRadialGradient(N / 2, N / 2, 0, N / 2, N / 2, N / 2);
+  grd.addColorStop(0.00, 'rgba(255,255,255,1)');
+  grd.addColorStop(0.25, 'rgba(255,255,255,0.55)');
+  grd.addColorStop(0.60, 'rgba(255,255,255,0.12)');
+  grd.addColorStop(1.00, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, N, N);
+  glowTex = new THREE.CanvasTexture(cv);
+  glowTex.encoding = THREE.sRGBEncoding;
+  return glowTex;
+}
+
+/* 관문 = 발판 테두리를 감싸는 두 겹의 링 + 가운데 빛무리.
+ * 캐릭터는 이 링 한가운데의 해치를 통해 떨어지므로, 문이 열리며 빛을
+ * 뚫고 내려가는 그림이 됩니다. */
+let gateRingGeo = null, gateRingGeo2 = null;
+
+function makeGate(R, color) {
+  if (!gateRingGeo) {
+    gateRingGeo = new THREE.RingGeometry(R * 1.22, R * 1.46, 48);
+    gateRingGeo2 = new THREE.RingGeometry(R * 1.02, R * 1.12, 40);
+  }
+  const gate = new THREE.Group();
+  const mk = (geo, y) => {
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color: color, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      depthWrite: false, toneMapped: false
+    }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = y;
+    gate.add(m);
+    return m;
+  };
+  const outer = mk(gateRingGeo, 0.10);
+  const inner = mk(gateRingGeo2, 2.30);
+
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeGlowTexture(), color: color, transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false
+  }));
+  /* 빛무리 크기. 가산 블렌딩은 밝은 배경(캔디 스카이 등)에서 금방 포화되어,
+   * 크게 잡으면 발판과 캐릭터가 흰 덩어리에 묻힙니다. 발판 지름 정도가 한계입니다. */
+  halo.scale.setScalar(R * 1.9);
+  halo.position.y = 1.2;
+  gate.add(halo);
+
+  return { group: gate, outer, inner, halo };
+}
+
+/* 관문이 터지는 순간 — 링이 바깥으로 퍼져 나갑니다.
+ * 기존 dashTrails 풀을 그대로 씁니다(수명이 다하면 알아서 정리됩니다). */
+function spawnGateFlare(x, y, z, color) {
+  const S = G.hexSize || 3.2 / 1.5;
+  if (!dashTrailGeo) dashTrailGeo = new THREE.RingGeometry(S * 0.35, S * 0.62, 18);
+  for (let i = 0; i < 5; i++) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: i < 2 ? 0xffffff : color, transparent: true, opacity: 0.95,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      depthWrite: false, toneMapped: false
+    });
+    const m = new THREE.Mesh(dashTrailGeo, mat);
+    m.position.set(x, y + 0.2 + i * 0.45, z);
+    m.rotation.x = -Math.PI / 2;
+    m.scale.setScalar(1.6 + i * 0.5);
+    fxGroup.add(m);
+    dashTrails.push({ mesh: m, mat, life: 0.55 - i * 0.05 });
+  }
+}
+
+/* 게임 시작 — 발판이 접수 게이트처럼 좌우로 갈라지며 열립니다 */
 function clearPedestals() {
   if (!G.pedestalsActive) return;
   G.pedestalsActive = false;
   const now = performance.now();
-  let i = 0;
+  /* ★ 시차를 두지 않습니다.
+   * state 가 'clearing' 이 되는 순간 findLanding 이 이 발판을 건너뛰므로
+   * 지지면은 전원이 동시에 사라집니다. 예전처럼 문 여는 시각만 40ms 씩
+   * 늦추면, 아직 닫혀 있는 문을 통과해 떨어지는 사람이 생깁니다. */
   for (const rec of G.pedestals.values()) {
     rec.state = 'clearing';
-    rec.clearAt = now + i * 40;   // 살짝씩 시차를 두어 도미노처럼
-    i++;
+    rec.clearAt = now;
+    if (rec.gate) spawnGateFlare(rec.x, rec.baseY, rec.z, 0x9fe4ff);
   }
+  riftAfterglow = 1;     // 하늘 균열이 한 번 확 타올랐다 사그라듭니다
   Sound.sfx('start');
 }
 
@@ -2191,21 +2481,93 @@ function updatePedestals(dt, now) {
       rec.ring.position.y = rec.baseY + bob + G.hexThick * 0.68;
       rec.ring.rotation.z += dt * 0.35;
       rec.top = rec.mesh.position.y + G.hexThick * 1.3 / 2;
+
+      /* ── 카운트다운 맥동 ──────────────────────────────────────────
+       * 종전 카운트다운은 화면 한가운데 숫자뿐이라, 내가 서 있는 발판과
+       * 아무 관계가 없어 보였습니다. 초가 바뀔 때마다 발밑 링이 같이
+       * 번쩍이면 숫자와 발판이 한 사건이 됩니다.
+       * 서버 시계(G.serverOffset 보정)를 쓰므로 모든 화면이 같은 박자입니다. */
+      if (G.phase === 'countdown' && G.phaseEndsAt) {
+        const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
+        const frac = (left % 1000) / 1000;      // 초가 바뀌는 순간 1 → 0 으로 감쇠
+        const pulse = Math.pow(frac, 2.4);
+        rec.ring.material.opacity = Math.min(1, rec.ringBase + 0.55 * pulse);
+        rec.ring.scale.setScalar(1 + 0.12 * pulse);
+        rec.mat.emissiveIntensity = 0.35 + 1.0 * pulse;
+      } else {
+        /* 카운트다운이 아니면 항상 기준값으로 되돌립니다.
+         * ★ 처음에는 '변형됐을 때만' 되돌리려고 scale !== 1 로 걸렀는데,
+         *   맥동 끝자락 값이 1.0000019 처럼 1 에 아주 가깝게 남아 판정이
+         *   어긋났습니다. 되돌릴 목적지가 ringBase(좌석 색 갱신이 써 주는
+         *   값)라서 매 프레임 덮어써도 싸울 상대가 없습니다 — 조건을 두는
+         *   것보다 무조건 맞추는 쪽이 단순하고 정확합니다. */
+        rec.ring.scale.setScalar(1);
+        rec.ring.material.opacity = rec.ringBase;
+        rec.mat.emissiveIntensity = rec.emiBase !== undefined ? rec.emiBase : 0.35;
+      }
+
+      /* ── 빛의 관문 ────────────────────────────────────────────────
+       * 대기 중에는 은은하게 돌기만 하고, 카운트다운에 들어가면 회전이
+       * 빨라지며 밝아집니다. '곧 열린다'가 숫자를 안 봐도 읽혀야 합니다. */
+      if (rec.gate) {
+        const g = rec.gate;
+        let heat = 0;              // 0 = 대기, 1 = 개방 직전
+        if (G.phase === 'countdown' && G.phaseEndsAt) {
+          const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
+          heat = THREE.MathUtils.clamp(1 - left / 5000, 0, 1);
+        }
+        const spin = 0.35 + heat * 3.2;
+        g.outer.rotation.z += dt * spin;
+        g.inner.rotation.z -= dt * spin * 1.4;
+        /* 초가 바뀔 때마다 한 번 더 번쩍이게 해서 발밑 링 맥동과 박자를 맞춥니다 */
+        let beat = 0;
+        if (G.phase === 'countdown' && G.phaseEndsAt) {
+          const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
+          beat = Math.pow((left % 1000) / 1000, 2.4);
+        }
+        /* ★ 상한을 1 로 두면 안 됩니다. 가산 블렌딩에서 1 은 이미 '하얗게
+         *   탄' 상태라, 배경이 밝은 테마에서는 링 모양 자체가 사라집니다.
+         *   링이 보이려면 배경과의 차이가 남아 있어야 합니다. */
+        const base = 0.10 + heat * 0.30;
+        g.outer.material.opacity = Math.min(0.62, base + beat * 0.26);
+        g.inner.material.opacity = Math.min(0.52, base * 0.8 + beat * 0.20);
+        g.halo.material.opacity = Math.min(0.30, 0.03 + heat * 0.14 + beat * 0.12);
+        g.group.position.y = rec.mesh.position.y;
+        g.group.visible = true;
+      }
     } else if (rec.state === 'clearing') {
       if (now < rec.clearAt) continue;
-      const t = (now - rec.clearAt) / 520;
-      if (t >= 1) {
+      /* ── 접수 게이트 열림 ────────────────────────────────────────
+       * 0 ~ 1 : 두 짝이 바깥 모서리를 축으로 아래로 젖혀집니다.
+       * 1 ~ 1.6 : 다 열린 뒤 옅어지며 사라집니다.
+       * 지지면은 이미 없어졌으므로(state !== 'idle') 주자는 문이 열리는
+       * 동안 그 틈으로 떨어집니다 — 그림과 물리가 같은 시각에 일어납니다. */
+      const t = (now - rec.clearAt) / PED_OPEN_MS;
+      const k = Math.min(1, t);
+      const e = 1 - Math.pow(1 - k, 3);        // ease-out: 처음에 확 열립니다
+      /* 경첩이 +z 인 문짝은 몸통이 -z 쪽에 있으므로 rotation.x 가 음수일 때
+       * 아래로 내려갑니다(y' = -z·sinθ). 반대쪽은 부호만 뒤집습니다. */
+      rec.hingeA.rotation.x = -e * PED_OPEN_RAD;
+      rec.hingeB.rotation.x = e * PED_OPEN_RAD;
+      rec.ring.material.opacity = Math.max(0, rec.ringBase * (1 - k));
+      /* 관문은 문이 열리는 동안 빠르게 사그라듭니다 — 빛이 남아 있으면
+       * 주자가 그 안으로 떨어지는 그림이 가려집니다. */
+      if (rec.gate) {
+        const f = Math.max(0, 1 - k * 1.8);
+        rec.gate.outer.material.opacity *= f;
+        rec.gate.inner.material.opacity *= f;
+        rec.gate.halo.material.opacity *= f;
+        rec.gate.outer.scale.setScalar(1 + k * 0.5);
+        rec.gate.inner.scale.setScalar(1 + k * 0.8);
+      }
+      if (t >= 1.6) {
         rec.state = 'gone';
         rec.mesh.visible = false;
         rec.ring.visible = false;
+        if (rec.gate) rec.gate.group.visible = false;
         continue;
       }
-      rec.mesh.position.y = rec.baseY - t * t * 42;
-      rec.mesh.rotation.x = t * 1.4;
-      rec.mesh.rotation.z = t * 0.9;
-      rec.mesh.scale.setScalar(Math.max(0.02, 1 - t * 0.6));
-      rec.mat.opacity = Math.max(0, 1 - t * 1.15);
-      rec.ring.visible = false;
+      if (t > 1) rec.mat.opacity = Math.max(0, 1 - (t - 1) / 0.6);
     }
   }
 }
@@ -2568,6 +2930,73 @@ const MODEL_CLIPS = {
 };
 const MODEL_CLIP_ORDER = ['dead', 'run', 'jump', 'fall', 'idle'];
 
+/* ══════════════════════════════════════════════════════════════════════
+ * 루트 모션 제거 (제자리 애니메이션으로 만들기)
+ * ────────────────────────────────────────────────────────────────────
+ * ★ 이 게임은 캐릭터 위치를 코드가 정합니다(물리 → local.render). 그런데
+ *   Mixamo 달리기 클립에는 '앞으로 나아가는' 이동이 애니메이션 자체에
+ *   들어 있습니다(루트 모션). 그대로 재생하면 아바타 그룹은 코드가 정한
+ *   자리에 있는데 그 '안에서' 모델이 앞으로 밀려 나갔다가, 클립이 루프할
+ *   때 시작 위치로 뚝 되돌아옵니다.
+ *
+ *   실측: run 클립이 한 주기(0.733초)에 월드 기준 2.21유닛을 전진시킵니다.
+ *   타일 간격이 3.69유닛이니 타일 절반 이상을 갔다가 되돌아오는 셈입니다 —
+ *   '분명히 타일을 지나갔는데 다시 시작점으로 오는' 증상의 정체입니다.
+ *
+ * ★ 왜 옆으로 달릴 때 더 잘 보이는가: 되돌아오는 방향이 캐릭터의 정면
+ *   축입니다. 화면 안쪽으로 달리면 그 축이 시선과 나란해 단축되어 보이고,
+ *   화면을 가로질러 달리면 그대로 옆으로 튀는 것이 보입니다.
+ *
+ * ★ 어느 채널이 전진인지는 모델마다 다릅니다(리그 방향·축 회전).
+ *   이 모델은 Hips.position 의 Y 채널이 전진이고 폭이 31.7 로, 나머지
+ *   (X 0.25 · Z 0.78)보다 40배 이상 큽니다. 그래서 '가장 큰 채널이 나머지
+ *   최대의 3배를 넘을 때만' 그 채널을 평탄화합니다 — 축을 박아 두면 모델을
+ *   바꿀 때 엉뚱한 축(위아래 들썩임)을 지워 버립니다.
+ *   나머지 채널은 남겨 둡니다. 위아래 들썩임과 좌우 흔들림은 살아 있어야
+ *   달리는 맛이 납니다.
+ * ══════════════════════════════════════════════════════════════════════ */
+function stripRootMotion(clip) {
+  if (!clip || !clip.tracks) return null;
+  /* 루트 본 이름은 리그마다 다릅니다. Hips 가 가장 흔하고, 없으면
+   * 키가 3개 이상인 첫 position 트랙을 루트로 봅니다(고정 본은 키가 2개). */
+  let track = clip.tracks.find((t) => /hips\.position$/i.test(t.name));
+  if (!track) {
+    track = clip.tracks.find((t) => /\.position$/.test(t.name) && t.values.length / 3 > 2);
+  }
+  if (!track) return null;
+
+  const v = track.values;
+  const n = v.length / 3;
+  if (n < 2) return null;
+  const span = [0, 1, 2].map((c) => {
+    let mn = Infinity, mx = -Infinity;
+    for (let i = 0; i < n; i++) { const x = v[i * 3 + c]; if (x < mn) mn = x; if (x > mx) mx = x; }
+    return mx - mn;
+  });
+  let dom = 0;
+  for (let c = 1; c < 3; c++) if (span[c] > span[dom]) dom = c;
+  const others = span.filter((_, i) => i !== dom);
+  const rest = Math.max(others[0], others[1]);
+  /* 뚜렷하게 지배적이지 않으면 건드리지 않습니다. 제자리 클립을 잘못
+   * 평탄화해 들썩임을 없애는 것이 루트 모션을 남기는 것보다 나쁩니다.
+   *
+   * ★ 경계값 8 은 이 모델의 실측에서 나왔습니다 (Hips.translation 채널 폭):
+   *     running  X0.25  Y31.74  Z0.78  → 지배 Y, 비율 40.8   ← 루트 모션
+   *     jumping  X0.90  Y53.55  Z5.69  → 지배 Y, 비율  9.4   ← 루트 모션
+   *     idle     X2.15  Y 0.42  Z0.17  → 지배 X, 비율  5.1   ← 좌우 흔들림
+   *     fall     X0.82  Y 0.81  Z0.19  → 지배 X, 비율  1.0   ← 없음
+   *   처음에 3 으로 잡았더니 idle 의 좌우 흔들림(비율 5.1)까지 지워
+   *   가만히 서 있을 때 뻣뻣해졌습니다. 9.4 와 5.1 사이를 가르는 8 이
+   *   양쪽에 여유가 있습니다.
+   *   다른 모델로 바꿨을 때 의도치 않게 지워지면 로드 로그의 CHAR.rootMotion
+   *   목록에 그 클립이 뜨므로 바로 알 수 있습니다. */
+  if (!(span[dom] > rest * 8) || span[dom] <= 1e-6) return null;
+
+  const base = v[dom];
+  for (let i = 0; i < n; i++) v[i * 3 + dom] = base;
+  return { axis: 'XYZ'[dom], span: span[dom], track: track.name };
+}
+
 function pickClip(animations, candidates) {
   const lower = animations.map(a => ({ a, n: a.name.toLowerCase() }));
   for (const c of candidates) {
@@ -2739,6 +3168,15 @@ function applyLoadedModel(gltf) {
     );
   } else {
     CHAR.clipMode = '이름 기준';
+  }
+
+  /* ★ 클립 배정이 전부 끝난 뒤에 한 번만 적용합니다.
+   * 위 분기들이 CHAR.clips 를 통째로 갈아치우므로 중간에 하면 날아갑니다.
+   * 아바타는 이 뒤 rebuildAllAvatars() 에서 만들어지므로 순서도 맞습니다. */
+  CHAR.rootMotion = [];
+  for (const key of Object.keys(CHAR.clips)) {
+    const r = stripRootMotion(CHAR.clips[key]);
+    if (r) CHAR.rootMotion.push(key + ' ' + r.axis + '축 ' + r.span.toFixed(1));
   }
   /* 남은 구멍 메우기.
    * 애니메이션이 하나도 없는 모델(Sketchfab 다수)에서 undefined 가
@@ -3263,6 +3701,33 @@ function buildProceduralAvatar(colorHex, name, seat) {
 /* ---------------------------------------------------------------------------
  * 애니메이션 — GLB 는 클립 크로스페이드, 절차적은 진자 + 스쿼시
  * ------------------------------------------------------------------------- */
+/* ── 달리기 클립 재생속도 ─────────────────────────────────────────────
+ * ★ 발이 땅에 붙어 있으려면 재생속도가 이동속도에 "비례"해야 합니다.
+ *   한 걸음에 나아가는 거리는 클립이 정한 고정값이므로,
+ *       초당 걸음수 × 걸음거리 = 이동속도
+ *   여야 발이 제자리에 심어집니다. 비례가 깨지면 심은 발이 땅 위를
+ *   미끄러지고, 그게 '앞으로 갔는데 발이 뒤로 밀리는' 느낌이 됩니다.
+ *
+ * ★ 종전 공식 0.7 + speed01*0.9 는 비례가 아니라 '오프셋 + 비례' 였습니다.
+ *   속도당 재생값이 걷기 0.0885 / 질주 0.0744 로 19% 어긋나고,
+ *   저속에서는 상수항 0.7 이 지배해 속도 2 에서 5배까지 벌어집니다
+ *   (제자리걸음에 가까운데 다리는 거의 전속으로 젓습니다).
+ *
+ * ★ STRIDE_REF 는 '클립이 원래 상정한 이동속도'입니다. 이 값에서 재생속도
+ *   1.0 이 되고, 나머지는 전부 여기서 비례로 나옵니다. 질주(21.5)에서
+ *   종전과 같은 1.6 이 나오도록 21.5/1.6 = 13.44 로 잡았습니다 —
+ *   가장 오래 보는 속도의 그림을 바꾸지 않으면서 비례만 되돌립니다.
+ *   발이 여전히 미끄러지면 이 숫자 하나만 올리거나 내리면 됩니다
+ *   (크게 잡을수록 다리를 천천히 젓습니다).
+ */
+const STRIDE_REF = 13.44;
+const RUN_TS_MIN = 0.35;   // 크로스페이드 도중 0 이 되어 클립이 얼어붙지 않게
+
+function runTimeScale(speed01) {
+  const speed = speed01 * PHYS.SPRINT;
+  return Math.max(RUN_TS_MIN, speed / STRIDE_REF);
+}
+
 function animateAvatar(av, dt, speed01, state) {
   if (!av) return;
   av.clock += dt;
@@ -3271,7 +3736,7 @@ function animateAvatar(av, dt, speed01, state) {
   if (av.isModel) {
     let key = av.actions[state] ? state : 'idle';
     crossFadeTo(av, key, state === 'dead' ? 0.12 : 0.18);
-    if (av.actions.run) av.actions.run.setEffectiveTimeScale(0.7 + speed01 * 0.9);
+    if (av.actions.run) av.actions.run.setEffectiveTimeScale(runTimeScale(speed01));
     av.mixer.update(dt);
     av.plate.visible = state !== 'dead';
     if (av.ring) av.ring.visible = state !== 'dead';
@@ -3309,7 +3774,7 @@ function animateAvatar(av, dt, speed01, state) {
     sy = 1 - av.landSquash * 0.28;
     sx = 1 + av.landSquash * 0.22;
   }
-  const sm = Math.min(1, dt * 20);
+  const sm = smoothK(20, dt);
   av.group.scale.set(L(av.group.scale.x, sx, sm), L(av.group.scale.y, sy, sm), L(av.group.scale.z, sx, sm));
 
   /* 공중 포즈 */
@@ -3361,6 +3826,18 @@ const local = {
    * 층 높이를 여기 박아 두면 층 구성이 바뀔 때마다 같이 고쳐야 합니다. */
   pos: new THREE.Vector3(0, 0, 0),
   vel: new THREE.Vector3(0, 0, 0),
+  /* ── 렌더 보간용 ──────────────────────────────────────────────────
+   * pos 는 '마지막 물리 스텝이 끝난 위치'라 60Hz 격자 위에서만 움직입니다.
+   * 화면 주사율은 그 격자와 정확히 맞지 않으므로, pos 를 그대로 그리면
+   * 어떤 프레임은 스텝이 0번(제자리), 어떤 프레임은 2번(두 배로 튐) 돌아
+   * 미세한 덜컹임이 생깁니다. prev(직전 스텝 위치)와 alpha(남은 누산기
+   * 비율)로 그 사이를 메워 그립니다.
+   *
+   * ★ 물리·네트워크는 계속 pos 만 씁니다. render 는 오직 그리기 전용입니다 —
+   *   물리에까지 보간값을 쓰면 판정이 프레임률에 따라 달라집니다.       */
+  prev: new THREE.Vector3(0, 0, 0),
+  render: new THREE.Vector3(0, 0, 0),
+  alpha: 1,
   ry: 0,
   grounded: false,
   groundTile: null,
@@ -3404,7 +3881,11 @@ window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; }
  * userZoomed 는 사용자가 휠을 돌린 적이 있는지 — 있으면 맵이 새로 깔려도
  * 사용자가 맞춰 둔 줌을 존중해 강제로 되돌리지 않습니다.               */
 const cam = {
-  yaw: 0, pitch: 0.62, dist: CAM.DIST, targetDist: CAM.DIST, height: CAM.HEIGHT,
+  /* 초기 피치는 지상 자동 피치(0.5)와 같아야 합니다. 종전 0.62 는 라운드가
+   * 시작되면 0.5 로 천천히 수렴하는데, 시정수가 1.1초라 첫 2~3초 동안
+   * 카메라가 계속 기울어집니다 — 진단에서 잡힌 '피치폭 0.099' 가 이것입니다.
+   * 끊김은 아니지만 라운드 시작마다 화면이 미세하게 흘러내립니다. */
+  yaw: 0, pitch: 0.5, dist: CAM.DIST, targetDist: CAM.DIST, height: CAM.HEIGHT,
   minDist: CAM.MIN, maxDist: CAM.MAX, scale: 1, userZoomed: false,
   dragging: false, lx: 0, ly: 0
 };
@@ -3810,10 +4291,30 @@ function applyRotationCarry() {
   const c = Math.cos(dTheta), sn = Math.sin(dTheta);
   const x = local.pos.x * c - local.pos.z * sn;
   const z = local.pos.x * sn + local.pos.z * c;
+  /* ★ 이 변위는 vel 을 거치지 않습니다 — 바닥이 주자를 실어 나르는 것이라
+   * 속도가 아니라 위치를 직접 돌립니다. 그래서 '속도 × 시간'으로 이동량을
+   * 검산하는 쪽에서는 이 몫을 따로 더해 줘야 합니다. 안 그러면 회전층에
+   * 서 있다는 이유만으로 물리가 고장난 것처럼 보입니다. */
+  local.carryAccum = (local.carryAccum || 0) +
+    Math.hypot(x - local.pos.x, z - local.pos.z);
   local.pos.x = x;
   local.pos.z = z;
   // 몸도 같이 돌아야 발밑과 어긋나지 않습니다 (제자리에서 미끄러져 보임)
   local.ry += dTheta;
+}
+
+/**
+ * 위치가 순간이동했을 때 보간 흔적을 지웁니다.
+ *
+ * ★ 이걸 빼먹으면 대시·점프·스폰·서버 보정처럼 좌표가 확 바뀌는 순간에
+ *   prev 가 옛 위치로 남아, 새 위치까지 한 프레임 동안 '주욱 미끄러지는'
+ *   그림이 나옵니다. 순간이동은 보간 대상이 아니라 보간을 끊어야 하는
+ *   사건입니다.
+ */
+function snapRender() {
+  local.prev.copy(local.pos);
+  local.render.copy(local.pos);
+  local.alpha = 1;
 }
 
 function stepPhysics(dt) {
@@ -3932,6 +4433,10 @@ function stepPhysics(dt) {
         Sound.sfx('land', { volume: Math.min(1, -local.vel.y / 40) });
       }
       local.pos.y = hit.surf;
+      /* 충격 세기는 vel.y 를 0 으로 만들기 전에 읽어야 합니다.
+       * wasGrounded 로 걸러 '공중에서 내려온 착지'만 흔듭니다 — 지면을
+       * 스치며 달릴 때도 이 분기를 지나가기 때문입니다. */
+      if (!wasGrounded) addCamShake(-local.vel.y);
       local.vel.y = 0;
       local.grounded = true;
       local.layer = hit.layer;
@@ -4010,6 +4515,7 @@ function stepPhysics(dt) {
       local.vel.set(0, 0, 0);
       local.grounded = true;
       local.jumped = false;
+      snapRender();
       local.lastGroundY = myPed.top;
       local.anim = 'idle';
       Sound.sfx('land', { volume: 0.4 });
@@ -4186,6 +4692,7 @@ function devTeleport(layerIndex) {
   local.grounded = false;
   local.jumped = false;
   local.dying = 0;
+  snapRender();
   local.layer = layerIndex;
   local.lastGroundY = py;
 
@@ -5001,7 +5508,7 @@ function updateTiles(dt, now) {
 
     /* 층 반투명 × 위상 OFF 반투명. 둘을 곱하는 이유는 tileAlphaFor 참고. */
     const wantAlpha = tileAlphaFor(rec);
-    rec.mat.opacity += (wantAlpha - rec.mat.opacity) * Math.min(1, dt * 6);
+    rec.mat.opacity += (wantAlpha - rec.mat.opacity) * smoothK(6, dt);
 
     /* ── 균열 오버레이 추종 ────────────────────────────────────────
      * 타일은 마모되면 가라앉고, 경고 중엔 진동하고, 스케일도 줄어듭니다.
@@ -5412,7 +5919,7 @@ class RemoteRunner {
      * 그래서 slerp 결과에서 yaw 만 뽑아 rotation.y 에 넣습니다.          */
     this._qCur.setFromAxisAngle(UP_AXIS, av.group.rotation.y);
     this._qTarget.setFromAxisAngle(UP_AXIS, this.renderRy);
-    this._qCur.slerp(this._qTarget, Math.min(1, dt * 14));
+    this._qCur.slerp(this._qTarget, smoothK(14, dt));
     // Y축 회전 쿼터니언 (0, sin(θ/2), 0, cos(θ/2)) 에서 θ 복원
     av.group.rotation.y = 2 * Math.atan2(this._qCur.y, this._qCur.w);
     this.speed01 = vel ? THREE.MathUtils.clamp(Math.hypot(vel.x, vel.z) / PHYS.SPRINT, 0, 1) : 0;
@@ -5438,6 +5945,76 @@ function lerpAngle(a, b, k) {
 
 const camTarget = new THREE.Vector3();
 const camDesired = new THREE.Vector3();
+/* camTarget.lerp 에 넘길 목표점. 매 프레임 new THREE.Vector3 를 만들면
+ * 초당 60개가 쓰레기로 쌓입니다. */
+const _camGoal = new THREE.Vector3();
+
+/**
+ * 프레임률에 영향받지 않는 지수 평활 계수.
+ *
+ * ★ `dt * k` 는 틀린 근사입니다.
+ *   지수 평활의 정확한 계수는 1 − e^(−k·dt) 인데, dt 가 작을 때만 dt·k 와
+ *   비슷합니다. 60fps 에서 k=8 이면 정확값 0.1248 vs 근사값 0.1333 — 7%
+ *   차이이고, 더 나쁜 것은 그 오차가 dt 에 비례해 '프레임마다 달라진다'는
+ *   점입니다. 카메라 추종 지연이 매 프레임 흔들리면, 월드에서 완벽하게
+ *   등속으로 달려도 화면 속 캐릭터는 앞뒤로 떱니다.
+ *
+ *   이 게임은 평활을 두 겹으로 겁니다(플레이어 → camTarget → camera.position).
+ *   두 겹이 각자 오차를 내므로 체감은 한 겹일 때의 두 배가 됩니다.
+ *
+ * ★ 같은 k 값을 그대로 넘겨도 됩니다. 정상 상태의 추종 지연은 거의 같고,
+ *   달라지는 것은 '프레임 시간이 흔들려도 결과가 같다'는 성질뿐입니다.
+ */
+function smoothK(k, dt) {
+  return 1 - Math.exp(-k * dt);
+}
+
+/* ── 낙하 속도선 ─────────────────────────────────────────────────────
+ * 세기는 '지금 낙하 속도 ÷ 한 층 낙하 속도(G.fallNorm)' 로 정합니다.
+ * 절대 속도로 잡으면 LAYER_GAP 을 바꿀 때마다 다시 맞춰야 하는데, 이 비율은
+ * 층 간격이 얼마든 '한 층 떨어지는 중 = 1.0' 이라는 뜻을 유지합니다.
+ *   0.6 부터 비치기 시작 → 1.6 에서 최대
+ *   한 층 낙하(1.0)는 옅게 스치고, 라운드 시작 낙하(≈1.55)에서 몰아칩니다.
+ */
+let speedLinesEl = null;
+let speedLinesOn = false;
+
+function updateSpeedLines(rawRatio) {
+  if (!speedLinesEl) speedLinesEl = document.getElementById('speedLines');
+  if (!speedLinesEl) return;
+  const k = THREE.MathUtils.clamp((rawRatio - 0.6) / 1.0, 0, 1);
+  const vis = !!local.alive && k > 0.001;
+  /* 클래스는 상태가 바뀔 때만 만집니다 — 매 프레임 toggle 하면 애니메이션이
+   * 계속 처음부터 다시 시작해 줄기가 떨립니다. */
+  if (vis !== speedLinesOn) {
+    speedLinesOn = vis;
+    speedLinesEl.classList.toggle('on', vis);
+  }
+  speedLinesEl.style.opacity = (k * 0.62).toFixed(3);
+}
+
+/* ── 착지 충격 카메라 흔들림 ─────────────────────────────────────────
+ * ★ lookAt 뒤에 위치만 흔듭니다. 시선(camTarget)은 건드리지 않으므로
+ *   주자는 화면에 그대로 있고 카메라만 덜컹입니다. 회전을 흔들면 조준점이
+ *   같이 튀어 조작이 흔들린 것처럼 느껴집니다.
+ *
+ * ★ 세기도 속도선과 같은 비율(충격속도 ÷ G.fallNorm)로 잡습니다.
+ *   0.45 미만(제자리 점프 착지 등)은 아예 흔들지 않습니다 — 걸어다니는 내내
+ *   화면이 덜덜거리면 연출이 아니라 잡음이 됩니다.                    */
+const CAM_SHAKE_MS = 300;
+const camShake = { t: 0, amp: 0, phase: 0, lat: new THREE.Vector3() };
+
+function addCamShake(impactSpeed) {
+  const n = (impactSpeed || 0) / (G.fallNorm || 45);
+  if (n < 0.45) return;
+  const amp = Math.min(0.95, 0.12 + (n - 0.45) * 0.55);
+  // 이미 더 센 흔들림이 돌고 있으면 약한 충격이 덮어쓰지 않게 합니다
+  if (amp <= camShake.amp * camShake.t) return;
+  camShake.amp = amp;
+  camShake.t = 1;
+  camShake.phase = 0;
+  camShake.lat.set(Math.random() * 2 - 1, 0, Math.random() * 2 - 1).normalize();
+}
 
 /* 천장(위층 판) 밑면과 카메라 사이에 남길 여유. 0 이면 카메라가 판에
  * 스치듯 붙어 근평면에 타일이 잘려 들어옵니다.                        */
@@ -5459,23 +6036,27 @@ function ceilingYAbove(y) {
 function updateCamera(dt) {
   // 탈락 연출 중에는 카메라를 캐릭터에 붙여 둡니다.
   // 곧바로 관전 시점으로 튀면 무슨 일이 일어났는지 알 수 없습니다.
-  const focus = (local.alive || local.dying > 0) ? local.pos : spectateFocus();
+  /* 카메라 초점도 보간 위치입니다. pos(60Hz 격자)를 따라가면 카메라가
+   * 격자 단위로 끊겨 움직여, 아바타를 보간해 놓고도 화면 전체가 덜컹입니다. */
+  const focus = (local.alive || local.dying > 0) ? local.render : spectateFocus();
 
-  camTarget.lerp(
-    new THREE.Vector3(focus.x, focus.y + cam.height, focus.z),
-    Math.min(1, dt * 8)
-  );
+  _camGoal.set(focus.x, focus.y + cam.height, focus.z);
+  camTarget.lerp(_camGoal, smoothK(8, dt));
 
   // Auto pitch: ease the camera up while the runner is plummeting so the
   // landing zone below stays framed, and pull it down on the top layer.
   // 45 였던 정규화 기준은 LAYER_GAP 파생(G.fallNorm)으로 바뀌었습니다.
-  const falling = THREE.MathUtils.clamp(-local.vel.y / (G.fallNorm || 45), 0, 1);
+  const fallRatio = -local.vel.y / (G.fallNorm || 45);
+  const falling = THREE.MathUtils.clamp(fallRatio, 0, 1);
   const autoPitch = 0.5 + falling * 0.42;
+  /* 속도선은 clamp 하지 않은 비율을 씁니다 — 카메라 피치는 1.0 에서
+   * 포화되지만, 속도선은 '한 층 낙하'와 '시작 낙하'를 구분해야 합니다. */
+  updateSpeedLines(fallRatio);
   cam.pitch = THREE.MathUtils.lerp(cam.pitch, THREE.MathUtils.clamp(cam.pitch, 0.08, 1.36), 1);
-  const usedPitch = cam.dragging ? cam.pitch : THREE.MathUtils.lerp(cam.pitch, autoPitch, dt * 0.9);
+  const usedPitch = cam.dragging ? cam.pitch : THREE.MathUtils.lerp(cam.pitch, autoPitch, smoothK(0.9, dt));
   if (!cam.dragging) cam.pitch = usedPitch;
 
-  cam.dist += (cam.targetDist - cam.dist) * Math.min(1, dt * 5);
+  cam.dist += (cam.targetDist - cam.dist) * smoothK(5, dt);
 
   const horiz = Math.cos(cam.pitch) * cam.dist;
   camDesired.set(
@@ -5507,8 +6088,18 @@ function updateCamera(dt) {
     camDesired.y = Math.max(camTarget.y + 1.0, Math.min(camDesired.y, limit));
   }
 
-  camera.position.lerp(camDesired, Math.min(1, dt * 9));
+  camera.position.lerp(camDesired, smoothK(9, dt));
   camera.lookAt(camTarget);
+
+  /* 착지 충격 — 시선을 잡은 뒤 위치만 덜컹입니다 (addCamShake 주석 참고).
+   * t 는 1 → 0 으로 줄고 제곱으로 감쇠시켜, 첫 덜컹이 가장 크고 빠르게 잦아듭니다. */
+  if (camShake.t > 0) {
+    camShake.t = Math.max(0, camShake.t - dt * (1000 / CAM_SHAKE_MS));
+    camShake.phase += dt * 42;
+    const k = camShake.amp * camShake.t * camShake.t;
+    camera.position.y += Math.sin(camShake.phase) * k;
+    camera.position.addScaledVector(camShake.lat, Math.sin(camShake.phase * 0.7) * k * 0.45);
+  }
 
   // 스카이돔은 항상 카메라를 중심에 둡니다. 어디로 이동하든 잘리지 않고,
   // 회전할 때만 배경이 움직여 실제 하늘처럼 보입니다.
@@ -5624,6 +6215,203 @@ function buildJoinStack(layers) {
 
 /* 최상층부터 한 칸씩 내려가며 점등 → 구름바다 → 잠깐 쉬고 반복.
  * 시놉시스 첫 줄('위에서 아래로 깎여 내려간다')을 그대로 움직임으로 옮긴 것입니다. */
+/* ══════════════════════════════════════════════════════════════════════
+ * 대기 화면 배경 — 무너지는 육각 타일
+ * ────────────────────────────────────────────────────────────────────
+ * 게임 본편과 같은 flat-top 육각 배치를 씁니다(가로 1.5R, 세로 √3R,
+ * 홀수 열 반 칸 내림). 같은 규약이라 배경과 실제 맵이 따로 놀지 않습니다.
+ *
+ * ★ 타일을 지웠다 되살리는 순환입니다. 계속 부수기만 하면 20초쯤 뒤에
+ *   화면이 텅 비어 배경이 사라집니다. 그래서 broken 이 된 타일은 일정
+ *   시간 뒤 다시 살아나고, 살아 있는 비율이 대체로 일정하게 유지됩니다.
+ *
+ * ★ 색은 층 팔레트에서 가져오되 아주 옅게 씁니다. 배경이 카드의 글자와
+ *   경쟁하면 안 되기 때문입니다 — 여기서 강하게 칠하고 싶어지면 opacity
+ *   대신 #joinBg 의 CSS opacity 를 만지세요.
+ * ══════════════════════════════════════════════════════════════════════ */
+const BG = {
+  hexR: 44,            // 육각 외접원 반지름(px)
+  breakEveryMs: 240,   // 이 간격마다 살아 있는 타일 하나를 무너뜨립니다
+  fuseMs: 620,         // 경고(금 가는 중) 지속
+  fallMs: 760,         // 무너지는 연출 길이
+  reviveMinMs: 2600,   // 되살아나기까지 최소/최대
+  reviveMaxMs: 7000,
+  fadeInMs: 900
+};
+
+let bgCanvas = null, bgCtx = null, bgTiles = [], bgRaf = 0, bgBreakAcc = 0, bgResizeBound = false;
+
+function bgLayerColors() {
+  const Ls = (G.cfg && G.cfg.LAYERS) || [];
+  const cols = Ls.map((L) => L.color).filter(Boolean);
+  return cols.length ? cols : ['#00ffcc', '#7c5cff', '#0088ff', '#ff8a3d', '#aa00ff'];
+}
+
+function bgBuild() {
+  if (!bgCanvas) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = bgCanvas.clientWidth, h = bgCanvas.clientHeight;
+  if (!w || !h) return;
+  bgCanvas.width = Math.round(w * dpr);
+  bgCanvas.height = Math.round(h * dpr);
+  bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const R = BG.hexR;
+  const dx = R * 1.5, dy = Math.sqrt(3) * R;
+  const cols = bgLayerColors();
+  bgTiles = [];
+  /* 화면 밖으로 한 칸씩 더 깔아 가장자리가 잘린 티가 안 나게 합니다. */
+  for (let q = -1; q * dx <= w + dx; q++) {
+    for (let i = -1; i * dy <= h + dy; i++) {
+      const cx = q * dx;
+      const cy = i * dy + (q % 2 ? dy / 2 : 0);
+      bgTiles.push({
+        x: cx, y: cy,
+        state: 'alive',      // alive | warn | fall | gone | rise
+        t: 0,
+        col: cols[(q * 3 + i * 5 + cols.length * 10) % cols.length],
+        /* 처음부터 몇 개는 비워 둡니다 — 전부 꽉 찬 상태로 시작하면
+         * 첫 몇 초 동안 아무 일도 안 일어나는 것처럼 보입니다. */
+        seed: (q * 7919 + i * 104729) % 1000 / 1000
+      });
+    }
+  }
+  for (const t of bgTiles) if (t.seed < 0.12) { t.state = 'gone'; t.t = t.seed * BG.reviveMaxMs; }
+}
+
+function bgHexPath(ctx, x, y, r) {
+  ctx.beginPath();
+  for (let k = 0; k < 6; k++) {
+    const a = k * Math.PI / 3;               // flat-top: 꼭짓점이 좌우를 향합니다
+    const px = x + r * Math.cos(a), py = y + r * Math.sin(a);
+    if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+function bgStep(dt) {
+  /* 살아 있는 것 중 하나를 골라 무너뜨립니다. 인덱스를 무작위로 한 번만
+   * 뽑고 그 근처를 훑습니다 — 매번 전체를 필터링하면 타일 수만큼 배열을
+   * 새로 만들게 됩니다.
+   *
+   * ★ 벽시계(performance.now)가 아니라 넘겨받은 dt 를 누적합니다.
+   *   타일의 퓨즈·부활은 dt 로 도는데 붕괴 스케줄만 벽시계를 쓰면 둘이
+   *   따로 놉니다 — 탭이 백그라운드에 다녀오면 dt 는 64ms 로 잘리는데
+   *   벽시계는 몇 초를 건너뛰어, 복귀 순간 한 장만 무너지고 나머지는
+   *   전부 되살아나 있는 이상한 상태가 됩니다. */
+  bgBreakAcc += dt;
+  if (bgBreakAcc >= BG.breakEveryMs && bgTiles.length) {
+    bgBreakAcc = 0;
+    let i = Math.floor(Math.random() * bgTiles.length);
+    for (let n = 0; n < bgTiles.length; n++) {
+      const t = bgTiles[(i + n) % bgTiles.length];
+      if (t.state === 'alive') { t.state = 'warn'; t.t = 0; break; }
+    }
+  }
+  for (const t of bgTiles) {
+    t.t += dt;
+    if (t.state === 'warn' && t.t >= BG.fuseMs) { t.state = 'fall'; t.t = 0; }
+    else if (t.state === 'fall' && t.t >= BG.fallMs) {
+      t.state = 'gone'; t.t = 0;
+      t.wait = BG.reviveMinMs + Math.random() * (BG.reviveMaxMs - BG.reviveMinMs);
+    }
+    else if (t.state === 'gone' && t.t >= (t.wait || BG.reviveMinMs)) { t.state = 'rise'; t.t = 0; }
+    else if (t.state === 'rise' && t.t >= BG.fadeInMs) { t.state = 'alive'; t.t = 0; }
+  }
+}
+
+function bgDraw() {
+  const ctx = bgCtx;
+  if (!ctx) return;
+  ctx.clearRect(0, 0, bgCanvas.clientWidth, bgCanvas.clientHeight);
+  const R = BG.hexR;
+  for (const t of bgTiles) {
+    if (t.state === 'gone') continue;
+    let a = 1, scale = 1, dy = 0, warn = 0;
+    if (t.state === 'warn') { warn = Math.min(1, t.t / BG.fuseMs); }
+    else if (t.state === 'fall') {
+      const k = Math.min(1, t.t / BG.fallMs);
+      a = 1 - k; scale = 1 - k * 0.35; dy = k * k * 26; warn = 1;
+    } else if (t.state === 'rise') {
+      a = Math.min(1, t.t / BG.fadeInMs);
+    }
+    if (a <= 0.01) continue;
+    bgHexPath(ctx, t.x, t.y + dy, R * 0.94 * scale);
+    /* 평소엔 거의 보이지 않는 종이색, 무너질 때만 층 색이 올라옵니다.
+     * '가만히 있으면 배경, 무너질 때만 눈에 띈다'가 의도입니다. */
+    ctx.fillStyle = 'rgba(236,231,216,' + (0.030 * a).toFixed(3) + ')';
+    ctx.fill();
+    if (warn > 0) {
+      ctx.fillStyle = bgHexToRgba(t.col, 0.16 * warn * a);
+      ctx.fill();
+    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = warn > 0
+      ? bgHexToRgba(t.col, (0.20 + 0.45 * warn) * a)
+      : 'rgba(236,231,216,' + (0.085 * a).toFixed(3) + ')';
+    ctx.stroke();
+  }
+}
+
+function bgHexToRgba(hex, alpha) {
+  const n = parseInt(String(hex).slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha.toFixed(3) + ')';
+}
+
+function startJoinBg() {
+  stopJoinBg();
+  if (!joinScreenVisible()) return;
+  bgCanvas = document.getElementById('joinBg');
+  if (!bgCanvas || !bgCanvas.getContext) return;
+  bgCtx = bgCanvas.getContext('2d');
+  bgBuild();
+  if (!bgResizeBound) {
+    bgResizeBound = true;
+    /* 리사이즈마다 격자를 다시 만듭니다. 캔버스 픽셀 크기가 바뀌면 좌표가
+     * 어긋나므로 늘리기만 해서는 안 됩니다. */
+    window.addEventListener('resize', () => { if (bgRaf) bgBuild(); });
+  }
+  /* 연출 최소화 설정이면 한 장만 그리고 멈춥니다. */
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    bgDraw();
+    return;
+  }
+  let last = performance.now();
+  const frame = (now) => {
+    if (!bgRaf) return;
+    const dt = Math.min(64, now - last);   // 탭 복귀 시 한 프레임에 몰아 도는 것 방지
+    last = now;
+    bgStep(dt);
+    bgDraw();
+    bgRaf = requestAnimationFrame(frame);
+  };
+  bgRaf = requestAnimationFrame(frame);
+}
+
+function stopJoinBg() {
+  if (bgRaf) { cancelAnimationFrame(bgRaf); bgRaf = 0; }
+  if (bgCtx && bgCanvas) bgCtx.clearRect(0, 0, bgCanvas.clientWidth, bgCanvas.clientHeight);
+  bgTiles = [];
+}
+
+/**
+ * 라운드 시작 낙하 동안 주자끼리 밀지 않게 막는 시간(ms).
+ *
+ * ★ 종전에는 BUMP.START_GRACE_MS = 700 이 박혀 있었습니다. 그 700 의 근거는
+ *   '발판 높이 9 에서 떨어지는 데 0.54초'였는데, 높이를 45 로 올리면 낙하가
+ *   1.2초라 창이 먼저 닫힙니다. 그러면 전원이 공중에 뜬 채로 서로 밀어
+ *   시작하자마자 난장판이 됩니다 — 바로 그 상황을 막으려고 만든 창인데
+ *   높이 하나 바꿨다고 무력해지는 셈입니다.
+ *
+ *   그래서 서버가 내려준 실제 높이에서 매번 계산합니다.
+ *       낙하 시간 = √(2·h/g),  여기에 착지 정리용 여유 260ms
+ */
+function startFallGraceMs() {
+  const rise = (G.cfg && G.cfg.PEDESTAL_RISE) || 9;
+  const g = Math.abs(PHYS.GRAVITY) || 62;
+  return Math.round(Math.sqrt(2 * rise / g) * 1000) + 260;
+}
+
 /** 대기 화면이 아직 떠 있는가.
  *
  * ★ 두 연출 타이머(층 스택 점등·대기열 폴링)의 시작 조건입니다.
@@ -5716,6 +6504,7 @@ function buildRulesText() {
   buildSynopsis(layers);
   buildJoinStack(layers);
   startQueuePoll();
+  startJoinBg();
   /* 좌석 수도 config 파생으로. 종전에는 '최대 4인'이 마크업에 박혀 있어
    * MAX_PLAYERS 를 바꾸면 버튼만 거짓말을 했습니다. */
   const pm = document.querySelector('.mode[data-mode="player"]');
@@ -6280,6 +7069,7 @@ function connect(name, mode) {
         local.seat = me.seat;
         local.lastGroundY = me.pos.y;
         local.grounded = true;
+        snapRender();
       }
       local.alive = true;
       G.selfAlive = true;
@@ -6314,13 +7104,14 @@ function connect(name, mode) {
     // 지난 회차의 밀림 기록이 새 회차 사인으로 넘어오지 않게 지웁니다
     lastBump.id = null; lastBump.name = ''; lastBump.at = -Infinity;
     local.deathBy = null; local.deathByName = '';
-    G.bumpReadyAt = performance.now() + BUMP.START_GRACE_MS;
+    G.bumpReadyAt = performance.now() + startFallGraceMs();
     syncPlayers(d.players);
     const me = d.players.find((p) => p.id === G.selfId);
     if (me && G.role === 'player') {
       local.seat = me.seat;
       local.pos.set(me.pos.x, me.pos.y, me.pos.z);
       local.vel.set(0, 0, 0);
+      snapRender();
       local.alive = true;
       local.layer = topLayerIndex();
       local.anim = 'idle';
@@ -6369,6 +7160,7 @@ function connect(name, mode) {
       local.seat = mine.seat;
       local.pos.set(mine.pos.x, mine.pos.y, mine.pos.z);
       local.vel.set(0, 0, 0);
+      snapRender();
       local.layer = topLayerIndex();
       local.anim = 'idle';
       local.jumped = false;
@@ -6498,8 +7290,8 @@ function connect(name, mode) {
   socket.on('pedestals_clear', () => {
     clearPedestals();
     // 전원이 동시에 공중에 뜨는 구간입니다. 여기서 서로 밀면 난장판이 됩니다.
-    G.bumpReadyAt = performance.now() + BUMP.START_GRACE_MS;
-    toast('대기 발판 해제 — 최상층으로 낙하합니다', 'obstacle');
+    G.bumpReadyAt = performance.now() + startFallGraceMs();
+    toast('접수 게이트 개방 — 최상층으로 낙하합니다', 'obstacle');
   });
 
   /* 서버 이동 검증에 걸려 위치가 되돌려졌습니다.
@@ -6508,6 +7300,7 @@ function connect(name, mode) {
     if (!d || !Array.isArray(d.p) || d.p.length !== 3) return;
     local.pos.set(d.p[0], d.p[1], d.p[2]);
     local.vel.set(0, 0, 0);
+    snapRender();
     local.grounded = false;
     local.jumped = false;
     local.lastGroundY = d.p[1];
@@ -6840,16 +7633,28 @@ function simulate(dt, now) {
   if (local.dying) {
     updateFallOut(dt);
     accumulator = 0;
+    snapRender();
   } else if (G.started && G.role === 'player' && local.alive &&
              (G.phase === 'playing' || G.phase === 'countdown' || G.phase === 'waiting')) {
     accumulator += dt;
     let guard = 0;
+    local.stepsThisFrame = 0;
+    local.carryAccum = 0;      // 이 프레임에 바닥이 실어 나른 거리
     while (accumulator >= PHYS.STEP && guard++ < 8) {
+      local.stepsThisFrame++;
+      /* prev 는 '마지막 스텝 직전' 위치여야 합니다. 루프 바깥에서 한 번만
+       * 저장하면 두 스텝이 도는 프레임에서 두 칸치를 한 번에 보간하게 되어,
+       * 고치려던 덜컹임이 그대로 남습니다. */
+      local.prev.copy(local.pos);
       stepPhysics(PHYS.STEP);
       accumulator -= PHYS.STEP;
     }
+    /* 남은 누산기가 곧 '다음 스텝까지 얼마나 왔는가' 입니다.
+     * 스텝이 0번 돈 프레임에서도 이 값이 커지므로 화면은 계속 앞으로 갑니다. */
+    local.alpha = THREE.MathUtils.clamp(accumulator / PHYS.STEP, 0, 1);
   } else {
     accumulator = 0;
+    snapRender();
   }
 
   /* --- 20Hz uplink --- */
@@ -6885,15 +7690,206 @@ function stepFrameOnce() {
   return { dt, now };
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+ * F3 — 주행 끊김 진단
+ * ────────────────────────────────────────────────────────────────────
+ * '달릴 때 걸리는 느낌'의 원인을 세 갈래로 갈라 줍니다. 눈으로는 셋이
+ * 똑같이 보이지만 고치는 방법이 전혀 다릅니다.
+ *
+ *   (A) 월드 이동이 불균일  → 물리/보간 문제
+ *   (B) 월드는 균일한데 화면에서만 불균일 → 카메라 추종 문제
+ *   (C) 프레임 시간 자체가 튐 → GC·드로우콜 등 프레임 스파이크
+ *
+ * ★ 화면 좌표로 재는 것이 핵심입니다. 사람이 실제로 보는 것은 월드 좌표가
+ *   아니라 '화면 속 캐릭터'이고, 카메라가 따로 흔들리면 월드가 완벽해도
+ *   끊겨 보입니다. 월드만 재면 이 경우를 영영 못 찾습니다.
+ * ══════════════════════════════════════════════════════════════════════ */
+const runDiag = { on: false, t0: 0, rows: [], lastW: null, lastS: null };
+const _diagV = new THREE.Vector3();
+
+function startRunDiag() {
+  runDiag.on = true;
+  runDiag.t0 = performance.now();
+  runDiag.rows.length = 0;
+  runDiag.lastW = null;
+  runDiag.lastS = null;
+  toast('주행 진단 4초 — 직선으로 계속 달리세요', 'cheer');
+}
+
+function sampleRunDiag(dt) {
+  if (!runDiag.on) return;
+  /* 화면 좌표(px). project() 는 카메라 행렬을 그대로 쓰므로 실제로
+   * 그려지는 위치와 같습니다. */
+  _diagV.copy(local.render).project(camera);
+  const sx = (_diagV.x * 0.5 + 0.5) * window.innerWidth;
+  const sy = (-_diagV.y * 0.5 + 0.5) * window.innerHeight;
+  const w = local.render;
+  if (runDiag.lastW) {
+    runDiag.rows.push({
+      dt: dt * 1000,
+      steps: local.stepsThisFrame || 0,
+      dw: Math.hypot(w.x - runDiag.lastW.x, w.z - runDiag.lastW.z),
+      sp: Math.hypot(local.vel.x, local.vel.z),
+      carry: local.carryAccum || 0,
+      layer: local.layer,
+      rot: isRotatingLayer(local.layer) ? 1 : 0,
+      alpha: local.alpha,
+      dsx: sx - runDiag.lastS.x,
+      dsy: sy - runDiag.lastS.y,
+      sx: sx, sy: sy,
+      gnd: local.grounded ? 1 : 0,
+      pitch: cam.pitch
+    });
+  }
+  runDiag.lastW = { x: w.x, z: w.z };
+  runDiag.lastS = { x: sx, y: sy };
+
+  if (performance.now() - runDiag.t0 < 4000) return;
+  runDiag.on = false;
+  reportRunDiag();
+}
+
+function reportRunDiag() {
+  /* ★ 프레임 단위로 '안 움직인 프레임' 을 거르면 안 됩니다.
+   * 처음에 그렇게 짰다가 판정 A 가 통째로 죽었습니다 — 끊김의 정체가
+   * 바로 '한 프레임 멈췄다가 다음 프레임에 두 배로 튀는' 것인데, 멈춘
+   * 프레임을 버리면 남는 것은 균일한 튐뿐이라 CV 가 0% 으로 나옵니다.
+   * 대신 구간 전체의 평균으로 '달리고 있었는가' 만 판단하고, 표본은
+   * 0 인 프레임까지 전부 씁니다. */
+  const rows = runDiag.rows;
+  const movedMean = rows.length ? rows.reduce((a, r) => a + r.dw, 0) / rows.length : 0;
+  if (rows.length < 30 || movedMean < 0.05) {
+    toast('표본 부족 — 직선으로 달리면서 다시 F3', 'kill');
+    return 'RUNDIAG 표본부족 (달리는 중에 눌러야 합니다)';
+  }
+  const cv = (arr) => {
+    const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const sd = Math.sqrt(arr.reduce((a, b) => a + (b - m) * (b - m), 0) / arr.length);
+    return { m: m, sd: sd, cv: m ? sd / m * 100 : 0 };
+  };
+  const dts = rows.map((r) => r.dt).sort((a, b) => a - b);
+  const med = dts[Math.floor(dts.length / 2)];
+  const spikes = rows.filter((r) => r.dt > med * 1.5).length;
+  /* ★ 이동거리(dw)의 변동계수를 그대로 쓰면 안 됩니다.
+   * 가속·감속·방향 전환이 전부 '불균일'로 잡혀 정상 주행에서도 15% 안팎이
+   * 나옵니다. 실제로 앞선 측정의 16.7% 중 9.1% 는 이상치 2프레임만으로도
+   * 설명되는 값이었습니다.
+   *
+   * 물어야 할 것은 '얼마나 움직였나'가 아니라 '흐른 시간에 비례해
+   * 움직였나' 입니다. 기대값 = 수평속도 × dt 로 나누면 가속·선회가
+   * 약분되고, 타이밍 결함만 남습니다. 정상이면 언제나 1.0 근처입니다. */
+  /* 기대 이동량 = 내가 낸 속도 × 시간 + 바닥이 실어 나른 거리.
+   * carry 를 빼먹으면 회전층에 서 있는 것만으로 이탈이 잡힙니다. */
+  const usable = rows.filter((r) => r.sp > 0.5 && r.dt > 0);
+  const withRatio = usable.map((r) => {
+    const exp = r.sp * r.dt / 1000 + (r.carry || 0);
+    return Object.assign({}, r, { ratio: exp > 0 ? r.dw / exp : 1 });
+  });
+  const ratios = withRatio.map((r) => r.ratio);
+  const world = ratios.length > 20 ? cv(ratios) : cv(rows.map((r) => r.dw));
+  const ratioBad = ratios.filter((v) => Math.abs(v - 1) > 0.3).length;
+  const ratioWorst = ratios.length ? Math.max(...ratios.map((v) => Math.abs(v - 1))) : 0;
+  /* ★ 이탈 프레임을 그냥 세기만 하면 원인을 못 찾습니다. 가장 심한 3개를
+   *   통째로 찍어야 '그 프레임에 무슨 일이 있었는지'가 드러납니다. */
+  const worst = withRatio.slice().sort((a, b) => Math.abs(b.ratio - 1) - Math.abs(a.ratio - 1)).slice(0, 3);
+  const rotFrames = rows.filter((r) => r.rot).length;
+  const carrySum = rows.reduce((a, r) => a + (r.carry || 0), 0);
+  /* 화면 이동은 부호가 중요합니다 — 전진 중인데 화면에서 뒤로 간 프레임이
+   * 바로 '되돌아오는 느낌'의 정체입니다. 주 진행 방향을 먼저 정하고 셉니다. */
+  /* ★ 화면 '이동량'의 변동계수는 쓰면 안 됩니다.
+   * 카메라가 주자를 따라가므로 정상 상태에서는 화면 속 위치가 거의 고정이고,
+   * 따라서 프레임간 이동량의 평균이 0 근처입니다. 0 으로 나눈 변동계수는
+   * 늘 수백 %가 나와 '정상'과 '고장'을 구분하지 못합니다. (첫 측정에서
+   * 133% 가 나왔던 것이 바로 이 함정이었습니다.)
+   * 대신 화면 위치가 평균 자리에서 몇 픽셀이나 떠는지를 절대값으로 봅니다 —
+   * 사람이 실제로 느끼는 것이 그 픽셀 흔들림입니다. */
+  const sd = (arr) => {
+    const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+    return Math.sqrt(arr.reduce((a, b) => a + (b - m) * (b - m), 0) / arr.length);
+  };
+  /* ★ 위치의 표준편차만 보면 '천천히 한 방향으로 흐른 것'과 '매 프레임
+   *   떤 것'을 구분하지 못합니다. 앞선 측정에서 Y 5.6px 가 나왔는데 실제로는
+   *   4초에 걸친 카메라 피치 수렴이었고, 프레임당으로 치면 0.023px 라
+   *   끊김으로 느껴질 수가 없는 값이었습니다.
+   *   사람이 끊김으로 느끼는 것은 '프레임간 변화량' 쪽이므로 둘을 나눕니다. */
+  const driftX = Math.abs(rows[rows.length - 1].sx - rows[0].sx);
+  const driftY = Math.abs(rows[rows.length - 1].sy - rows[0].sy);
+  const jitX = sd(rows.map((r) => r.dsx));
+  const jitY = sd(rows.map((r) => r.dsy));
+  const sumX = rows.reduce((a, r) => a + r.dsx, 0);
+  const sign = sumX >= 0 ? 1 : -1;
+  const proj = rows.map((r) => r.dsx * sign);
+  const back = proj.filter((v) => v < -0.5).length;
+  /* 달리는 중 접지가 끊긴 횟수. 타일을 건널 때마다 발이 떨어지면
+   * autoPitch 가 흔들려 카메라가 같이 들썩입니다. */
+  let gndFlips = 0;
+  for (let i = 1; i < rows.length; i++) if (rows[i].gnd !== rows[i - 1].gnd) gndFlips++;
+  const pitchSwing = Math.max(...rows.map((r) => r.pitch)) - Math.min(...rows.map((r) => r.pitch));
+  const stepHist = {};
+  for (const r of rows) stepHist[r.steps] = (stepHist[r.steps] || 0) + 1;
+
+  /* 판정 기준은 '보이는가' 입니다. 화면 지터 2px 미만은 사람이 못 느낍니다. */
+  let verdict;
+  if (spikes > rows.length * 0.03) verdict = '(C) 프레임 스파이크 — GC/드로우콜 쪽';
+  else if (world.cv > 12) verdict = '(A) 월드 이동 불균일 — 물리/보간 쪽';
+  /* 판정은 프레임간 지터로만 합니다. 드리프트는 참고용으로 찍기만 합니다 —
+   * 천천히 흐르는 것은 끊김으로 느껴지지 않기 때문입니다. */
+  else if (jitX > 3 || jitY > 3) verdict = '(B) 카메라 추종 — 프레임간 흔들림이 큼';
+  else if (jitX > 1.2 || jitY > 1.2) verdict = '(B약) 카메라 추종 — 흔들림이 조금 남음';
+  else verdict = '(위치는 정상) 프레임간 흔들림 1.2px 미만 — 위치가 아니라 애니메이션(발 미끄러짐) 쪽을 보세요';
+
+  const line =
+    'RUNDIAG ' + rows.length + '프레임' +
+    ' | dt중앙 ' + med.toFixed(2) + 'ms 스파이크 ' + spikes +
+    ' | 스텝 ' + Object.keys(stepHist).sort().map((k) => k + ':' + stepHist[k]).join(' ') +
+    ' | 시간대비 CV ' + world.cv.toFixed(1) + '% 이탈 ' + ratioBad +
+    '(최대 ' + (ratioWorst * 100).toFixed(0) + '%)' +
+    ' | 지터 X' + jitX.toFixed(2) + 'px Y' + jitY.toFixed(2) + 'px' +
+    ' 드리프트 X' + driftX.toFixed(0) + 'px Y' + driftY.toFixed(0) + 'px 역행 ' + back +
+    ' | 접지끊김 ' + gndFlips + ' 피치폭 ' + pitchSwing.toFixed(3) +
+    ' | ' + verdict;
+  console.log('%c' + line, 'color:#00ffcc');
+  /* 층과 회전 실림 정보. '타일을 지나갔는데 되돌아온다'가 회전층 기믹
+   * 때문인지 아닌지를 이 두 줄로 가릅니다. */
+  const layers = {};
+  for (const r of rows) layers[r.layer] = (layers[r.layer] || 0) + 1;
+  console.log('  층: ' + Object.keys(layers).map((k) => 'L' + k + ' ' + layers[k] + '프레임').join(', ') +
+    ' | 회전층 프레임 ' + rotFrames + ' | 바닥이 실어 나른 거리 합계 ' + carrySum.toFixed(2) + '유닛');
+  if (worst.length) {
+    console.log('  이탈 최악 3프레임 (기대 대비 실제):');
+    for (const w of worst) {
+      console.log('   · ' + (w.ratio * 100).toFixed(0) + '%' +
+        '  dt ' + w.dt.toFixed(2) + 'ms  스텝 ' + w.steps +
+        '  alpha ' + (w.alpha !== undefined ? w.alpha.toFixed(3) : '?') +
+        '  속도 ' + w.sp.toFixed(1) + '  carry ' + (w.carry || 0).toFixed(3) +
+        '  L' + w.layer + (w.rot ? ' (회전층)' : '') + (w.gnd ? '' : ' 공중'));
+    }
+  }
+  toast(verdict, 'cheer');
+  runDiag.last = line;
+  return line;
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'F3') { e.preventDefault(); startRunDiag(); }
+});
+
 function renderFrame(dt, now) {
   /* --- local avatar --- */
+  /* 그릴 위치를 먼저 정합니다. 카메라도 이 값을 보므로 아바타보다 앞서야
+   * 합니다 — pos 로 카메라를 잡고 render 로 아바타를 그리면 둘이 프레임마다
+   * 어긋나 오히려 더 흔들립니다. */
+  local.render.copy(local.prev).lerp(local.pos, local.alpha);
   if (local.avatar) {
-    local.avatar.group.position.copy(local.pos);
-    local.avatar.group.rotation.y = lerpAngle(local.avatar.group.rotation.y, local.ry, Math.min(1, dt * 16));
+    local.avatar.group.position.copy(local.render);
+    /* 몸통 방향. 프레임률 의존이면 방향을 틀 때마다 몸이 덜컥거립니다 —
+     * 위치가 매끄러워도 '덩어리 전체가 끊긴다'로 느껴지는 지점입니다. */
+    local.avatar.group.rotation.y = lerpAngle(local.avatar.group.rotation.y, local.ry, smoothK(16, dt));
     const sp = THREE.MathUtils.clamp(Math.hypot(local.vel.x, local.vel.z) / PHYS.SPRINT, 0, 1);
     animateAvatar(local.avatar, dt, sp, local.alive ? local.anim : 'dead');
     local.avatar.group.visible = true;
-    updateGroundShadow(local.avatar, local.pos.y, groundYUnder(local.pos.x, local.pos.z, local.pos.y), local.grounded);
+    updateGroundShadow(local.avatar, local.render.y,
+      groundYUnder(local.render.x, local.render.z, local.render.y), local.grounded);
   }
 
   /* --- remote runners (dead reckoning) --- */
@@ -6908,6 +7904,9 @@ function renderFrame(dt, now) {
   updateBoosters(dt, now);
   updateObstacles(dt, now);
   updateCamera(dt);
+  /* 카메라가 정해진 뒤에 재야 합니다 — 이 순서가 아니면 화면 좌표가
+   * 한 프레임 전 카메라로 계산되어 측정 자체가 틀립니다. */
+  sampleRunDiag(dt);
   updateSky(dt, now);
 
   updatePedestals(dt, now);
@@ -7226,6 +8225,7 @@ dom.btnJoin.addEventListener('click', () => {
    * 계속 살아 있으면 매 2.5초 fetch 와 매 0.9초 DOM 조작이 프레임에 끼어듭니다. */
   stopStackLoop();
   stopQueuePoll();
+  stopJoinBg();
   dom.joinScreen.classList.remove('show');
   G.role = joinMode;
   connect(name, joinMode);
