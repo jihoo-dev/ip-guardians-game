@@ -82,40 +82,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
 .doc .no{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.4)}
 .doc .nm{font-size:12.5px;font-weight:700;margin-top:3px;line-height:1.3}
 .doc .alt{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:rgba(236,231,216,.35);margin-top:3px}
-
-/* ── 현재 층의 기믹 (상시) ────────────────────────────────────────────
- * ★ 층 진입 배너는 2.6초 뒤 사라집니다.
- *   그 다음에 '이 층에 뭐가 있었더라?' 하면 확인할 곳이 없었습니다.
- *   배너는 '방금 도착했다'는 알림이고, 이 목록은 '지금 여기는 이렇다'는
- *   참조입니다. 역할이 다르므로 둘 다 있어야 합니다.
- *
- * ★ 현재 층에서만 펼칩니다.
- *   여섯 층을 다 펼치면 목록이 화면 높이를 넘고, 무엇보다 지금 필요 없는
- *   정보가 화면의 대부분을 먹습니다. 내가 선 층만 펼치면 높이가 거의
- *   그대로입니다(한 층치 두세 줄).
- *
- * ★ max-height 로 접습니다.
- *   display:none 으로 감추면 전환이 툭 끊깁니다. 층을 오르내릴 때마다
- *   목록이 덜컹거리면 눈이 그쪽으로 끌려갑니다.                      */
-.doc .marks{
-  max-height:0;overflow:hidden;opacity:0;
-  transition:max-height .3s cubic-bezier(.2,.8,.2,1),opacity .25s,margin-top .3s;
-  margin-top:0
-}
-/* 두 줄로 접히는 항목이 둘인 층(의견제출통지)이 가장 높습니다 */
-.doc.on .marks{max-height:150px;opacity:1;margin-top:7px}
-.doc .marks .mk{
-  display:grid;grid-template-columns:13px 1fr;gap:0 6px;align-items:baseline;
-  font-size:10.5px;line-height:1.45;color:rgba(236,231,216,.72);margin-top:3px;
-  /* ★ 한글은 기본 줄바꿈 규칙(break-all 성격)이라 단어 한가운데서 끊깁니다.
-   *   목록 폭이 208px 로 좁아서 '주변 6칸까지 폭/발' 처럼 잘렸습니다.
-   *   keep-all 은 어절 단위로만 끊으므로 읽기 흐름이 유지됩니다.       */
-  word-break:keep-all;overflow-wrap:break-word
-}
-.doc .marks .mk i{font-style:normal;color:var(--layer-c);text-align:center;font-size:11px}
-.doc .marks .mk.none{color:rgba(236,231,216,.4)}
-/* 목록이 좁아진 화면에서는 접어 둡니다 — 층 이름이 먼저입니다 */
-@media (max-height:620px){.doc.on .marks{max-height:0;opacity:0;margin-top:0}}
 .doc.on{background:rgba(236,231,216,.1);transform:translateX(10px)}
 .doc.on .nm{color:var(--layer-c)}
 .doc.on{border-color:var(--layer-c);box-shadow:-3px 0 0 var(--layer-c),0 0 26px -6px var(--layer-c)}
@@ -258,10 +224,7 @@ body.dev #devLayers{display:flex}
 /* 기믹은 한 문장으로 뭉치지 않고 항목으로 쪼갭니다. 기믹이 둘인 층
  * (의견제출통지)에서 한 문장에 두 가지가 들어가 특히 안 읽혔습니다. */
 #layerBanner .lbMarks{display:flex;flex-direction:column;gap:6px;margin:4px 0 2px}
-/* 배너도 같은 이유로 어절 단위 줄바꿈. 폭이 넓어 잘 안 걸리지만,
- * 긴 문구를 넣거나 좁은 화면에서 같은 증상이 납니다. */
 #layerBanner .lbMark{display:grid;grid-template-columns:22px 1fr;align-items:baseline;
-  word-break:keep-all;overflow-wrap:break-word;
   gap:0 8px;text-align:left;font-size:15px;line-height:1.4;color:#e6ecf6}
 #layerBanner .lbMark i{font-style:normal;font-size:16px;color:var(--layer-c);text-align:center}
 #layerBanner .lbMark.none{color:#9aa6b8;font-size:14px}
@@ -8009,35 +7972,13 @@ function buildLayerStack() {
     const rotm = document.createElement('div');
     rotm.className = 'rotmark';
 
-    /* 이 층의 기믹. 층 배너와 <b>같은 데이터(L.marks)</b>를 씁니다 —
-     * 문구를 두 벌로 두면 반드시 한쪽만 낡습니다. 평소엔 접혀 있고
-     * 내가 선 층(.doc.on)에서만 펼쳐집니다. */
-    const mk = document.createElement('div');
-    mk.className = 'marks';
-    const marks = (L.marks && L.marks.length)
-      ? L.marks
-      : (L.tip ? [{ i: '·', t: L.tip }] : []);
-    mk.innerHTML = marks.map((m) =>
-      '<div class="mk' + (m.i === '—' ? ' none' : '') + '">' +
-      '<i>' + escapeHtml(m.i || '·') + '</i>' +
-      '<span>' + escapeHtml(m.t || '') + '</span></div>').join('');
-
-    d.appendChild(no); d.appendChild(nm); d.appendChild(alt);
-    d.appendChild(mk); d.appendChild(rotm);
+    d.appendChild(no); d.appendChild(nm); d.appendChild(alt); d.appendChild(rotm);
     box.appendChild(d);
   }
 
   dom.docs = Array.from(box.querySelectorAll('.doc'));
-  refitLayerStack();
-}
-
-/* 목록이 화면을 넘치는지 다시 재어 스크롤을 켭니다.
- * 층 수·펼침 상태·창 크기가 바뀔 때마다 달라지므로 한 함수로 모읍니다. */
-function refitLayerStack() {
-  const box = document.getElementById('layerStack');
-  if (!box) return;
   // 여백까지 다 그려진 뒤에야 넘치는지 알 수 있습니다
-  box.classList.toggle('scroll', box.scrollHeight > box.clientHeight + 1);
+  if (box.scrollHeight > box.clientHeight + 1) box.classList.add('scroll');
 }
 
 /* ── 층 특성 이벤트 연출 ──────────────────────────────────────────────
@@ -8308,16 +8249,9 @@ function hideLayerBanner() {
 }
 
 function updateLayerStack(layer) {
-  let changed = false;
   for (const d of dom.docs) {
-    const on = parseInt(d.dataset.l, 10) === layer;
-    if (d.classList.contains('on') !== on) changed = true;
-    d.classList.toggle('on', on);
+    d.classList.toggle('on', parseInt(d.dataset.l, 10) === layer);
   }
-  /* 펼쳐진 층이 바뀌면 목록 높이도 바뀝니다. 넘침(.scroll) 판정을 다시
-   * 하지 않으면 아래쪽 층이 잘린 채 스크롤도 안 되는 상태가 됩니다.
-   * 전환 애니메이션(0.3s)이 끝난 뒤에 재야 실제 높이가 나옵니다. */
-  if (changed) setTimeout(refitLayerStack, 340);
   if (DEV.on && DEV.layerJump) markDevLayerButton(layer);
 
   /* 남은 층은 살아 있는 주자일 때만 뜻이 있습니다. 관전 중에는 지금

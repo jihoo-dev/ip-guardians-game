@@ -102,55 +102,13 @@ const STATIC_DIR = process.env.STATIC_DIR || 'public';
  *   MAX_PLAYERS=16 node server.js
  * ------------------------------------------------------------------ */
 const MAX_PLAYERS = Math.max(1, parseInt(process.env.MAX_PLAYERS, 10) || 4);
-
-/* ── 타일 넓이 배율 (TILE_AREA_SCALE) ─────────────────────────────────
- * 타일 한 장의 '넓이'를 몇 배로 할지. 종전 크기가 1.0 입니다.
- *
- * ★ 넓이 배율이지 한 변 배율이 아닙니다.
- *   육각형 넓이는 한 변의 제곱에 비례하므로, 한 변에는 √배율 을 곱합니다.
- *   2배로 쓰면 한 변은 1.414배입니다. 여기를 '2'로 두고 한 변에 2를 곱하면
- *   넓이가 4배가 됩니다 — 실수하기 쉬운 자리라 단위를 이름에 박았습니다.
- *
- * ★ 왜 늘렸나 (2.0 채택)
- *   종전 크기에서는 타일 안지름이 3.70, 주자 폭이 1.56 이라 주자가 타일
- *   하나의 42% 를 덮었습니다. '지금 어느 타일을 밟고 있는지'가 안 읽혀서
- *   특정 타일을 노려 밟는 플레이가 성립하지 않았습니다. 더 결정적인 것은
- *   점프 사거리입니다 — 질주 점프가 4.0칸을 날아가서, 길목을 3칸 부숴도
- *   그냥 뛰어넘어 갔습니다. 2배에서는 안지름 5.23(주자가 30%), 점프
- *   사거리 2.85칸이 되어 '3칸 띠를 부수면 막힌다'가 성립합니다.
- *
- * ★ 여기를 바꾸면 따라오는 것 (숫자를 두 번 적을 필요가 없습니다)
- *   HEX_SIZE · HEX_THICKNESS · 대시 거리와 창 · 취약 타일 퓨즈 ·
- *   맵 반경 · 대기 발판 간격, 그리고 클라이언트 쪽 카메라 거리 ·
- *   부스터/장애물 치수 · 폭발 반경까지 전부 파생입니다.
- *
- * ★ 따라오지 '않는' 것 — 의도한 것입니다.
- *   주자 치수(PLAYER)와 속도(PHYS.MOVE/SPRINT/JUMP_V)는 그대로 둡니다.
- *   같이 키우면 화면만 확대될 뿐 '타일이 커진' 효과가 0 이 됩니다.
- *   타일이 주자보다 커지는 것이 이 변경의 전부입니다.
- *
- * ★ 부작용: 타일 수는 그대로(층당 271)인데 한 장이 커지므로 맵도 같이
- *   커집니다. 2배면 아레나 반경 34.5 → 48.8, 가로지르기 4.6초 → 6.5초.
- *   맵이 너무 넓게 느껴지면 TILES_PER_PLAYER 를 60 → 48 로 내리세요
- *   (GRID_RADIUS 9 → 8, 아레나 43.4 로 되돌아옵니다).
- *
- *   TILE_AREA_SCALE=1.5 npm start  로 바로 비교해 볼 수 있습니다.
- * ------------------------------------------------------------------ */
-const TILE_AREA_SCALE = Math.max(0.25, parseFloat(process.env.TILE_AREA_SCALE) || 2);
-const TILE_LINEAR = Math.sqrt(TILE_AREA_SCALE);   // 한 변에 곱할 배율
-
 const TICK_HZ = 20;             // 20Hz => 50ms snapshot interval
 const TICK_MS = 1000 / TICK_HZ;
 
 const LOBBY_WAIT_MS = parseInt(process.env.LOBBY_WAIT_MS, 10) || 20000;  // 정원이 안 차면 이만큼 기다렸다 시작
 const SOLO_WAIT_MS  = parseInt(process.env.SOLO_WAIT_MS, 10)  || 15000;  // 혼자일 때 대기 (탭 2개 열 시간 확보)
 const COUNTDOWN_MS = 5000;      // "심사 착수" countdown before the run
-/* 한 라운드 상한. 5분 → 6분.
- * 일반 타일(밟고 0.7~1.0초)을 없애고 강화 타일 하나로 바닥을 깔면서,
- * 층이 죽는 속도가 통째로 느려졌습니다. 종전 5분은 '한 번 밟으면 1초 뒤
- * 사라지는' 바닥을 전제한 값이라 그대로 두면 정상적인 라운드가 무승부로
- * 끝납니다. 타일 규칙을 되돌리면 여기도 같이 되돌리세요.              */
-const ROUND_MAX_MS = 360000;    // hard cap on a round (6 minutes)
+const ROUND_MAX_MS = 300000;    // hard cap on a round (5 minutes)
 const RESET_DELAY_MS = 8000;    // podium screen duration before the next map
 
 /* ── 타일 종류 체계 (TILE_MIX / TILE_KINDS) ───────────────────────────
@@ -159,78 +117,21 @@ const RESET_DELAY_MS = 8000;    // podium screen duration before the next map
  * 않고 '강화 타일'이 그대로 물려받았습니다 — 2회 밟기라 구조가 같습니다.
  * (종전 상수 TILE_HITS 는 TILE_KINDS.reinforced.hits 로 흡수됐습니다)
  *
- *   normal     일반   1회 밟기 + 0.7~1.0초 퓨즈          ← 지금은 미사용(0%)
- *   fragile    취약   1회 밟기 + 짧은 퓨즈                ← 지금은 미사용(0%)
- *   reinforced 강화   1회에 금 → 2회째(누구든)에 파괴, 아무도 안 밟아도 자동 파괴
- *   special    특수   층마다 다른 기믹 타일
+ *   normal     일반   1회 밟기 + 0.7~1.0초 퓨즈
+ *   fragile    취약   1회 밟기 + 0.2~0.3초 퓨즈 (구 trap 을 재활용)
+ *   reinforced 강화   1회에 금 → 2회째(누구든)에 파괴, 아무도 안 밟아도 3초 뒤 자동 파괴
+ *   special    특수   층별 태그만 붙은 상태. 이번 단계에서는 일반과 동작이 같고 색만 다릅니다.
  *
- * ── 바닥을 '강화 타일' 하나로 통일했습니다 (2종 체계) ──────────────
- *
- * ★ 왜 종류를 줄였나
- *   4종을 섞어 두면 플레이어가 달리면서 색을 읽어 종류를 판별해야 합니다.
- *   특히 취약 타일은 걸어서 건너면 절반쯤 발밑에서 꺼지는데, 밟기 전에
- *   알아볼 시간이 없습니다. '왜 죽었는지 모르겠다'는 불만의 대부분이
- *   여기서 나왔습니다.
- *
- * ★ 더 중요한 이유 — 위협이 화면에 보이게 됩니다
- *   1회 밟기 + 퓨즈 방식에서는 플레이어를 죽이는 것이 '등 뒤에서 조용히
- *   타들어가는 타이머'입니다. 화면에 없는 것이 죽이니 배울 수가 없습니다.
- *   2회 밟기로 바꾸면 첫 걸음이 타일에 금을 남깁니다 — 어디가 이미 죽은
- *   땅인지, 남이 어디를 지나갔는지가 바닥에 그려집니다. 난이도 하향이라기
- *   보다 공정성 개선입니다.
- *
- *   덤으로 '길목을 미리 밟아 없애는' 플레이가 비로소 성립합니다. 종전에는
- *   밟으면 무조건 타이머가 돌아 의도와 무관하게 사라졌지만, 2회 규칙에서는
- *   같은 줄을 두 번 밟는 것이 명백한 의도적 행위입니다.
- *
- * ★ 자동 파괴(autoMs)는 반드시 살아 있어야 합니다
- *   순수하게 '2번 밟아야 사라짐'으로만 두면 4명이 271장을 두 번씩 밟기
- *   전에는 층이 죽지 않아 라운드가 상한에 걸려 무승부로 끝납니다.
- *   금이 간 타일은 아무도 안 밟아도 autoMs 뒤에 무너집니다 — 금은
- *   '영구 상태'가 아니라 '눈에 보이는 퓨즈'입니다.
- *
- * ★ 되돌리려면 TILE_MIX 한 줄이면 됩니다.
- *   { normal: 0.60, fragile: 0.10, reinforced: 0.10, special: 0.20 }
- *   다만 TILE_STYLE.reinforced(클라이언트)와 ROUND_MAX_MS 도 같이
- *   되돌려야 겉모습과 라운드 길이가 맞습니다.
+ * 비율을 바꾸려면 TILE_MIX 만 고치면 됩니다(합이 1 이 아니어도 정규화됩니다).
  * ------------------------------------------------------------------ */
-const TILE_MIX = { normal: 0, fragile: 0, reinforced: 0.80, special: 0.20 };
+const TILE_MIX = { normal: 0.60, fragile: 0.10, reinforced: 0.10, special: 0.20 };
 
-/* ★ 취약 타일 퓨즈만 타일 크기를 탑니다 (TILE_LINEAR).
- *
- *   퓨즈는 '초' 단위지만 실제로 의미가 있는 것은 '한 칸 건너가는 데 걸리는
- *   시간의 몇 배인가' 입니다. 한 칸 = √3·S 이므로 타일이 커지면 통과 시간이
- *   그만큼 길어집니다.
- *
- *   취약 타일은 원래 '질주로만 건널 수 있는 타일'입니다 — 종전 기준으로
- *   걸으면 246ms 걸리는데 퓨즈가 200~300ms 라 절반쯤 밟은 자리에서 무너지고,
- *   질주하면 172ms 라 항상 건넜습니다. 이 퓨즈를 고정해 두고 타일만 2배로
- *   키우면 질주 통과가 243ms 가 되어 퓨즈 구간(200~300)과 겹칩니다.
- *   즉 질주로도 43% 확률로 발밑이 꺼지는, 피할 방법이 없는 타일이 됩니다.
- *   √배율을 곱해 두면 '질주 전용'이라는 원래 성격이 그대로 보존됩니다.
- *
- *   일반·특수(700~1000)와 강화(3초)는 일부러 고정입니다. 2배에서도 여유가
- *   2.0~2.9칸 / 3초로 남고, 여기까지 늘리면 게임 전체가 그만큼 느려지기만
- *   합니다. '타일 한 장이 더 아깝다'가 이번 변경의 목적입니다.        */
 const TILE_KINDS = {
   normal:     { hits: 1, fuseMin: 700,  fuseMax: 1000, autoMs: 0    },
-  fragile:    { hits: 1,
-                fuseMin: Math.round(200 * TILE_LINEAR),
-                fuseMax: Math.round(300 * TILE_LINEAR), autoMs: 0    },
-  /* autoMs 3000 → 2500.
-   * 강화 타일이 바닥 전체가 되면서 층이 죽는 속도를 이 값 하나가
-   * 결정하게 됐습니다. 종전 일반 타일은 밟고 0.7~1.0초였으니 3초는
-   * 3배 이상 느립니다. 2.5초면 '한 번 지나간 자리를 다시 지날 수는
-   * 있지만 오래는 못 버틴다' 정도로, 층이 제시간에 정리됩니다. */
-  reinforced: { hits: 2, fuseMin: 0,    fuseMax: 0,    autoMs: 2500 },
+  fragile:    { hits: 1, fuseMin: 200,  fuseMax: 300,  autoMs: 0    },
+  reinforced: { hits: 2, fuseMin: 0,    fuseMax: 0,    autoMs: 3000 },
   special:    { hits: 1, fuseMin: 700,  fuseMax: 1000, autoMs: 0    }
 };
-
-/* 바닥을 채우는 기본 타일. 특수 타일을 쓰지 않는 층이나 스폰 보호 구역에서
-* '그냥 바닥'으로 되돌릴 때 쓰는 기준입니다. TILE_MIX 를 되돌릴 때 여기도
-* 'normal' 로 함께 바꾸세요 — 두 군데가 어긋나면 스폰 링만 다른 타일이
-* 깔려 보호가 아니라 함정이 됩니다.                                   */
-const BASE_TILE_KIND = 'reinforced';
 
 const TILE_KIND_ORDER = Object.keys(TILE_KINDS);
 const TILE_MIX_TOTAL =
@@ -251,26 +152,14 @@ function pickTileKind(rand) {
  *
  * 의견제출통지 층은 특수 20% 를 다음과 같이 씁니다.
  *   75% → reject  거절이유 타일 (전체의 15%)  — 밟으면 주변까지 폭발
- *   25% → none    기믹 없음     (전체의  5%)  — 그냥 바닥 타일이 됩니다
- *
- * ★ 보정 타일(amend)을 뺐습니다 — 구현은 살아 있고 연결만 끊었습니다.
- *   전체의 5% 뿐이라 한 라운드에 한 번 밟힐까 말까 했고, 효과(부서진
- *   이웃 한 칸 복구)도 밟은 본인조차 알아채기 어려웠습니다. 아무도
- *   모르는 규칙은 규칙이 아니라 인지 부하일 뿐입니다.
- *   되살리려면 이 줄을 { reject: 0.75, amend: 0.25 } 로 되돌리면 됩니다
- *   (tryAmend · isAmendTile · tile_amend 는 그대로 남아 있습니다).
- *
- * ★ 'none' 은 buildMap 에서 기본 바닥 타일로 강등됩니다.
- *   비율을 그냥 { reject: 1 } 로 올리지 않은 이유는, 그러면 거절이유
- *   타일이 전체의 15% 에서 20% 로 늘어나기 때문입니다. 폭발 한 번에
- *   7칸이 날아가는 타일이라 밀도를 유지하는 편이 낫습니다.
+ *   25% → amend   보정 타일     (전체의  5%)  — 아직 미구현, 일반처럼 동작
  *
  * ★ 키는 층 번호가 아니라 '층의 special 태그'입니다. 그래서 의견제출통지
  *   층이 몇 번째로 가든 이 분화가 그대로 따라갑니다.
  * 서브믹스가 없는 태그(accel · phase 등)는 태그 이름이 그대로
  * specialType 이 됩니다 — 지금까지와 동일합니다.
  * ------------------------------------------------------------------ */
-const OFFICE_SPECIAL_MIX = { reject: 0.75, none: 0.25 };
+const OFFICE_SPECIAL_MIX = { reject: 0.75, amend: 0.25 };
 
 /* ── 점프 타일 (JUMP_TILE) ────────────────────────────────────────────
  * LAYER_DEFS 에서 special:'jump' 인 층의 특수 타일입니다.
@@ -294,31 +183,6 @@ const JUMP_TILE = { levels: [1, 2] };
  * 종류를 손으로 나열하지 않으므로 levels 만 고치면 전부 따라옵니다.  */
 const JUMP_SUBMIX = {};
 for (const lv of JUMP_TILE.levels) JUMP_SUBMIX['jump' + lv] = 1 / JUMP_TILE.levels.length;
-
-/* ── 특수 타일 첫 접촉 안내문 (SPECIAL_TIPS) ─────────────────────────
- * 그 종류를 '처음 밟았을 때 딱 한 번' 뜨는 한 줄입니다.
- *
- * ★ 왜 미리 설명하지 않는가
- *   대기 화면에서 다섯 가지를 한꺼번에 읽히면 아무것도 안 남습니다.
- *   방금 내 발밑에서 일어난 일을 그 순간에 이름 붙여 주는 편이 훨씬
- *   잘 남습니다 — 5층을 내려가는 동안 규칙을 하나씩 배우게 됩니다.
- *
- * ★ 키는 specialType 입니다 (층 번호가 아닙니다).
- *   층을 옮기거나 순서를 바꿔도 그대로 따라옵니다. 점프 타일처럼 세부
- *   종류로 갈리는 것은 갈린 이름(jump1 / jump2)을 그대로 씁니다.
- * ------------------------------------------------------------------ */
-const SPECIAL_TIPS = {
-  /* 기본 바닥 타일. 키가 specialType 이 아니라 kind 라, 클라이언트는
-   * specialType 으로 먼저 찾고 없으면 kind 로 한 번 더 찾습니다.
-   * 2회 밟기 규칙은 게임 전체에서 가장 먼저 알아야 하는 것이라 여기에
-   * 같이 둡니다 — 대기 화면이 아니라 첫 걸음에 배우게 됩니다.      */
-  reinforced: '바닥은 한 번 밟으면 금이 갑니다 — 한 번 더 밟히거나 잠시 지나면 무너집니다',
-  accel:  '신속심사 타일 — 진행 방향으로 두 칸 튀어나갑니다. 앞이 비어 있으면 그대로 떨어집니다',
-  reject: '거절이유 발견 — 잠시 뒤 이 타일과 맞닿은 6칸이 함께 무너집니다. 지금 벗어나세요',
-  phase:  '위상 타일 — 2초 켜지고 1초 꺼집니다. 꺼져 있는 동안에는 밟을 수 없습니다',
-  jump1:  '점프 타일 — 한 층 위로 올려 보냅니다',
-  jump2:  '점프 타일 — 두 층 위로 올려 보냅니다'
-};
 
 const SPECIAL_SUBMIX = {
   reject: OFFICE_SPECIAL_MIX,     // special:'reject' 인 층에 적용
@@ -681,15 +545,7 @@ const VALIDATE = {
    * 순간이동 한 번이 통과합니다. BURST 와 함께 이중으로 막습니다.     */
   MAX_DT: 0.5,
   BOUND_XZ: 220,             // 클라이언트 장외 판정(170) 보다 넉넉하게
-  /* ★ MAX_Y 는 '층 수'에 딸린 값입니다 (140 → 180).
-   *   합법적으로 가장 높은 좌표는 대기 발판입니다 —
-   *       최상층 y + PEDESTAL_RISE = LAYER_GAP × (층 수 − 1) + 45
-   *   5층일 때 72+45 = 117 이라 140 으로 충분했는데, 6층이 되며 90+45 = 135
-   *   가 되어 여유가 5 밖에 안 남았습니다. 여유가 0 이 되는 순간 대기 중인
-   *   주자가 좌표 범위 검증에 걸려 되돌려지는데, 증상이 '발판 위에서 덜덜
-   *   떨림'으로 나타나 원인을 찾기 아주 어렵습니다.
-   *   180 이면 8층(126+45=171)까지 버팁니다. 층을 더 늘리면 여기부터 보세요. */
-  MIN_Y: -180, MAX_Y: 180,
+  MIN_Y: -140, MAX_Y: 140,
   WARN_AT: 4,                // 연속 위반 이 횟수에서 보정 (20Hz 기준 약 200ms)
   LOG: true
 };
@@ -744,15 +600,8 @@ const OBSTACLE_FALL_MS = 1400;
  *
  * DEV_MODE 에서도 같은 값을 씁니다 — 크기가 모드에 따라 달라지면
  * 겹침/빈틈 특성이 두 벌이 되어 검증이 무의미해집니다.               */
-/* 기준 크기 2.1333 에 TILE_AREA_SCALE 의 제곱근을 곱합니다.
- * 이 기준값은 클라이언트 HEX_SIZE_BASE 와 같아야 합니다 — 클라이언트는
- * '내려온 크기 ÷ 기준 크기'로 카메라 거리를 맞추므로, 기준을 같이 올리면
- * 배율이 1 이 되어 카메라가 따라오지 않습니다(타일만 커지고 화면은 그대로). */
-const HEX_SIZE_BASE = 3.2 / 1.5;                    // 2.1333
-const HEX_SIZE = HEX_SIZE_BASE * TILE_LINEAR;
-/* 두께도 같이 키웁니다. 안 키우면 넓어진 만큼 종잇장처럼 보입니다
- * (기준 3.2 : 1.0 = 0.31 비율을 그대로 유지). */
-const HEX_THICKNESS = 0.7 * TILE_LINEAR;
+const HEX_SIZE = 3.2 / 1.5;     // 2.1333 (종전 3.2 에서 1.5배 축소)
+const HEX_THICKNESS = 0.7;      // 타일이 얇아진 비율에 맞춤 (종전 1.0)
 
 /* 1칸 = 육각 이웃 중심거리. flat-top 규약에서 √3·S 입니다.
  * HEX_SIZE 를 바꾸면 대시 거리도 자동으로 따라옵니다 (숫자를 박지 마세요).
@@ -799,16 +648,6 @@ function jumpLaunchSpeed(dy) {
 
 const HEX_NEIGHBOR_STEP = Math.sqrt(3) * HEX_SIZE;
 const DASH_DISTANCE = DASH.tiles * HEX_NEIGHBOR_STEP;
-
-/* 대시 검증 면제 창도 거리에서 역산합니다.
- *
- * 400ms 고정은 종전 타일 크기 전용 숫자였습니다 — 2칸 = 7.39, speed 38 이라
- * 이동에 194ms 만 쓰고 206ms 가 남았습니다. 타일을 2배로 키우면 2칸이 10.45 로
- * 늘어 275ms 가 걸리고, 여기에 서버→클라이언트 편도 지연까지 얹히면 사내
- * 프록시(왕복 100ms 대)에서 창이 먼저 닫힙니다. 창이 닫힌 뒤 도착한 이동은
- * 순간이동으로 잡혀 대시 도중에 제자리로 튕깁니다.
- * 그래서 '이동 시간 + 지연 여유 220ms' 로 두고, 종전 400ms 를 하한으로 남깁니다. */
-DASH.graceMs = Math.max(400, Math.round(DASH_DISTANCE / DASH.speed * 1000) + 220);
 
 /* 맵 반경은 인원에 맞춰 늘어납니다.
  * 반경 R 의 육각 그리드 타일 수 = 3R² + 3R + 1
@@ -864,11 +703,6 @@ const PEDESTAL_RISE  = 45.0;  // 최상층 위로 띄우는 높이
 /* 타일이 1.5배 작아졌으므로 발판은 상대 배율을 올려 서 있기 편한 크기를 유지합니다.
  * 1.45 × 3.2 = 4.64  →  2.1 × 2.133 = 4.48 (절대 크기가 거의 그대로)      */
 const PEDESTAL_SCALE = 2.1;
-/* 로비 목록에 '어느 맵인가' 를 보여 주려고 이름만 들고 있습니다.
- * 실제 배경은 클라이언트 THEMES 가 그립니다 — 순서가 같아야 합니다.
- * (CLAUDE.md 의 'THEME_COUNT 와 THEMES 길이를 맞추라' 와 같은 규칙) */
-const THEME_NAMES = ['캔디 스카이', '네온 아레나', '새벽 구름'];
-
 const THEME_COUNT = 3;          // 배경 맵 개수 (public/assets/bg)
 
 /* ── 층 정의 (LAYER_DEFS) ─────────────────────────────────────────────
@@ -937,109 +771,38 @@ const LAYER_GAP = parseInt(process.env.LAYER_GAP, 10) || 18;   // 층 간격
 const LAYER_BASE_Y = 0;                                        // 최하층 y
 
 const LAYER_DEFS = [
-  /* ★ 한 층에 배울 것을 하나씩만 둡니다 (기믹 8 → 5).
+  /* ★ 최상층에 '심사 가속'을 답니다 (스토리텔링 기획서 기준).
+   * 우선심사가 붙은 출원은 심사가 몇 배로 빨라지고 그만큼 대응 시간이
+   * 짧아진다 — 가장 높은 자리가 가장 불안정하다는 것이 이 층의 주제이고,
+   * 붕괴 속도 2배가 그 주제를 그대로 옮긴 것입니다.
    *
-   * 종전에는 특수 타일 5종 + 층 특성 3종 = 8개였습니다. 5분짜리 게임을
-   * 처음 하는 사람이 타일 4종·조작·관전자 개입까지 합쳐 열다섯 가지를
-   * 동시에 만났고, '기믹이 너무 많다'는 불만이 정확히 이것이었습니다.
+   * ★ 한때 'none' 으로 빼 두었던 이유도 같이 남깁니다 (되돌릴 근거).
+   *   전원이 여기서 시작하므로 이 층이 사실상 학습 구간인데, 심사 가속은
+   *   대응 수단이 없습니다 — 어둠엔 검색 타일, 회전엔 이동이라는 답이
+   *   있지만 가속엔 답이 없습니다. 첫인상을 담당하기에 부담이라는 판단이
+   *   었습니다. 다시 빼려면 'none' 으로 되돌리기만 하면 됩니다.
    *
-   * 기준은 '보이는 난이도만 남긴다' 였습니다 — 죽은 이유가 화면에
-   * 그려져 있어야 다음 판에 배울 수 있습니다.
-   *
-   *   남김 : 신속심사(튀어나감) · 거절이유(색이 변함) · 회전(층이 돎)
-   *          위상(깜빡임) · 점프(쏘아 올림)  — 전부 눈에 보입니다
-   *   제거 : 심사 가속 — 퓨즈가 몰래 빨라질 뿐 알아볼 방법이 없음
-   *          어둠      — '못 보는 것'이 난이도인 유일한 기믹
-   *          검색 타일 — 어둠이 없으면 존재 이유가 없음(세트로 제거)
-   *          보정 타일 — OFFICE_SPECIAL_MIX 주석 참고
-   *
-   * ★ 되돌리는 법: 아래 special / trait 태그만 원래대로 쓰면 됩니다.
-   *   ACCEL_EVENT · DARK_EVENT · SEARCH_TILE 상수와 그 구현은 하나도
-   *   지우지 않았습니다. ACTIVE_TRAITS 가 '그 특성을 쓰는 층이 있는지'
-   *   로만 판단하므로, 태그를 되돌리면 시계가 그대로 다시 돕니다.
-   *
-   * ★ tip 은 그 층에 처음 내려섰을 때 화면에 뜨는 한 줄입니다.
-   *   대기 화면의 긴 설명문을 아무도 읽지 않는다는 것이 '불친절하다'는
-   *   불만의 실체였습니다. 설명을 지운 게 아니라, 필요한 순간에 필요한
-   *   것만 한 줄씩 나눠 주는 쪽으로 옮겼습니다.
-   *
-   * ★ 최상층은 기믹을 하나만 둡니다 (층 특성 없음).
-   *   전원이 여기서 시작하므로 이 층이 사실상 학습 구간입니다.      */
+   *   지금은 EVENT_SCHEDULE.warmupMs(25초)가 그 부담을 줄여 줍니다 —
+   *   라운드 시작 직후에는 발동하지 않으므로 처음 몇 초는 그대로
+   *   학습 구간으로 남습니다. 다만 그만큼 '주자가 아직 최상층에 있는
+   *   동안 가속이 걸릴' 기회 자체가 줄어드니, 이 층에서 가속이 거의
+   *   안 보인다고 느껴지면 warmupMs 를 먼저 의심하세요.              */
   { key: 'fasttrack', name: '우선심사 패스트트랙', short: 'FAST-TRACK',
-    color: '#00ffcc', special: 'accel',  trait: 'none',
-    tip: '밝게 빛나는 타일을 밟으면 진행 방향으로 두 칸 튀어나갑니다',
-    marks: [{ i: '⚡', t: '밝게 빛나는 타일 = 앞으로 두 칸 사출' }] },
+    color: '#00ffcc', special: 'accel',  trait: 'accel' },
   /* ★ 실체심사가 의견제출통지보다 반드시 위층입니다 (순서를 바꾸지 마세요).
    * 실무 절차가 그렇습니다 — 심사관이 실체심사에서 선행기술을 조사하고,
    * 거절이유를 발견했을 때 비로소 의견제출통지서를 발송합니다(특허법 제63조).
    * 아래로 떨어지는 것이 곧 권리가 깎여 내려가는 것이라는 이 게임의 전제상,
    * 두 층이 뒤바뀌면 절차를 거꾸로 설명하는 셈이 됩니다.
    * (종전에는 office 가 위였습니다 — 스토리텔링 기획서 기준으로 교정)   */
-  /* ★ 이 층만 기믹이 없습니다 — 일부러 비워 둔 '숨 고르는 층'입니다.
-   *   어둠과 검색 타일은 한 세트라 둘 다 빠지면서 비게 됐는데, 채우는
-   *   대신 그대로 뒀습니다. 5층 내내 새 규칙이 쏟아지면 배울 틈이 없고,
-   *   중간에 순수하게 달리기만 하는 구간이 있어야 난이도 곡선에 숨이
-   *   생깁니다. special 이 'none' 이면 그 층의 특수 타일 몫(20%)은
-   *   buildMap 에서 기본 바닥 타일로 강등됩니다.                    */
   { key: 'exam',      name: '실체심사/선행기술조사', short: 'EXAMINATION',
-    color: '#7c5cff', special: 'none',   trait: 'none',
-    tip: '특별한 장치가 없는 층입니다 — 금 간 타일만 피해 달리세요',
-    marks: [{ i: '—', t: '장치 없는 층 · 금 간 타일만 피하면 됩니다' }] },
+    color: '#7c5cff', special: 'search', trait: 'dark' },
   { key: 'office',    name: '의견제출통지',       short: 'OFFICE ACTION',
-    color: '#0088ff', special: 'reject', trait: 'rotate',
-    tip: '층 전체가 천천히 돕니다 · 노랗게 변한 타일은 곧 주변까지 터집니다',
-    marks: [
-      { i: '⟳', t: '층 전체가 회전 · 15초마다 방향 반전' },
-      { i: '◆', t: '노랗게 변한 타일 = 주변 6칸까지 폭발' }
-    ] },
-  /* ── 보정 층 (2026-09-13 추가) ────────────────────────────────────
-   * 라운드가 너무 빨리 끝난다는 의견에 대한 답입니다.
-   *
-   * ★ 왜 '층을 늘리는' 쪽을 골랐나
-   *   라운드 길이는 대략 이렇게 정해집니다 —
-   *       T ∝ 층 수 × 층당 타일 수 × 한 칸 통과 시간 ÷ 동시 주자 수
-   *   층 수와 층당 타일 수는 같은 비율만큼 늘리면 효과도 같고 드로우콜
-   *   비용도 같습니다. 다른 점은 부작용입니다. 층당 타일을 늘리면 아레나가
-   *   같이 커져 가로지르기가 길어지는데(지금도 6.5초), 층을 늘리면 아레나는
-   *   그대로입니다. 이미 타일 크기를 2배로 키우며 아레나가 41% 커진 뒤라
-   *   더 넓히지 않는 쪽이 맞다고 봤습니다.
-   *
-   *   '게임 속도를 늦춘다'(PHYS.MOVE 하향)는 택하지 않았습니다. 이동 속도를
-   *   내리면 점프 사거리가 칸 단위로 같이 줄어듭니다(질주 점프 2.85칸 →
-   *   2.28칸). 끊긴 길을 못 건너게 되는 것이라 '너무 어렵다'는 직전 의견과
-   *   정면으로 부딪힙니다. 조작감도 둔해집니다.
-   *
-   *   자동 파괴(autoMs)를 늘리는 것도 답이 아닙니다. 밟힌 타일은 어차피
-   *   전부 사라지므로 autoMs 는 '사라지는 시각'만 미룰 뿐 총량을 바꾸지
-   *   못합니다. 압박감만 옅어집니다.
-   *
-   * ★ 왜 기믹을 안 붙였나
-   *   기믹이 너무 많다는 의견을 받아 8개에서 5개로 줄인 직후입니다. 층이
-   *   늘었다고 기믹을 도로 늘리면 그 작업을 무르는 셈입니다. 장치 없는 층은
-   *   '길게 만드는 층'으로 그 자체가 역할입니다 — 실체심사 층과 함께 6층 중
-   *   둘이 휴식 구간이 되어 장치 → 휴식 → 장치 → 휴식 → 장치 → 장치 리듬이
-   *   생깁니다.
-   *
-   * ★ 절차상 자리
-   *   의견제출통지서를 받으면 출원인이 보정서로 청구항을 스스로 깎습니다.
-   *   '아래로 내려갈수록 권리가 깎인다'는 이 게임의 전제에서 의견제출통지와
-   *   청구항 사이가 정확히 그 자리입니다.
-   *
-   * ★ 여기를 더 늘리려면 VALIDATE.MAX_Y 를 먼저 보세요.
-   *   대기 발판 높이 = 최상층 y + PEDESTAL_RISE 이고 최상층 y 는 층 수에
-   *   비례해 올라갑니다. 지금은 90 + 45 = 135 이고 MAX_Y 는 180 입니다.  */
-  { key: 'amend',     name: '보정',               short: 'AMENDMENT',
-    color: '#8ee04a', special: 'none',   trait: 'none',
-    tip: '이 층도 장치가 없습니다 — 숨을 고르고 다음 층을 고르세요',
-    marks: [{ i: '—', t: '장치 없는 층 · 숨 고르고 다음 층을 고르세요' }] },
+    color: '#0088ff', special: 'reject', trait: 'rotate' },
   { key: 'claim',     name: '청구항',             short: 'CLAIM',
-    color: '#ff8a3d', special: 'phase',  trait: 'none',
-    tip: '깜빡이는 타일은 꺼져 있는 동안 밟을 수 없습니다',
-    marks: [{ i: '◇', t: '깜빡이는 타일 = 꺼진 동안 밟을 수 없음' }] },
+    color: '#ff8a3d', special: 'phase',  trait: 'none' },
   { key: 'idea',      name: '아이디어',           short: 'IDEATION',
-    color: '#aa00ff', special: 'jump',   trait: 'none',
-    tip: '청록·자홍 발판을 밟으면 위층으로 다시 올라갑니다',
-    marks: [{ i: '▲', t: '청록 = 한 층 위 · 자홍 = 두 층 위' }] }
+    color: '#aa00ff', special: 'jump',   trait: 'none' }
 ];
 
 /* 파생 — 여기서 만들어진 LAYERS 가 그대로 클라이언트로 내려갑니다. */
@@ -1052,16 +815,7 @@ const LAYERS = LAYER_DEFS.map((d, i) => ({
   name: d.name,
   short: d.short,
   special: d.special,
-  trait: d.trait,
-  /* 그 층에 처음 내려섰을 때 띄우는 한 줄 안내. 클라이언트가 문구를
-   * 들고 있으면 층 구성을 바꿀 때마다 두 파일을 고쳐야 합니다.     */
-  tip: d.tip || '',
-  /* ★ marks 는 같은 내용을 '항목'으로 쪼갠 것입니다.
-   *   tip 한 줄로 뭉쳐 두니 층 배너에서 읽히지 않았습니다 — 기믹이 둘인
-   *   층(의견제출통지)은 한 문장에 두 가지가 들어가 특히 심했습니다.
-   *   배너는 marks 를 줄 단위로 그리고, marks 가 없으면 tip 으로 물러납니다.
-   *   아이콘(i)은 글자 하나라 폰트가 없어도 깨지지 않는 것만 씁니다.  */
-  marks: Array.isArray(d.marks) ? d.marks : []
+  trait: d.trait
 }));
 
 const TOP_LAYER = LAYERS[0];
@@ -1256,42 +1010,21 @@ function buildMap(seed) {
          * 비교하므로, 층을 늘리거나 순서를 뒤집어도 그대로 동작합니다.   */
         const protectedSpawn = layer.index === TOP_LAYER.index && dist >= GRID_RADIUS - 1;
 
-        /* 종류와 퓨즈를 먼저 뽑고, 보호 구역이면 기본 바닥으로 되돌립니다.
+        /* 종류와 퓨즈를 먼저 뽑고, 보호 구역이면 일반으로 되돌립니다.
          * 보호 구역에서 rand() 를 건너뛰면 안 됩니다 — 난수 소비 횟수가
-         * 달라져 같은 시드인데 나머지 타일 배치가 통째로 바뀝니다.
-         *
-         * ★ 'normal' 이 아니라 BASE_TILE_KIND 로 되돌립니다.
-         *   종전에는 여기에 'normal' 이 박혀 있었는데, 일반 타일을 0% 로
-         *   내리면 스폰 링만 유일하게 1회 밟기 타일이 됩니다. 가장 안전해야
-         *   할 자리가 가장 빨리 꺼지는 자리가 되는 셈이라, 보호가 아니라
-         *   함정이 됩니다.                                              */
+         * 달라져 같은 시드인데 나머지 타일 배치가 통째로 바뀝니다.      */
         let kind = pickTileKind(rand);
         let fuse = pickTileFuse(kind, rand);
-        if (protectedSpawn && kind !== BASE_TILE_KIND) {
-          kind = BASE_TILE_KIND;
-          fuse = pickTileFuse(BASE_TILE_KIND, rand);
+        if (protectedSpawn && kind !== 'normal') {
+          kind = 'normal';
+          fuse = pickTileFuse('normal', rand);
         }
 
         /* 특수 타일이면 그 층의 서브믹스로 세부 종류를 한 번 더 뽑습니다.
          * 서브믹스가 없는 층은 태그가 그대로 specialType 이 됩니다.    */
-        let specialType = kind === 'special'
+        const specialType = kind === 'special'
           ? pickSpecialSubtype(layer.special, rand)
           : null;
-
-        /* ★ 기믹이 없는 특수 타일은 그냥 바닥으로 강등합니다.
-         *   두 경우가 여기로 옵니다 — 층에 special 태그가 없거나(실체심사),
-         *   서브믹스에서 'none' 이 뽑혔거나(의견제출통지의 25%).
-         *   강등하지 않으면 kind='special' 인데 하는 일이 없는 타일이
-         *   남습니다. 클라이언트는 kind 로 겉모습을 정하므로, 층 원색으로
-         *   번쩍이면서 밟아도 아무 일도 없는 타일이 되어 제일 나쁩니다.
-         *
-         *   퓨즈를 다시 뽑아도 난수는 더 쓰지 않습니다 — 기본 타일은
-         *   fuseMin === fuseMax 라 pickTileFuse 가 rand() 를 건너뜁니다. */
-        if (kind === 'special' && (!specialType || specialType === 'none')) {
-          kind = BASE_TILE_KIND;
-          specialType = null;
-          fuse = pickTileFuse(BASE_TILE_KIND, rand);
-        }
 
         const spec = TILE_KINDS[kind];
         tiles.push({
@@ -2768,17 +2501,10 @@ function publicConfig() {
     DEV_MODE: DEV.on,   // 구 클라이언트 호환 (예전엔 이 불리언 하나였습니다)
     VALIDATE_ON: VALIDATE.ON,   // 진단 패널에 검증 동작 여부를 표시합니다
     MAX_PLAYERS, TICK_HZ, HEX_SIZE, HEX_THICKNESS, GRID_RADIUS,
-    /* 좌석별 색. 대기 화면의 캐릭터 미리보기가 '내가 받게 될 색'을
-     * 미리 보여 주는 데 씁니다. 종전에는 플레이어 객체에만 실려 가서,
-     * 아직 참가하지 않은 사람은 자기 색을 알 방법이 없었습니다. */
-    seatColors: [...PLAYER_COLORS],
     /* 층·타일 규격은 전부 서버가 내려줍니다. 클라이언트는 이 값으로만
      * 지오메트리와 HUD 를 만들고 아무것도 하드코딩하지 않습니다.     */
     SEA_Y, LAYERS, LAYER_GAP, LAYER_BASE_Y,
     TILE_MIX, TILE_KINDS, PHASE_TILE, DASH, REJECT_TILE, OFFICE_SPECIAL_MIX, JUMP_TILE,
-    /* 안내 문구도 서버가 내려줍니다 — 층 구성과 문구가 한 파일에 있어야
-     * 기믹을 바꿀 때 설명이 같이 따라옵니다.                          */
-    SPECIAL_TIPS, BASE_TILE_KIND,
     /* 심사 가속. effectiveIntervalMs 는 dev 에서 줄어든 '실제' 간격입니다 —
      * 규칙 안내문이 원래 값을 그대로 쓰면 dev 에서 설명과 화면이 어긋납니다. */
     ACCEL_EVENT: {
@@ -2819,24 +2545,11 @@ app.get('/healthz', (_req, res) => {
   res.status(200).json({ ok: true, rooms: rooms.size, uptime: process.uptime() });
 });
 
-/* 로비 화면이 1초마다 부르는 목록입니다.
- * 방을 고르는 데 필요한 것만 담습니다 — 어느 방이 곧 시작하는지,
- * 들어갈 자리가 있는지. 진단용 corrections 는 종전대로 둡니다.  */
 app.get('/api/rooms', (_req, res) => {
-  const now = Date.now();
   res.json([...rooms.values()].map(r => ({
     id: r.id,
     phase: r.phase,
     players: r.players.size,
-    max: MAX_PLAYERS,
-    theme: r.theme,
-    themeName: THEME_NAMES[r.theme] || '',
-    /* 대기/카운트다운이면 시작까지 남은 시간(ms). 아니면 0.
-     * 로비에서 '곧 시작' 을 띄우는 근거입니다. */
-    startsIn: (r.phase === 'waiting' || r.phase === 'countdown') && r.phaseEndsAt
-      ? Math.max(0, r.phaseEndsAt - now) : 0,
-    /* 지금 주자로 바로 들어갈 수 있는가. 라운드 중이면 관전으로 밀립니다. */
-    joinable: r.players.size < MAX_PLAYERS && (r.phase === 'waiting' || r.phase === 'countdown'),
     spectators: r.spectators.size,
     // 이동 검증이 얼마나 개입했는지. 평상시 0 이어야 정상입니다.
     corrections: [...r.players.values()].reduce((n, p) => n + (p.corrections || 0), 0)
@@ -2859,41 +2572,8 @@ io.on('connection', (socket) => {
     socket.emit('pong_probe', { clientSent, serverTime: Date.now() });
   });
 
-  /* 지금 방에서 빠집니다. 소켓은 살아 있고 방만 떠납니다.
-   * disconnect 와 같은 정리를 하되 방 파괴는 호출자가 정합니다 —
-   * 재참가 도중에 방을 부수면 방금 고른 방이 사라질 수 있습니다. */
-  function leaveCurrentRoom() {
-    if (!room) return;
-    const wasPlayer = room.players.has(socket.id);
-    const p = room.players.get(socket.id);
-    room.players.delete(socket.id);
-    room.spectators.delete(socket.id);
-    socket.leave(room.id);
-    if (wasPlayer) {
-      socket.to(room.id).emit('player_left', { id: socket.id, name: p ? p.name : '' });
-      checkRoundEnd(room);
-    } else {
-      socket.to(room.id).emit('spectator_left', { id: socket.id });
-    }
-    broadcastPhase(room);
-    const empty = room.players.size === 0 && room.spectators.size === 0;
-    const left = room;
-    room = null; role = 'spectator';
-    return empty ? left : null;
-  }
-
-  /* ── join ─────────────────────────────────────────────────────────────
-   * ★ 재참가를 허용합니다 (종전에는 room 이 있으면 그대로 return).
-   *   대기 화면 뒤에서 진짜 게임이 돌아가게 하려고, 페이지를 열면 곧바로
-   *   '미리보기 관전'으로 붙습니다. 그 상태에서 사용자가 이름을 적고
-   *   참가를 누르면 같은 소켓으로 다시 join 이 옵니다 — 방을 옮기거나
-   *   관전에서 주자로 올라가야 하므로 한 번은 빠졌다 들어가야 합니다.
-   *
-   * ★ 빠져나온 방이 비었더라도 곧바로 부수지 않습니다.
-   *   내가 고른 방이 '방금 빠져나온 그 방' 일 수 있습니다(이름만 바꾸는
-   *   경우). 배정이 끝난 뒤에, 내가 들어간 방이 아닐 때만 부숩니다.   */
   socket.on('join', (payload = {}) => {
-    const vacated = room ? leaveCurrentRoom() : null;
+    if (room) return;
 
     const name = clampName(payload.name);
     const wantSpectate = payload.mode === 'spectator';
@@ -2917,17 +2597,8 @@ io.on('connection', (socket) => {
     } else {
       // wantsPlay: 주자로 들어오려 했지만 라운드 중이라 밀린 경우.
       // 다음 맵 리셋에서 자동으로 주자로 승격됩니다.
-      /* ★ preview: 대기 화면 뒤에서 구경만 하는 상태입니다.
-       *   wantsPlay 를 켜 두면 사용자가 참가를 누르지도 않았는데 다음
-       *   회차에 자동으로 주자가 되어 버립니다. 이름도 아직 없습니다.  */
-      const preview = !!payload.preview;
-      room.spectators.set(socket.id, {
-        id: socket.id, name, preview,
-        wantsPlay: !wantSpectate && !preview
-      });
-      socket.to(room.id).emit('spectator_joined', {
-        id: socket.id, name, wantsPlay: !wantSpectate && !preview
-      });
+      room.spectators.set(socket.id, { id: socket.id, name, wantsPlay: !wantSpectate });
+      socket.to(room.id).emit('spectator_joined', { id: socket.id, name, wantsPlay: !wantSpectate });
     }
 
     socket.emit('init', {
@@ -2952,11 +2623,6 @@ io.on('connection', (socket) => {
 
     broadcastPhase(room);
     if (role === 'player') evaluateLobby(room);
-    /* 재참가로 비게 된 방은 여기서 정리합니다. 내가 다시 들어간 방이면
-     * 당연히 안 비어 있으므로 이 조건에 걸리지 않습니다. */
-    if (vacated && vacated !== room && vacated.players.size === 0 && vacated.spectators.size === 0) {
-      destroyRoom(vacated);
-    }
     console.log('[join] ' + name + ' as ' + role + ' -> ' + room.id +
       ' (' + room.players.size + 'p/' + room.spectators.size + 's)');
   });
@@ -3393,24 +3059,6 @@ server.listen(PORT, HOST, () => {
   console.log(' tile: S=' + HEX_SIZE.toFixed(4) + '  radius=' + GRID_RADIUS +
     '  ' + perLayer + ' tiles/layer' +
     '  arena R=' + (HEX_SIZE * 1.5 * GRID_RADIUS).toFixed(1));
-  {
-    /* 타일 크기를 바꿨을 때 실제로 확인해야 하는 값들입니다.
-     * 한 칸 통과 시간과 퓨즈를 나란히 찍어 두면, 퓨즈가 통과 시간보다
-     * 짧아지는 순간(= 밟자마자 발밑이 꺼지는 타일)을 기동 즉시 봅니다. */
-    const step = HEX_NEIGHBOR_STEP;
-    const walk = step / 15.0, run = step / 21.5;          // PHYS.MOVE / PHYS.SPRINT
-    const airT = 2 * 21.5 / GRAVITY_MAG;                  // PHYS.JUMP_V
-    console.log(' 타일 넓이 ×' + TILE_AREA_SCALE.toFixed(2) + ' (한 변 ×' + TILE_LINEAR.toFixed(3) +
-      ')  한 칸=' + step.toFixed(2) + '  안지름/주자폭=' + (step / 1.56).toFixed(2) + '배');
-    console.log('   한 칸 통과: 걷기 ' + (walk * 1000).toFixed(0) + 'ms · 질주 ' +
-      (run * 1000).toFixed(0) + 'ms   |   퓨즈 일반 ' + TILE_KINDS.normal.fuseMin + '~' +
-      TILE_KINDS.normal.fuseMax + 'ms · 취약 ' + TILE_KINDS.fragile.fuseMin + '~' +
-      TILE_KINDS.fragile.fuseMax + 'ms' +
-      (TILE_KINDS.fragile.fuseMin <= run * 1000 ? '  ★ 취약: 질주로도 못 건넘' : ''));
-    console.log('   질주 점프 ' + (21.5 * airT / step).toFixed(2) + '칸 · 대시 ' + DASH.tiles +
-      '칸 ' + Math.round(DASH_DISTANCE / DASH.speed * 1000) + 'ms/창 ' + DASH.graceMs + 'ms' +
-      ' · 가로지르기 ' + (2 * HEX_SIZE * 1.5 * GRID_RADIUS / 15.0).toFixed(1) + '초');
-  }
   console.log(' layers: ' + LAYERS.length + '개  gap=' + LAYER_GAP +
     '  y=' + LAYERS.map((L) => L.index + ':' + L.y).join(' ') +
     '  sea=' + SEA_Y);
@@ -3426,9 +3074,7 @@ server.listen(PORT, HOST, () => {
       ', ' + REJECT_TILE.delayMin + '~' + REJECT_TILE.delayMax + 'ms 뒤 반경 ' +
       REJECT_TILE.radius + ' 폭발)'
     : '없음'));
-  /* 보정 타일은 연결이 끊겨 있으면(OFFICE_SPECIAL_MIX 에 amend 가 없으면)
-   * 줄을 아예 찍지 않습니다. 종전에는 무조건 찍어서 비율이 NaN% 로 나왔습니다. */
-  if (rejectLayers.length && OFFICE_SPECIAL_MIX.amend > 0) {
+  if (rejectLayers.length) {
     console.log(' 보정 타일    : LAYER ' + rejectLayers[0].index + ' ' + rejectLayers[0].name +
       '  (특수 ' + Math.round(TILE_MIX.special / TILE_MIX_TOTAL * 100) + '% 중 ' +
       Math.round(OFFICE_SPECIAL_MIX.amend * 100) + '% = 전체 ' +

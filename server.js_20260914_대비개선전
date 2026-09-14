@@ -864,11 +864,6 @@ const PEDESTAL_RISE  = 45.0;  // 최상층 위로 띄우는 높이
 /* 타일이 1.5배 작아졌으므로 발판은 상대 배율을 올려 서 있기 편한 크기를 유지합니다.
  * 1.45 × 3.2 = 4.64  →  2.1 × 2.133 = 4.48 (절대 크기가 거의 그대로)      */
 const PEDESTAL_SCALE = 2.1;
-/* 로비 목록에 '어느 맵인가' 를 보여 주려고 이름만 들고 있습니다.
- * 실제 배경은 클라이언트 THEMES 가 그립니다 — 순서가 같아야 합니다.
- * (CLAUDE.md 의 'THEME_COUNT 와 THEMES 길이를 맞추라' 와 같은 규칙) */
-const THEME_NAMES = ['캔디 스카이', '네온 아레나', '새벽 구름'];
-
 const THEME_COUNT = 3;          // 배경 맵 개수 (public/assets/bg)
 
 /* ── 층 정의 (LAYER_DEFS) ─────────────────────────────────────────────
@@ -967,8 +962,7 @@ const LAYER_DEFS = [
    *   전원이 여기서 시작하므로 이 층이 사실상 학습 구간입니다.      */
   { key: 'fasttrack', name: '우선심사 패스트트랙', short: 'FAST-TRACK',
     color: '#00ffcc', special: 'accel',  trait: 'none',
-    tip: '밝게 빛나는 타일을 밟으면 진행 방향으로 두 칸 튀어나갑니다',
-    marks: [{ i: '⚡', t: '밝게 빛나는 타일 = 앞으로 두 칸 사출' }] },
+    tip: '밝게 빛나는 타일을 밟으면 진행 방향으로 두 칸 튀어나갑니다' },
   /* ★ 실체심사가 의견제출통지보다 반드시 위층입니다 (순서를 바꾸지 마세요).
    * 실무 절차가 그렇습니다 — 심사관이 실체심사에서 선행기술을 조사하고,
    * 거절이유를 발견했을 때 비로소 의견제출통지서를 발송합니다(특허법 제63조).
@@ -983,15 +977,10 @@ const LAYER_DEFS = [
    *   buildMap 에서 기본 바닥 타일로 강등됩니다.                    */
   { key: 'exam',      name: '실체심사/선행기술조사', short: 'EXAMINATION',
     color: '#7c5cff', special: 'none',   trait: 'none',
-    tip: '특별한 장치가 없는 층입니다 — 금 간 타일만 피해 달리세요',
-    marks: [{ i: '—', t: '장치 없는 층 · 금 간 타일만 피하면 됩니다' }] },
+    tip: '특별한 장치가 없는 층입니다 — 금 간 타일만 피해 달리세요' },
   { key: 'office',    name: '의견제출통지',       short: 'OFFICE ACTION',
     color: '#0088ff', special: 'reject', trait: 'rotate',
-    tip: '층 전체가 천천히 돕니다 · 노랗게 변한 타일은 곧 주변까지 터집니다',
-    marks: [
-      { i: '⟳', t: '층 전체가 회전 · 15초마다 방향 반전' },
-      { i: '◆', t: '노랗게 변한 타일 = 주변 6칸까지 폭발' }
-    ] },
+    tip: '층 전체가 천천히 돕니다 · 노랗게 변한 타일은 곧 주변까지 터집니다' },
   /* ── 보정 층 (2026-09-13 추가) ────────────────────────────────────
    * 라운드가 너무 빨리 끝난다는 의견에 대한 답입니다.
    *
@@ -1030,16 +1019,13 @@ const LAYER_DEFS = [
    *   비례해 올라갑니다. 지금은 90 + 45 = 135 이고 MAX_Y 는 180 입니다.  */
   { key: 'amend',     name: '보정',               short: 'AMENDMENT',
     color: '#8ee04a', special: 'none',   trait: 'none',
-    tip: '이 층도 장치가 없습니다 — 숨을 고르고 다음 층을 고르세요',
-    marks: [{ i: '—', t: '장치 없는 층 · 숨 고르고 다음 층을 고르세요' }] },
+    tip: '이 층도 장치가 없습니다 — 숨을 고르고 다음 층을 고르세요' },
   { key: 'claim',     name: '청구항',             short: 'CLAIM',
     color: '#ff8a3d', special: 'phase',  trait: 'none',
-    tip: '깜빡이는 타일은 꺼져 있는 동안 밟을 수 없습니다',
-    marks: [{ i: '◇', t: '깜빡이는 타일 = 꺼진 동안 밟을 수 없음' }] },
+    tip: '깜빡이는 타일은 꺼져 있는 동안 밟을 수 없습니다' },
   { key: 'idea',      name: '아이디어',           short: 'IDEATION',
     color: '#aa00ff', special: 'jump',   trait: 'none',
-    tip: '청록·자홍 발판을 밟으면 위층으로 다시 올라갑니다',
-    marks: [{ i: '▲', t: '청록 = 한 층 위 · 자홍 = 두 층 위' }] }
+    tip: '청록·자홍 발판을 밟으면 위층으로 다시 올라갑니다' }
 ];
 
 /* 파생 — 여기서 만들어진 LAYERS 가 그대로 클라이언트로 내려갑니다. */
@@ -1055,13 +1041,7 @@ const LAYERS = LAYER_DEFS.map((d, i) => ({
   trait: d.trait,
   /* 그 층에 처음 내려섰을 때 띄우는 한 줄 안내. 클라이언트가 문구를
    * 들고 있으면 층 구성을 바꿀 때마다 두 파일을 고쳐야 합니다.     */
-  tip: d.tip || '',
-  /* ★ marks 는 같은 내용을 '항목'으로 쪼갠 것입니다.
-   *   tip 한 줄로 뭉쳐 두니 층 배너에서 읽히지 않았습니다 — 기믹이 둘인
-   *   층(의견제출통지)은 한 문장에 두 가지가 들어가 특히 심했습니다.
-   *   배너는 marks 를 줄 단위로 그리고, marks 가 없으면 tip 으로 물러납니다.
-   *   아이콘(i)은 글자 하나라 폰트가 없어도 깨지지 않는 것만 씁니다.  */
-  marks: Array.isArray(d.marks) ? d.marks : []
+  tip: d.tip || ''
 }));
 
 const TOP_LAYER = LAYERS[0];
@@ -2768,10 +2748,6 @@ function publicConfig() {
     DEV_MODE: DEV.on,   // 구 클라이언트 호환 (예전엔 이 불리언 하나였습니다)
     VALIDATE_ON: VALIDATE.ON,   // 진단 패널에 검증 동작 여부를 표시합니다
     MAX_PLAYERS, TICK_HZ, HEX_SIZE, HEX_THICKNESS, GRID_RADIUS,
-    /* 좌석별 색. 대기 화면의 캐릭터 미리보기가 '내가 받게 될 색'을
-     * 미리 보여 주는 데 씁니다. 종전에는 플레이어 객체에만 실려 가서,
-     * 아직 참가하지 않은 사람은 자기 색을 알 방법이 없었습니다. */
-    seatColors: [...PLAYER_COLORS],
     /* 층·타일 규격은 전부 서버가 내려줍니다. 클라이언트는 이 값으로만
      * 지오메트리와 HUD 를 만들고 아무것도 하드코딩하지 않습니다.     */
     SEA_Y, LAYERS, LAYER_GAP, LAYER_BASE_Y,
@@ -2819,24 +2795,11 @@ app.get('/healthz', (_req, res) => {
   res.status(200).json({ ok: true, rooms: rooms.size, uptime: process.uptime() });
 });
 
-/* 로비 화면이 1초마다 부르는 목록입니다.
- * 방을 고르는 데 필요한 것만 담습니다 — 어느 방이 곧 시작하는지,
- * 들어갈 자리가 있는지. 진단용 corrections 는 종전대로 둡니다.  */
 app.get('/api/rooms', (_req, res) => {
-  const now = Date.now();
   res.json([...rooms.values()].map(r => ({
     id: r.id,
     phase: r.phase,
     players: r.players.size,
-    max: MAX_PLAYERS,
-    theme: r.theme,
-    themeName: THEME_NAMES[r.theme] || '',
-    /* 대기/카운트다운이면 시작까지 남은 시간(ms). 아니면 0.
-     * 로비에서 '곧 시작' 을 띄우는 근거입니다. */
-    startsIn: (r.phase === 'waiting' || r.phase === 'countdown') && r.phaseEndsAt
-      ? Math.max(0, r.phaseEndsAt - now) : 0,
-    /* 지금 주자로 바로 들어갈 수 있는가. 라운드 중이면 관전으로 밀립니다. */
-    joinable: r.players.size < MAX_PLAYERS && (r.phase === 'waiting' || r.phase === 'countdown'),
     spectators: r.spectators.size,
     // 이동 검증이 얼마나 개입했는지. 평상시 0 이어야 정상입니다.
     corrections: [...r.players.values()].reduce((n, p) => n + (p.corrections || 0), 0)
@@ -2859,41 +2822,8 @@ io.on('connection', (socket) => {
     socket.emit('pong_probe', { clientSent, serverTime: Date.now() });
   });
 
-  /* 지금 방에서 빠집니다. 소켓은 살아 있고 방만 떠납니다.
-   * disconnect 와 같은 정리를 하되 방 파괴는 호출자가 정합니다 —
-   * 재참가 도중에 방을 부수면 방금 고른 방이 사라질 수 있습니다. */
-  function leaveCurrentRoom() {
-    if (!room) return;
-    const wasPlayer = room.players.has(socket.id);
-    const p = room.players.get(socket.id);
-    room.players.delete(socket.id);
-    room.spectators.delete(socket.id);
-    socket.leave(room.id);
-    if (wasPlayer) {
-      socket.to(room.id).emit('player_left', { id: socket.id, name: p ? p.name : '' });
-      checkRoundEnd(room);
-    } else {
-      socket.to(room.id).emit('spectator_left', { id: socket.id });
-    }
-    broadcastPhase(room);
-    const empty = room.players.size === 0 && room.spectators.size === 0;
-    const left = room;
-    room = null; role = 'spectator';
-    return empty ? left : null;
-  }
-
-  /* ── join ─────────────────────────────────────────────────────────────
-   * ★ 재참가를 허용합니다 (종전에는 room 이 있으면 그대로 return).
-   *   대기 화면 뒤에서 진짜 게임이 돌아가게 하려고, 페이지를 열면 곧바로
-   *   '미리보기 관전'으로 붙습니다. 그 상태에서 사용자가 이름을 적고
-   *   참가를 누르면 같은 소켓으로 다시 join 이 옵니다 — 방을 옮기거나
-   *   관전에서 주자로 올라가야 하므로 한 번은 빠졌다 들어가야 합니다.
-   *
-   * ★ 빠져나온 방이 비었더라도 곧바로 부수지 않습니다.
-   *   내가 고른 방이 '방금 빠져나온 그 방' 일 수 있습니다(이름만 바꾸는
-   *   경우). 배정이 끝난 뒤에, 내가 들어간 방이 아닐 때만 부숩니다.   */
   socket.on('join', (payload = {}) => {
-    const vacated = room ? leaveCurrentRoom() : null;
+    if (room) return;
 
     const name = clampName(payload.name);
     const wantSpectate = payload.mode === 'spectator';
@@ -2917,17 +2847,8 @@ io.on('connection', (socket) => {
     } else {
       // wantsPlay: 주자로 들어오려 했지만 라운드 중이라 밀린 경우.
       // 다음 맵 리셋에서 자동으로 주자로 승격됩니다.
-      /* ★ preview: 대기 화면 뒤에서 구경만 하는 상태입니다.
-       *   wantsPlay 를 켜 두면 사용자가 참가를 누르지도 않았는데 다음
-       *   회차에 자동으로 주자가 되어 버립니다. 이름도 아직 없습니다.  */
-      const preview = !!payload.preview;
-      room.spectators.set(socket.id, {
-        id: socket.id, name, preview,
-        wantsPlay: !wantSpectate && !preview
-      });
-      socket.to(room.id).emit('spectator_joined', {
-        id: socket.id, name, wantsPlay: !wantSpectate && !preview
-      });
+      room.spectators.set(socket.id, { id: socket.id, name, wantsPlay: !wantSpectate });
+      socket.to(room.id).emit('spectator_joined', { id: socket.id, name, wantsPlay: !wantSpectate });
     }
 
     socket.emit('init', {
@@ -2952,11 +2873,6 @@ io.on('connection', (socket) => {
 
     broadcastPhase(room);
     if (role === 'player') evaluateLobby(room);
-    /* 재참가로 비게 된 방은 여기서 정리합니다. 내가 다시 들어간 방이면
-     * 당연히 안 비어 있으므로 이 조건에 걸리지 않습니다. */
-    if (vacated && vacated !== room && vacated.players.size === 0 && vacated.spectators.size === 0) {
-      destroyRoom(vacated);
-    }
     console.log('[join] ' + name + ' as ' + role + ' -> ' + room.id +
       ' (' + room.players.size + 'p/' + room.spectators.size + 's)');
   });

@@ -82,40 +82,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
 .doc .no{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.4)}
 .doc .nm{font-size:12.5px;font-weight:700;margin-top:3px;line-height:1.3}
 .doc .alt{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:rgba(236,231,216,.35);margin-top:3px}
-
-/* ── 현재 층의 기믹 (상시) ────────────────────────────────────────────
- * ★ 층 진입 배너는 2.6초 뒤 사라집니다.
- *   그 다음에 '이 층에 뭐가 있었더라?' 하면 확인할 곳이 없었습니다.
- *   배너는 '방금 도착했다'는 알림이고, 이 목록은 '지금 여기는 이렇다'는
- *   참조입니다. 역할이 다르므로 둘 다 있어야 합니다.
- *
- * ★ 현재 층에서만 펼칩니다.
- *   여섯 층을 다 펼치면 목록이 화면 높이를 넘고, 무엇보다 지금 필요 없는
- *   정보가 화면의 대부분을 먹습니다. 내가 선 층만 펼치면 높이가 거의
- *   그대로입니다(한 층치 두세 줄).
- *
- * ★ max-height 로 접습니다.
- *   display:none 으로 감추면 전환이 툭 끊깁니다. 층을 오르내릴 때마다
- *   목록이 덜컹거리면 눈이 그쪽으로 끌려갑니다.                      */
-.doc .marks{
-  max-height:0;overflow:hidden;opacity:0;
-  transition:max-height .3s cubic-bezier(.2,.8,.2,1),opacity .25s,margin-top .3s;
-  margin-top:0
-}
-/* 두 줄로 접히는 항목이 둘인 층(의견제출통지)이 가장 높습니다 */
-.doc.on .marks{max-height:150px;opacity:1;margin-top:7px}
-.doc .marks .mk{
-  display:grid;grid-template-columns:13px 1fr;gap:0 6px;align-items:baseline;
-  font-size:10.5px;line-height:1.45;color:rgba(236,231,216,.72);margin-top:3px;
-  /* ★ 한글은 기본 줄바꿈 규칙(break-all 성격)이라 단어 한가운데서 끊깁니다.
-   *   목록 폭이 208px 로 좁아서 '주변 6칸까지 폭/발' 처럼 잘렸습니다.
-   *   keep-all 은 어절 단위로만 끊으므로 읽기 흐름이 유지됩니다.       */
-  word-break:keep-all;overflow-wrap:break-word
-}
-.doc .marks .mk i{font-style:normal;color:var(--layer-c);text-align:center;font-size:11px}
-.doc .marks .mk.none{color:rgba(236,231,216,.4)}
-/* 목록이 좁아진 화면에서는 접어 둡니다 — 층 이름이 먼저입니다 */
-@media (max-height:620px){.doc.on .marks{max-height:0;opacity:0;margin-top:0}}
 .doc.on{background:rgba(236,231,216,.1);transform:translateX(10px)}
 .doc.on .nm{color:var(--layer-c)}
 .doc.on{border-color:var(--layer-c);box-shadow:-3px 0 0 var(--layer-c),0 0 26px -6px var(--layer-c)}
@@ -242,57 +208,26 @@ body.dev #devLayers{display:flex}
  * 그 층에서 알아야 할 것 한 줄만 그 자리에서 알려 주는 자리입니다.
  * 토스트보다 위(top:150px)에 둬서 둘이 겹치지 않게 합니다.          */
 #layerBanner{
-  position:absolute;left:50%;top:122px;transform:translateX(-50%);
-  display:none;flex-direction:column;align-items:center;gap:5px;
-  padding:20px 40px 18px;pointer-events:none;text-align:center;max-width:min(560px,86vw);
+  position:absolute;left:50%;top:150px;transform:translateX(-50%);
+  display:none;flex-direction:column;align-items:center;gap:4px;
+  padding:14px 30px;pointer-events:none;text-align:center;max-width:82vw;
   background:linear-gradient(180deg,rgba(11,14,22,.93),rgba(11,14,22,.80));
   border:1px solid var(--layer-c);border-top:0;border-bottom:2px solid var(--layer-c);
   box-shadow:0 10px 40px -14px var(--layer-c)
 }
 #layerBanner.on{display:flex;animation:lbin .42s cubic-bezier(.2,.9,.3,1)}
 #layerBanner.out{opacity:0;transition:opacity .5s ease}
-#layerBanner .lbNo{font-size:11px;letter-spacing:.3em;color:var(--layer-c);opacity:.95}
-/* 22 → 34px. 층 이름이 이 배너의 주인공입니다 — '여기가 어디인가' 가
- * 한눈에 들어와야 나머지 줄을 읽을 이유가 생깁니다. */
-#layerBanner .lbName{font-size:34px;font-weight:800;letter-spacing:-.015em;line-height:1.12;margin:2px 0 4px}
-/* 기믹은 한 문장으로 뭉치지 않고 항목으로 쪼갭니다. 기믹이 둘인 층
- * (의견제출통지)에서 한 문장에 두 가지가 들어가 특히 안 읽혔습니다. */
-#layerBanner .lbMarks{display:flex;flex-direction:column;gap:6px;margin:4px 0 2px}
-/* 배너도 같은 이유로 어절 단위 줄바꿈. 폭이 넓어 잘 안 걸리지만,
- * 긴 문구를 넣거나 좁은 화면에서 같은 증상이 납니다. */
-#layerBanner .lbMark{display:grid;grid-template-columns:22px 1fr;align-items:baseline;
-  word-break:keep-all;overflow-wrap:break-word;
-  gap:0 8px;text-align:left;font-size:15px;line-height:1.4;color:#e6ecf6}
-#layerBanner .lbMark i{font-style:normal;font-size:16px;color:var(--layer-c);text-align:center}
-#layerBanner .lbMark.none{color:#9aa6b8;font-size:14px}
+#layerBanner .lbNo{font-size:10px;letter-spacing:.26em;color:var(--layer-c);opacity:.9}
+#layerBanner .lbName{font-size:22px;font-weight:700;letter-spacing:-.01em;line-height:1.2}
+#layerBanner .lbTip{font-size:13px;color:#cfd6e4;max-width:44ch;line-height:1.5}
 #layerBanner .lbSafe{
-  margin-top:8px;font-size:12px;letter-spacing:.1em;color:#9fb0c6;
-  border-top:1px solid rgba(255,255,255,.12);padding-top:9px
+  margin-top:6px;font-size:11px;letter-spacing:.12em;color:#9fb0c6;
+  border-top:1px solid rgba(255,255,255,.10);padding-top:7px
 }
 #layerBanner .lbSafe b{color:var(--layer-c);font-weight:600}
 @keyframes lbin{from{opacity:0;transform:translateX(-50%) translateY(-14px)}
                 to{opacity:1;transform:translateX(-50%) translateY(0)}}
-/* ── 사건 메시지 (#toasts) ────────────────────────────────────────────
- * ★ 화면 위 → 화면 아래로 옮겼습니다.
- *
- *   종전에는 top:92px 였는데 층 배너(top:136~288)와 <b>28px 물리적으로
- *   겹쳤습니다.</b> 둘 다 가운데 정렬이라 가로로도 완전히 포개졌습니다.
- *   착지하자마자 바닥을 밟으므로 '층 안내' 와 '타일 설명' 이 같은 자리에
- *   동시에 떠서 둘 다 안 읽혔습니다.
- *
- * ★ 성격이 다른 것을 다른 자리에 둡니다.
- *     위 = 장소 (여기가 어디인가) — 층 배너
- *     아래 = 사건 (방금 무슨 일이 있었나) — 이 토스트
- *   겹칠 수 있는 구조 자체를 없애는 편이, 타이밍을 조절하는 것보다
- *   확실합니다.
- *
- * ★ 아래가 오히려 더 잘 보입니다.
- *   시선은 화면 중앙 아래쪽(자기 캐릭터)에 있습니다. 종전 자리는
- *   시선에서 가장 먼 꼭대기였습니다.
- *
- * bottom:56px — 조작 힌트(#hint, bottom:24px) 바로 위입니다.        */
-#toasts{position:absolute;left:50%;bottom:56px;transform:translateX(-50%);display:flex;
-  flex-direction:column-reverse;gap:5px;align-items:center;width:max-content;max-width:80vw}
+#toasts{position:absolute;left:50%;top:92px;transform:translateX(-50%);display:flex;flex-direction:column;gap:5px;align-items:center;width:max-content;max-width:80vw}
 .toast{
   font-size:12px;padding:7px 15px;background:rgba(11,14,22,.92);border:1px solid var(--rule);
   border-left:3px solid var(--paper);animation:tin .3s cubic-bezier(.2,.9,.3,1)
@@ -336,22 +271,6 @@ body.dev #devLayers{display:flex}
 #joinScreen.live .card{background:rgba(9,12,19,.94);box-shadow:0 40px 90px -30px rgba(0,0,0,.9)}
 /* 3D 가 뒤에 있으면 2D 육각 루프는 중복입니다 */
 #joinScreen.live #joinBg{opacity:0;transition:opacity .6s}
-
-/* ── 입장 전환 ───────────────────────────────────────────────────────
- * 종전에는 참가를 누르면 패널이 그냥 사라졌습니다. 시작 연출(게이트가
- * 열리고 떨어짐)이 곧바로 이어지는데, 그 앞이 '툭 꺼짐' 이라 두 장면이
- * 이어지지 않았습니다.
- *
- * 이제 패널이 뒤로 접히며 사라지고, 그 뒤의 3D 가 드러납니다.
- * 카메라는 그 사이에 타워로 날아갑니다(beginCamFlight).             */
-#joinScreen.folding{animation:joinFold .52s cubic-bezier(.5,0,.75,0) forwards;pointer-events:none}
-#joinScreen.folding .card{animation:cardFold .52s cubic-bezier(.5,0,.75,0) forwards;transform-origin:50% 12%}
-@keyframes joinFold{to{opacity:0}}
-@keyframes cardFold{
-  0%{transform:perspective(1100px) rotateX(0) scale(1)}
-  100%{transform:perspective(1100px) rotateX(-22deg) scale(.86)}}
-@media (prefers-reduced-motion:reduce){
-  #joinScreen.folding,#joinScreen.folding .card{animation-duration:.01s}}
 
 /* ── 로비 (방 목록) ──────────────────────────────────────────────────
  * ★ '빠른 참가' 가 기본이고 방 선택은 보조입니다.
@@ -795,7 +714,7 @@ input[type=text]{
   <div id="roster"><div class="rname">출원인 명단</div><div id="rosterList"></div></div>
 
   <div id="specBanner">관전 중 · 다음 회차에 주자로 자동 참가합니다</div>
-  <div id="layerBanner"><div class="lbNo"></div><div class="lbName"></div><div class="lbMarks"></div><div class="lbSafe"></div></div>
+  <div id="layerBanner"><div class="lbNo"></div><div class="lbName"></div><div class="lbTip"></div><div class="lbSafe"></div></div>
   <div id="toasts"></div>
 
   <div id="spec" class="panel">
@@ -5317,42 +5236,6 @@ function onSteppedOn(rec) {
  *   문구가 없는 종류도 한 번 본 것으로 기록해 둡니다 — 그래야 매번
  *   테이블을 다시 뒤지지 않습니다.
  * ------------------------------------------------------------------ */
-/* 층 배너가 떠 있는 동안 도착한 타일 안내는 줄을 세웁니다.
- *
- * ★ 자리를 나눈 것(배너 위 · 토스트 아래)만으로는 부족합니다.
- *   착지하자마자 바닥을 밟으므로 두 메시지가 <b>같은 순간에</b> 뜹니다.
- *   겹치지는 않아도 한 번에 네 줄이 쏟아지면 읽히지 않습니다.
- *   장소를 먼저 알려 주고, 그 다음에 사건을 알려 주는 순서가 맞습니다.
- *
- * ★ 큐에 쌓아 두고 순서대로 흘려보냅니다.
- *   한 번에 여러 종류를 처음 밟는 경우(바닥 + 특수 타일)가 있어서,
- *   배너가 끝난 뒤 0.6초 간격으로 하나씩 내보냅니다. 한꺼번에 두 개를
- *   띄우면 자리만 바뀌었지 같은 문제가 됩니다.                    */
-const tipQueue = [];
-let tipTimer = 0;
-
-function flushTipQueue() {
-  if (tipTimer) return;
-  const step = () => {
-    tipTimer = 0;
-    if (!tipQueue.length) return;
-    /* 아직 배너가 떠 있으면 더 기다립니다 */
-    const el = document.getElementById('layerBanner');
-    if (el && el.classList.contains('on')) {
-      tipTimer = setTimeout(step, 300);
-      return;
-    }
-    toast(tipQueue.shift(), 'learn');
-    if (tipQueue.length) tipTimer = setTimeout(step, 600);
-  };
-  tipTimer = setTimeout(step, 300);
-}
-
-function clearTipQueue() {
-  tipQueue.length = 0;
-  if (tipTimer) { clearTimeout(tipTimer); tipTimer = 0; }
-}
-
 function noticeTileTip(rec) {
   if (G.phase !== 'playing' || !local.alive) return;
   const tips = G.cfg && G.cfg.SPECIAL_TIPS;
@@ -5360,9 +5243,7 @@ function noticeTileTip(rec) {
   const key = rec.specialType || rec.kind;
   if (!key || G.seenTips.has(key)) return;
   G.seenTips.add(key);
-  if (!tips[key]) return;
-  tipQueue.push(tips[key]);
-  flushTipQueue();
+  if (tips[key]) toast(tips[key], 'learn');
 }
 
 /* DEV.noEliminate: 구름바다까지 떨어졌을 때 탈락시키지 않고 최상층 위로
@@ -6020,7 +5901,6 @@ function applyTileWear(rec) {
 function resetTileWear() {
   G.seenTips.clear();
   G.lastLayerShown = null;
-  clearTipQueue();       // 지난 회차 안내가 새 회차로 흘러나오지 않게
   hideLayerBanner();
   for (const rec of G.tiles.values()) {
     rec.hits = 0;
@@ -7049,36 +6929,6 @@ function ceilingYAbove(y) {
   return best;
 }
 
-/* ══════════════════════════════════════════════════════════════════════
- * 입장 카메라 비행
- * ────────────────────────────────────────────────────────────────────
- * 대기 화면에서 보던 자리(관전 시점)에서 내 대기 발판까지 카메라가
- * 날아갑니다. 대기 화면 뒤에서 이미 게임이 보이고 있었기 때문에,
- * 이 비행이 '구경하던 곳에서 내 자리로 들어간다'로 읽힙니다.
- *
- * ★ 카메라를 직접 몰지 않고 '기존 해답을 블렌딩'합니다.
- *   updateCamera 가 매 프레임 내는 목표(camDesired/camTarget)는 천장
- *   클램프·낙하 피치·거리 평활을 전부 거친 값입니다. 비행 중에만 다른
- *   식으로 몰면 끝나는 순간 그 규칙들로 돌아가면서 툭 튑니다.
- *   시작 자세에서 '그 시점의 정답'으로 이어 주면 끝에서 정확히 맞물립니다.
- *
- * ★ 비행 중에는 위치 평활(lerp)을 끕니다.
- *   블렌딩 위에 평활이 또 걸리면 카메라가 목표를 못 따라가 끝에서
- *   한 번 더 미끄러집니다. 비행 자체가 이미 이징입니다.             */
-let camFlight = null;          // { t, dur, from: Vector3, look: Vector3 }
-let pendingCamFlight = false;  // 참가를 눌렀고, init 이 오면 날아갈 것
-
-function beginCamFlight(dur) {
-  camFlight = {
-    t: 0,
-    dur: dur || 1.15,
-    from: camera.position.clone(),
-    look: camTarget.clone()
-  };
-}
-
-function cancelCamFlight() { camFlight = null; pendingCamFlight = false; }
-
 function updateCamera(dt) {
   // 탈락 연출 중에는 카메라를 캐릭터에 붙여 둡니다.
   // 곧바로 관전 시점으로 튀면 무슨 일이 일어났는지 알 수 없습니다.
@@ -7137,19 +6987,7 @@ function updateCamera(dt) {
     camDesired.y = Math.max(camTarget.y + 1.0, Math.min(camDesired.y, limit));
   }
 
-  if (camFlight) {
-    camFlight.t = Math.min(1, camFlight.t + dt / camFlight.dur);
-    /* ease-in-out — 출발과 도착이 부드럽고 가운데가 빠릅니다.
-     * 등속으로 날면 '카메라가 끌려간다'로 보입니다. */
-    const x = camFlight.t;
-    const e = x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-    camDesired.lerpVectors(camFlight.from, camDesired, e);
-    camTarget.lerpVectors(camFlight.look, camTarget, e);
-    camera.position.copy(camDesired);
-    if (camFlight.t >= 1) camFlight = null;
-  } else {
-    camera.position.lerp(camDesired, smoothK(9, dt));
-  }
+  camera.position.lerp(camDesired, smoothK(9, dt));
   camera.lookAt(camTarget);
 
   /* 착지 충격 — 시선을 잡은 뒤 위치만 덜컹입니다 (addCamShake 주석 참고).
@@ -8009,35 +7847,13 @@ function buildLayerStack() {
     const rotm = document.createElement('div');
     rotm.className = 'rotmark';
 
-    /* 이 층의 기믹. 층 배너와 <b>같은 데이터(L.marks)</b>를 씁니다 —
-     * 문구를 두 벌로 두면 반드시 한쪽만 낡습니다. 평소엔 접혀 있고
-     * 내가 선 층(.doc.on)에서만 펼쳐집니다. */
-    const mk = document.createElement('div');
-    mk.className = 'marks';
-    const marks = (L.marks && L.marks.length)
-      ? L.marks
-      : (L.tip ? [{ i: '·', t: L.tip }] : []);
-    mk.innerHTML = marks.map((m) =>
-      '<div class="mk' + (m.i === '—' ? ' none' : '') + '">' +
-      '<i>' + escapeHtml(m.i || '·') + '</i>' +
-      '<span>' + escapeHtml(m.t || '') + '</span></div>').join('');
-
-    d.appendChild(no); d.appendChild(nm); d.appendChild(alt);
-    d.appendChild(mk); d.appendChild(rotm);
+    d.appendChild(no); d.appendChild(nm); d.appendChild(alt); d.appendChild(rotm);
     box.appendChild(d);
   }
 
   dom.docs = Array.from(box.querySelectorAll('.doc'));
-  refitLayerStack();
-}
-
-/* 목록이 화면을 넘치는지 다시 재어 스크롤을 켭니다.
- * 층 수·펼침 상태·창 크기가 바뀔 때마다 달라지므로 한 함수로 모읍니다. */
-function refitLayerStack() {
-  const box = document.getElementById('layerStack');
-  if (!box) return;
   // 여백까지 다 그려진 뒤에야 넘치는지 알 수 있습니다
-  box.classList.toggle('scroll', box.scrollHeight > box.clientHeight + 1);
+  if (box.scrollHeight > box.clientHeight + 1) box.classList.add('scroll');
 }
 
 /* ── 층 특성 이벤트 연출 ──────────────────────────────────────────────
@@ -8245,10 +8061,7 @@ function floorsLeft(layerIndex) {
 }
 
 let layerBannerT1 = 0, layerBannerT2 = 0;
-/* 3400 → 2600. 글자를 키우면 같은 내용을 더 빨리 읽습니다.
- * 오래 떠 있으면 그 자체가 화면을 가리고, 다음 층으로 내려갔을 때
- * 이전 배너가 아직 남아 있는 일이 생깁니다. */
-const LAYER_BANNER_MS = 2600;
+const LAYER_BANNER_MS = 3400;
 
 /**
  * 층 진입 배너.
@@ -8265,18 +8078,9 @@ function showLayerBanner(layerIndex, dir) {
   el.style.setProperty('--layer-c', Lx.color || '#00ffcc');
   el.querySelector('.lbNo').textContent = 'LAYER ' + String(Lx.index).padStart(2, '0');
   el.querySelector('.lbName').textContent = Lx.name || '';
-
-  /* 층 기믹은 서버 LAYER_DEFS 가 유일한 출처입니다(marks, 없으면 tip).
-   * 클라이언트가 문구를 들고 있으면 기믹을 바꿀 때 설명만 옛날 것으로
-   * 남습니다. marks 는 한 문장으로 뭉치지 않고 항목으로 그립니다 —
-   * 기믹이 둘인 층에서 한 줄에 두 가지를 넣으면 읽히지 않았습니다. */
-  const marks = (Lx.marks && Lx.marks.length)
-    ? Lx.marks
-    : (Lx.tip ? [{ i: '·', t: Lx.tip }] : []);
-  el.querySelector('.lbMarks').innerHTML = marks.map((m) =>
-    '<div class="lbMark' + (m.i === '—' ? ' none' : '') + '">' +
-    '<i>' + escapeHtml(m.i || '·') + '</i>' +
-    '<span>' + escapeHtml(m.t || '') + '</span></div>').join('');
+  /* 층 안내문은 서버 LAYER_DEFS.tip 입니다. 클라이언트가 문구를 들고
+   * 있으면 기믹을 바꿀 때 설명만 옛날 것으로 남습니다.             */
+  el.querySelector('.lbTip').textContent = Lx.tip || '';
 
   const safe = el.querySelector('.lbSafe');
   if (left <= 0) {
@@ -8308,16 +8112,9 @@ function hideLayerBanner() {
 }
 
 function updateLayerStack(layer) {
-  let changed = false;
   for (const d of dom.docs) {
-    const on = parseInt(d.dataset.l, 10) === layer;
-    if (d.classList.contains('on') !== on) changed = true;
-    d.classList.toggle('on', on);
+    d.classList.toggle('on', parseInt(d.dataset.l, 10) === layer);
   }
-  /* 펼쳐진 층이 바뀌면 목록 높이도 바뀝니다. 넘침(.scroll) 판정을 다시
-   * 하지 않으면 아래쪽 층이 잘린 채 스크롤도 안 되는 상태가 됩니다.
-   * 전환 애니메이션(0.3s)이 끝난 뒤에 재야 실제 높이가 나옵니다. */
-  if (changed) setTimeout(refitLayerStack, 340);
   if (DEV.on && DEV.layerJump) markDevLayerButton(layer);
 
   /* 남은 층은 살아 있는 주자일 때만 뜻이 있습니다. 관전 중에는 지금
@@ -8541,14 +8338,6 @@ function connect(name, mode, opts) {
     applyTheme(d.theme || 0);
     buildMap(d.map, mapCfg());
 
-    /* 참가 직후의 첫 init 에서만 날아갑니다. map_reset 이나 재연결로
-     * 다시 오는 init 에서는 날면 안 됩니다 — 라운드 중에 카메라가
-     * 제멋대로 움직이는 것으로 보입니다. */
-    if (pendingCamFlight) {
-      pendingCamFlight = false;
-      beginCamFlight(1.15);
-    }
-
     G.pedestalsActive = d.pedestalsActive !== false;
     if (!G.pedestalsActive) {
       for (const rec of G.pedestals.values()) { rec.state = 'gone'; rec.mesh.visible = false; rec.ring.visible = false; }
@@ -8625,7 +8414,6 @@ function connect(name, mode, opts) {
     /* 지난 회차 연출이 새 회차로 넘어오면 카메라가 빈 자리를 공전합니다 */
     endFinale();
     hideVerdict();
-    cancelCamFlight();
     resetTileWear();
     contactTile = null;      // 지난 회차의 접촉 기록이 새 회차로 넘어오지 않게
     local.dash = null;       // 지난 회차의 대시가 넘어오지 않게
@@ -9941,14 +9729,8 @@ dom.btnJoin.addEventListener('click', () => {
   stopQueuePoll();
   stopJoinBg();
   disposeAvPreview();
-  /* 패널을 즉시 지우지 않고 접습니다. 접히는 동안 뒤의 3D 가 드러나고,
-   * init 이 도착하면 카메라가 내 발판으로 날아갑니다.
-   * show 는 접힘이 끝난 뒤에 뗍니다 — 먼저 떼면 애니메이션이 안 보입니다. */
-  dom.joinScreen.classList.add('folding');
-  pendingCamFlight = true;
-  setTimeout(() => {
-    dom.joinScreen.classList.remove('show', 'folding', 'live');
-  }, 520);
+  dom.joinScreen.classList.remove('show');
+  dom.joinScreen.classList.remove('live');
   G.role = joinMode;
   G.name = name;
   G.joinMode = joinMode;
