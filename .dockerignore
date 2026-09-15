@@ -1,0 +1,29 @@
+# Dockerfile 이 `COPY . .` 라서, 여기 안 적으면 전부 이미지에 들어갑니다.
+# 패턴의 * 는 / 를 넘지 않으므로 하위 경로는 **/ 를 붙여야 합니다.
+
+node_modules
+npm-debug.log
+.git
+.gitignore
+
+# 서빙하지 않는 에셋 보관소 (약 33MB)
+assets_unused/
+
+# 개발용 도구 — 운영 서버는 쓰지 않습니다.
+# (pngjs 는 devDependency 라 `npm install --production` 에서도 안 깔립니다)
+tools/
+
+# 수동 백업 스냅샷 (*_YYYYMMDD, *_YYYYMMDD_설명).
+# public/ 안에도 있어서(약 15MB) 빼지 않으면 배포본에 그대로 들어갑니다.
+**/*_20[0-9][0-9][0-9][0-9][0-9][0-9]
+**/*_20[0-9][0-9][0-9][0-9][0-9][0-9]_*
+
+# 쓰지 않는 경량 캐릭터 모델 (0.37MB). 룩 차이가 커서 채택하지 않았습니다.
+# 쓰려면 이 줄을 지우고 index.html 의 MODEL_PATH 와 ASSET_VER 을 바꾸세요.
+public/assets/character_one.glb
+
+# 기획 문서 — 게임 구동과 무관
+public/patent_storytelling_concept.html
+
+# ★ public/vendor/ 는 절대 빼면 안 됩니다.
+#   three.js 와 글꼴이 거기 있고, 없으면 게임이 아예 뜨지 않습니다.

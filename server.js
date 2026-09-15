@@ -17,6 +17,7 @@
 const path = require('path');
 const http = require('http');
 const express = require('express');
+const compression = require('compression');
 const { Server } = require('socket.io');
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -150,7 +151,15 @@ const COUNTDOWN_MS = 5000;      // "심사 착수" countdown before the run
  * 층이 죽는 속도가 통째로 느려졌습니다. 종전 5분은 '한 번 밟으면 1초 뒤
  * 사라지는' 바닥을 전제한 값이라 그대로 두면 정상적인 라운드가 무승부로
  * 끝납니다. 타일 규칙을 되돌리면 여기도 같이 되돌리세요.              */
-const ROUND_MAX_MS = 360000;    // hard cap on a round (6 minutes)
+const ROUND_MAX_MS = parseInt(process.env.ROUND_MAX_MS, 10) || 360000;   // 6 minutes
+/* 혼자일 때의 상한.
+ *
+ * ★ 혼자면 '마지막 한 명'이 성립하지 않습니다. 버틸 상대가 없으니
+ *   시간이 상대입니다. 그런데 6분을 그대로 쓰면 사실상 끝낼 수 없는
+ *   목표라 승리 조건이 있으나 마나 합니다 — 행사장에서 혼자 와서
+ *   해 보는 사람은 늘 실패 화면만 보게 됩니다.
+ *   2분은 실제로 도달 가능하면서, 대충 뛰어서는 안 되는 길이입니다.  */
+const SOLO_ROUND_MS = parseInt(process.env.SOLO_ROUND_MS, 10) || 120000;
 const RESET_DELAY_MS = 8000;    // podium screen duration before the next map
 
 /* ── 타일 종류 체계 (TILE_MIX / TILE_KINDS) ───────────────────────────
@@ -1124,6 +1133,9 @@ const SEA_Y = BOTTOM_LAYER.y - SEA_DROP;
 
 /* --------------------------------------------------------------- utilities */
 
+/* 소수점 3자리 반올림. 스냅샷 직렬화의 핫패스라 문자열을 거치지 않습니다. */
+function r3(x) { return Math.round(x * 1000) / 1000; }
+
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
@@ -1468,6 +1480,10 @@ function makePlayer(id, name, seat, room) {
     seat,
     alive: true,
     placement: 0,
+    /* 결과 화면의 '얼마나 버텼는지 · 어디까지 내려갔는지'. diedAt 0 은
+     * 아직 살아 있다는 뜻이고, deepest 는 층 번호라 작을수록 깊습니다. */
+    diedAt: 0,
+    deepest: TOP_LAYER.index,
     layer: TOP_LAYER.index,
     anim: 'idle',
     pos: { x: spawn.x, y: spawn.y, z: spawn.z },
@@ -1642,7 +1658,10 @@ function startRound(room) {
   if (room.phase !== 'countdown') return;
   room.phase = 'playing';
   room.roundStartedAt = Date.now();
-  room.phaseEndsAt = room.roundStartedAt + ROUND_MAX_MS;
+  /* 화면의 '남은 시간'도 같은 상한을 따라야 합니다 — 혼자일 때 6분으로
+   * 표시하면 2분에 끝나는 이유를 알 수 없습니다.                     */
+  room.phaseEndsAt = room.roundStartedAt +
+    (room.players.size === 1 ? SOLO_ROUND_MS : ROUND_MAX_MS);
   room.winnerId = null;
   /* 위상 타일은 라운드 시작 순간 ON 으로 출발합니다.
    * 시작 시각을 그대로 기준으로 삼으므로 elapsed 0 → ON 입니다.      */
@@ -1670,6 +1689,8 @@ function startRound(room) {
   for (const p of room.players.values()) {
     p.alive = true;
     p.placement = 0;
+    p.diedAt = 0;
+    p.deepest = TOP_LAYER.index;
     p.layer = TOP_LAYER.index;
     p.anim = 'fall';
     /* 이동 기록을 지웁니다. 안 지우면 지난 회차에 움직인 기록이 남아
@@ -1693,9 +1714,18 @@ function startRound(room) {
     players: [...room.players.values()].map(publicPlayer)
   });
 
+  /* 시간이 다 되었을 때.
+   *
+   * ★ 종전에는 무조건 winner=null 이었습니다. 그래서 멀쩡히 살아 있는
+   *   사람에게도 '전원 탈락'이 떴습니다 — 사실과 반대되는 통보입니다.
+   *   살아남은 사람이 있으면 그 사람들이 이긴 것입니다.               */
   roomTimeout(room, () => {
-    if (room.phase === 'playing') endRound(room, null, 'timeout');
-  }, ROUND_MAX_MS);
+    if (room.phase !== 'playing') return;
+    const left = [...room.players.values()].filter((p) => p.alive);
+    if (left.length === 1) endRound(room, left[0], 'survived');
+    else if (left.length > 1) endRound(room, null, 'survived');
+    else endRound(room, null, 'timeout');
+  }, room.players.size === 1 ? SOLO_ROUND_MS : ROUND_MAX_MS);
 }
 
 /**
@@ -1708,6 +1738,7 @@ function eliminateStale(room, p, cause) {
   p.anim = 'dead';
   p.vel.x = 0; p.vel.y = 0; p.vel.z = 0;
   p.placement = aliveCount(room) + 1;
+  p.diedAt = Date.now();
 
   io.to(room.id).emit('eliminated', {
     id: p.id,
@@ -1760,9 +1791,26 @@ function endRound(room, winner, reason) {
     winner.wins = (winner.wins || 0) + 1;
   }
 
+  const endedAt = Date.now();
+  /* 시간 만료로 끝났으면 살아남은 사람 전원이 공동 1위입니다.
+   * 순위 칸에 쓸 특수 기호(♛ 등)를 따로 두지 않는 이유: 글꼴 서브셋에
+   * 없어 시스템 글꼴로 폴백하면 그 글자만 서체가 달라집니다.       */
+  if (reason === 'survived') {
+    for (const p of room.players.values()) if (p.alive) p.placement = 1;
+  }
   const standings = [...room.players.values()]
-    .sort((a, b) => (a.placement || 99) - (b.placement || 99))
-    .map(p => ({ id: p.id, name: p.name, color: p.color, placement: p.placement || 99 }));
+    /* 살아남은 사람(placement 0)이 맨 위에 와야 합니다. 종전 정렬은
+     * 0 을 99 로 바꿔 버려 생존자가 꼴찌로 내려갔습니다.            */
+    .sort((a, b) => (a.placement || 0) - (b.placement || 0))
+    .map((p) => ({
+      id: p.id, name: p.name, color: p.color,
+      placement: p.placement || 0,          // 0 = 끝까지 생존
+      alive: !!p.alive,
+      /* 버틴 시간과 가장 깊이 내려간 층. 한 판이 30초~2분인 게임에서
+       * '다시 해 볼까'를 만드는 건 이 숫자입니다.                   */
+      survivedMs: Math.max(0, (p.diedAt || endedAt) - room.roundStartedAt),
+      deepest: p.deepest === undefined ? p.layer : p.deepest
+    }));
 
   // 아무도 안 남은 방은 곧바로 다음 판 준비로 넘어갑니다
   if (reason === 'abandoned') room.phaseEndsAt = Date.now() + 1500;
@@ -1811,6 +1859,8 @@ function resetRoom(room) {
   for (const p of room.players.values()) {
     p.alive = true;
     p.placement = 0;
+    p.diedAt = 0;
+    p.deepest = TOP_LAYER.index;
     p.layer = TOP_LAYER.index;
     p.lastMoveAt = 0;
     p.lastDashAt = 0;
@@ -2730,8 +2780,50 @@ const io = new Server(server, {
 });
 
 app.disable('x-powered-by');
+/* 백업 스냅샷은 서빙하지 않습니다.
+ *
+ * public/ 안에 index.html_20260914_로비전 같은 수동 백업이 18개,
+ * 7.1MB 쌓여 있는데 전부 그대로 내려받혔습니다(확인: HTTP 200).
+ * 배포본에서 굳이 꺼내 갈 수 있을 이유가 없습니다.
+ *
+ * .dockerignore 로 이미지에서 빼기도 하지만, Render 처럼 저장소를 그대로
+ * 올리는 경로에서는 파일이 남아 있으므로 서버에서도 막습니다.
+ * 파일을 지우지는 않습니다 — 백업은 사용자가 직접 관리합니다.
+ *
+ * ★ 확장자가 날짜보다 '앞'에 오는 것만 막습니다(index.html_20260915_...).
+ *   그냥 '_20 + 여섯 자리'로 잡으면 vendor/fonts 의 구글 해시 파일명이
+ *   우연히 걸릴 수 있습니다. 지금은 안 걸리지만 해시는 언제든 바뀝니다. */
+const BACKUP_SNAPSHOT = new RegExp('\.[A-Za-z0-9]+_20[0-9]{6}(_|$)');
+app.use((req, res, next) => {
+  if (BACKUP_SNAPSHOT.test(decodeURIComponent(req.path || ''))) return res.status(404).end();
+  next();
+});
+
+/* gzip. index.html 이 0.48MB 인데 그대로 나가고 있었습니다(gzip 0.16MB).
+ * 사내망처럼 대역폭이 좁은 곳에서는 이 차이가 첫 진입 시간에 그대로 보입니다.
+ *
+ * 이미 압축된 것은 건드리지 않습니다 — GLB 는 내부가 대부분 PNG/JPEG 라
+ * 다시 압축해도 14% 줄자고 CPU 만 태웁니다. mp3/png 도 같습니다.          */
+const PRECOMPRESSED = new RegExp(
+  '\\.(glb|gltf|png|jpe?g|gif|webp|avif|mp3|ogg|wav|m4a|woff2?|zip|br|gz)$', 'i');
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => {
+    if (PRECOMPRESSED.test((req.path || '').split('?')[0])) return false;
+    return compression.filter(req, res);
+  }
+}));
+
 /* HTML 은 절대 캐시하지 않습니다. 개발 중 index.html 을 고쳤는데 브라우저가
- * 옛 파일을 계속 띄우는 사고를 막습니다. 이미지/텍스처만 캐시합니다.        */
+ * 옛 파일을 계속 띄우는 사고를 막습니다.
+ *
+ * 에셋은 종전에 1시간이었는데, 그러면 행사 도중 새로고침 한 번에 캐릭터를
+ * 통째로 다시 받습니다. 그렇다고 무조건 1년으로 두면 이번엔 에셋을 교체해도
+ * 아무도 새 파일을 못 받습니다.
+ * 그래서 '버전이 붙은 요청만' 1년으로 둡니다 — 클라이언트는 에셋을
+ * ?v=ASSET_VER 로 부르므로(index.html 의 ASSET_VER), 파일을 갈아끼울 때
+ * 그 숫자만 올리면 URL 이 바뀌어 즉시 반영됩니다.
+ * 버전 없이 주소를 직접 친 경우는 종전대로 1시간.                          */
 app.use(express.static(path.join(__dirname, STATIC_DIR), {
   etag: true,
   lastModified: true,
@@ -2739,6 +2831,8 @@ app.use(express.static(path.join(__dirname, STATIC_DIR), {
   setHeaders: (res, filePath) => {
     if (/\.html?$/i.test(filePath)) {
       res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    } else if (res.req && res.req.query && res.req.query.v) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     } else {
       res.setHeader('Cache-Control', 'public, max-age=3600');
     }
@@ -2853,6 +2947,19 @@ io.on('connection', (socket) => {
   let room = null;
   let role = null; // 'player' | 'spectator'
 
+  /* ★ role 은 '접속(join)한 순간'의 값입니다. 그런데 resetRoom 은
+   *   라운드 중 난입해 관전자로 밀렸던 사람을 다음 회차에 주자로
+   *   승격시킵니다 — 그때 이 클로저는 갱신되지 않습니다.
+   *
+   *   그래서 승격된 사람은 player_state / tile_step / player_death 가
+   *   전부 첫 줄에서 막혔습니다. 결과는 '발판 위에 굳은 채 매 회차
+   *   자동 탈락'입니다(서버 로그 [stale] … 자동 탈락). 사람이 한 명씩
+   *   들어오는 행사장에서는 거의 모두가 이걸 겪습니다.
+   *
+   *   권한의 진짜 근거는 '지금 이 방의 주자 명단에 있는가'입니다.
+   *   캐시된 값이 아니라 그걸 봅니다.                               */
+  const isRunner = () => !!room && room.players.has(socket.id);
+
   socket.emit('server_hello', { now: Date.now(), config: publicConfig() });
 
   socket.on('ping_probe', (clientSent) => {
@@ -2951,7 +3058,7 @@ io.on('connection', (socket) => {
     });
 
     broadcastPhase(room);
-    if (role === 'player') evaluateLobby(room);
+    if (isRunner()) evaluateLobby(room);
     /* 재참가로 비게 된 방은 여기서 정리합니다. 내가 다시 들어간 방이면
      * 당연히 안 비어 있으므로 이 조건에 걸리지 않습니다. */
     if (vacated && vacated !== room && vacated.players.size === 0 && vacated.spectators.size === 0) {
@@ -2963,7 +3070,7 @@ io.on('connection', (socket) => {
 
   /* ---- player state ingest (client-authoritative movement, server relays) */
   socket.on('player_state', (s) => {
-    if (!room || role !== 'player') return;
+    if (!isRunner()) return;
     const p = room.players.get(socket.id);
     if (!p || !p.alive) return;
     if (!s || !Array.isArray(s.p) || s.p.length !== 3) return;
@@ -3036,7 +3143,12 @@ io.on('connection', (socket) => {
       p.vel.z = +s.v[2] || 0;
     }
     p.ry = +s.ry || 0;
-    p.layer = s.layer | 0;
+    /* 층 번호는 클라이언트가 보내는 값이라 범위를 막습니다.
+     * 안 막으면 0 이나 음수가 그대로 들어오고, 그 값이 결과 화면의
+     * '내려간 곳'에 '0층' 같은 이름 없는 층으로 나옵니다.           */
+    p.layer = Math.max(BOTTOM_LAYER.index, Math.min(TOP_LAYER.index, s.layer | 0));
+    /* 층 번호는 위가 큽니다(6F=6). 가장 작은 값이 가장 깊이 내려간 것. */
+    if (p.layer < p.deepest) p.deepest = p.layer;
     p.anim = typeof s.anim === 'string' ? s.anim.slice(0, 12) : 'idle';
     // 접지 여부(g). 구 클라이언트는 이 필드를 안 보내므로, 없으면 종전처럼 공중으로 봅니다.
     p.grounded = s.g === undefined ? false : !!s.g;
@@ -3052,7 +3164,7 @@ io.on('connection', (socket) => {
    * 받아 주면 그대로 순간이동 치트가 됩니다.                          */
   socket.on('dev_teleport', (data = {}) => {
     if (!DEV.on || !DEV.layerJump) return;
-    if (!room || role !== 'player') return;
+    if (!isRunner()) return;
     const p = room.players.get(socket.id);
     if (!p) return;
     grantMoveExemption(p, 1500);
@@ -3067,7 +3179,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('tile_step', (data = {}) => {
-    if (!room || role !== 'player') return;
+    if (!isRunner()) return;
     const p = room.players.get(socket.id);
     if (!p || !p.alive) return;
     if (typeof data.tileId !== 'string') return;
@@ -3097,7 +3209,7 @@ io.on('connection', (socket) => {
      * 클라이언트는 애초에 player_death 를 보내지 않지만, 개인 설정이라
      * dev 를 끈 탭에서 보내올 수도 있으므로 서버에서도 한 번 더 막습니다. */
     if (DEV.on && DEV.noEliminate) return;
-    if (!room || role !== 'player') return;
+    if (!isRunner()) return;
     const p = room.players.get(socket.id);
     if (!p || !p.alive) return;
     if (room.phase !== 'playing') return;
@@ -3105,6 +3217,7 @@ io.on('connection', (socket) => {
     p.alive = false;
     p.anim = 'dead';
     p.placement = aliveCount(room) + 1;
+    p.diedAt = Date.now();
 
     /* 밀어서 떨어뜨린 사람. 클라이언트가 by 로 보내오지만 그대로 믿지 않고
      * 같은 방에 살아 있는 주자인지만 확인합니다 — 자기 자신을 넣거나
@@ -3291,11 +3404,16 @@ setInterval(() => {
   const now = Date.now();
   for (const room of rooms.values()) {
     // 끊어진 소켓이 방에 남아 있으면 정리하고 라운드 종료 조건을 다시 봅니다
+    /* ★ [...map.keys()] 로 배열을 뜨던 것을 없앴습니다.
+     *   끊어진 소켓이 없을 때도(대부분의 틱) 방마다 배열 두 개가 새로
+     *   만들어졌습니다 — 40개 방이면 초당 1,600개입니다.
+     *   Map 이터레이터는 순회 중 삭제가 안전합니다(아직 방문하지 않은
+     *   항목이 지워지면 건너뛸 뿐입니다). 그래서 직접 돌아도 됩니다. */
     let pruned = false;
-    for (const id of [...room.players.keys()]) {
+    for (const id of room.players.keys()) {
       if (!io.sockets.sockets.get(id)) { room.players.delete(id); pruned = true; }
     }
-    for (const id of [...room.spectators.keys()]) {
+    for (const id of room.spectators.keys()) {
       if (!io.sockets.sockets.get(id)) room.spectators.delete(id);
     }
     if (pruned) { broadcastPhase(room); checkRoundEnd(room); }
@@ -3354,9 +3472,15 @@ setInterval(() => {
     for (const p of room.players.values()) {
       players.push({
         id: p.id,
-        p: [+p.pos.x.toFixed(3), +p.pos.y.toFixed(3), +p.pos.z.toFixed(3)],
-        v: [+p.vel.x.toFixed(3), +p.vel.y.toFixed(3), +p.vel.z.toFixed(3)],
-        ry: +p.ry.toFixed(3),
+        /* ★ toFixed(3) 대신 r3() 를 씁니다.
+         *   toFixed 는 숫자를 문자열로 만들고 + 가 다시 숫자로 되돌립니다 —
+         *   반올림 한 번에 문자열 객체가 하나씩 생깁니다. 이 줄은 주자 1명당
+         *   9번, 20Hz 로 돕니다. 160명이면 초당 28,800개입니다.
+         *   측정: toFixed 123.8ns/회 → r3 14.0ns/회 (8.8배). 절대값은 작지만
+         *   (0.36% → 0.04% CPU) 할당이 0 이 되는 쪽이 공짜입니다.        */
+        p: [r3(p.pos.x), r3(p.pos.y), r3(p.pos.z)],
+        v: [r3(p.vel.x), r3(p.vel.y), r3(p.vel.z)],
+        ry: r3(p.ry),
         l: p.layer,
         a: p.anim,
         al: p.alive ? 1 : 0,

@@ -19,6 +19,16 @@ PORT=8080 npm start
 LOBBY_WAIT_MS=5000 SOLO_WAIT_MS=3000 npm start   # 테스트 시 대기 시간 단축
 
 docker build -t ip-guardians . && docker run -p 3000:3000 ip-guardians
+
+# 개발용 도구 (운영 배포와 무관)
+node tools/fetch_vendor.js                                  # three.js·로더 다시 받기
+node tools/fetch_fonts.js                                   # 글꼴 서브셋 다시 만들기
+node tools/shrink_glb.js public/assets/character.glb --info  # 텍스처 분석
+
+# 3인 이상 검증 (짧은 라운드로 서버를 띄운 뒤)
+ROUND_MAX_MS=16000 LOBBY_WAIT_MS=10000 PORT=3000 npm start
+node tools/testbots.js --port 3000 --bots 4 --die 5,9,13,0 --intervene
+node tools/testbots.js --port 3000 --bots 3 --die 5,0,0      # 일부만 생존한 채 만료
 ```
 
 테스트 프레임워크, 린터, 빌드 단계가 없습니다. 검증은 **브라우저 탭 2개 이상을 `http://localhost:3000` 에 띄워** 직접 플레이하는 방식입니다. 클라이언트에서 **F2** 를 누르면 진단 패널(소켓 연결/transport, init 수신, 룸, 타일 수, 아바타 생성, 위치 보정 횟수, GLB 로드 상태)이 열립니다. 서버 상태는 `GET /healthz`, `GET /api/rooms` 로 확인합니다.
@@ -31,7 +41,15 @@ docker build -t ip-guardians . && docker run -p 3000:3000 ip-guardians
 
 - `server.js` (~1000줄) — 권위 서버 전체. 설정, 맵 생성, 룸 상태 머신, 소켓 핸들러, 20Hz 브로드캐스트가 한 파일에 있습니다.
 - `public/index.html` (~3800줄) — 클라이언트 전체. CSS + three.js 씬 + 물리 + 네트워킹이 한 파일에 있으며, 번호가 붙은 섹션 주석(`/* ==== 8. physics ==== */`)으로 구획됩니다. 코드를 찾을 때는 이 섹션 헤더를 grep 하세요.
-- `public/assets/` — `character.glb`(스켈레탈 애니메이션 포함), `face_atlas.png`, `audio/bgm_main.mp3`. **모든 에셋은 선택 사항** — GLB 로드에 실패하면 절차적 치비 캐릭터로 폴백하므로 게임은 항상 동작합니다.
+- `public/assets/` — `character.glb`(실제 사용, 2.91MB · 스켈레탈 애니메이션 포함. 형상은 그대로 두고 텍스처 해상도만 낮춘 판입니다 — 노멀 256 · 베이스 512 · 얼굴 원본), `character_one.glb`(경량 대안 0.37MB · 룩 차이로 미채택), `audio/bgm_main.mp3`. **모든 에셋은 선택 사항** — GLB 로드에 실패하면 절차적 치비 캐릭터로 폴백하므로 게임은 항상 동작합니다.
+- `public/vendor/` — three.js·로더·글꼴. **CDN을 쓰지 않습니다**(아래 '외부 의존 없음'). 직접 고치지 말고 `tools/` 의 스크립트로 다시 만드세요.
+- `tools/` — 개발용 스크립트. 운영 서버는 쓰지 않으며 `.dockerignore` 로 이미지에서 빠집니다.
+  - `fetch_vendor.js` — three.js r128 + GLTFLoader/DRACOLoader/SkeletonUtils 를 `public/vendor/` 로. `--draco` 로 Draco 디코더(1.05MB)까지.
+  - `fetch_fonts.js` — 이 게임이 실제로 화면에 쓰는 글자만 골라 Google Fonts 서브셋을 받아 `public/vendor/fonts.css` 생성. **UI 문구를 크게 바꿨으면 다시 돌리세요.**
+  - `shrink_glb.js` — GLB 텍스처 해상도만 낮춥니다(형상·애니메이션 불변). `--info` 로 분석만. `pngjs` devDependency 필요.
+  - `testbots.js` — **검증용 봇**. 죽는 시각을 지정할 수 있어, 탭만으로는 못 만드는 상황(탈락 순위·사람마다 다른 생존 시간·일부만 생존한 시간 만료·탈락자 개입·정원 초과)을 만듭니다. `socket.io-client` devDependency 필요.
+    브라우저 탭 하나를 같은 방(`--room`)에 넣고 봇으로 나머지를 채우면 결과 화면까지 같이 볼 수 있습니다.
+- `assets_unused/` — `public/` 밖이라 서빙되지 않습니다. 참조가 없어진 파일들의 보관소입니다(약 33MB). 자세한 내용은 그 안의 `README.md`.
 - `public/patent_storytelling_concept.html` — 독립 기획서 문서. 게임과 무관합니다.
 - `*_YYYYMMDD`, `*_YYYYMMDD_NN` 접미사 파일 — 수동 백업 스냅샷. 이 저장소의 관례입니다. 편집 대상이 아니며, 새 백업을 만들지도 마세요(사용자가 직접 관리).
 
@@ -57,7 +75,7 @@ docker build -t ip-guardians . && docker run -p 3000:3000 ip-guardians
 waiting ──(정원 충족 또는 LOBBY_WAIT_MS/SOLO_WAIT_MS 만료)──▶ countdown (5s)
    ▲                                                              │
    │                                                              ▼
-ended ◀──(최후 1인 / 전멸 / 5분 타임아웃 / 전원 이탈)──── playing
+ended ◀──(최후 1인 / 전멸 / 시간 만료 / 전원 이탈)──── playing
    │
    └──(RESET_DELAY_MS 후 resetRoom: 새 시드·새 테마, 관전자 승격)──▶ waiting
 ```
@@ -65,7 +83,17 @@ ended ◀──(최후 1인 / 전멸 / 5분 타임아웃 / 전원 이탈)──�
 주의할 점들:
 
 - **대기 발판(pedestal)**: 게임 시작 전 플레이어는 최상층 위 공중 발판에 서 있습니다. `startRound` 는 플레이어를 이동시키지 않고 발판만 치웁니다(`pedestals_clear`) — 그 자리에서 최상층으로 낙하하며 라운드가 시작됩니다.
+- **승리 조건은 둘입니다** — 2인 이상이면 '최후 1인'(`lastStanding`), 시간이 다 되면 **그때 살아 있는 사람 전원이 승자**(`survived`) 입니다.
+  `survived` 를 별도 reason 으로 둔 이유: 종전에는 타임아웃이 무조건 `winner=null` 이라 **멀쩡히 살아 있는 사람에게도 '전원 탈락'이 떴습니다.** 클라이언트 `showResult` 는 `winnerId` 뿐 아니라 `reason === 'survived'` 와 `standings[].alive` 를 함께 봐야 합니다.
+  혼자일 때는 '최후 1인'이 성립하지 않으므로 **시간이 상대**입니다. 그래서 `SOLO_ROUND_MS`(기본 2분, 환경변수로 조정)를 따로 두었습니다 — `ROUND_MAX_MS`(6분)를 그대로 쓰면 승리 조건이 있으나 마나 합니다.
+- `game_over` 의 `standings` 에는 `survivedMs`·`deepest`(가장 깊이 내려간 층 번호, 작을수록 깊음)·`alive` 가 실립니다. 결과 화면의 '내 기록'이 이걸 씁니다.
+  시간 만료(`survived`)면 살아남은 사람 전원에게 `placement = 1`(공동 1위)을 줍니다. 순위 칸에 ♛ 같은 기호를 쓰지 않는 이유는 **글꼴 서브셋에 없어 그 글자만 시스템 글꼴로 폴백**하기 때문입니다.
+  <br>2인 게임에서 패자의 `survivedMs` 가 라운드 길이와 같게 나오는 것은 정상입니다 — 그 사망이 곧 라운드 종료입니다. 개인별로 다른 값이 나오는지 보려면 3인 이상이어야 합니다(실측: 5.0 / 9.1 / 13.1초).
+- `player_state` 의 `layer` 는 클라이언트가 보내는 값이라 `BOTTOM_LAYER.index ~ TOP_LAYER.index` 로 막습니다. 안 막으면 0 이나 음수가 그대로 `deepest` 에 들어가 결과 화면에 '0층' 같은 이름 없는 층이 뜹니다.
 - **라운드 중 접속자는 관전자**로 밀리지만 `wantsPlay: true` 로 표시되어 다음 `resetRoom` 에서 자동으로 주자 승격됩니다. 탈락한 주자는 즉시 관전자 개입 권한을 얻고, 다음 라운드 시작 시 회수됩니다.
+
+  ⚠️ **소켓 핸들러에서 권한을 볼 때 `role` 클로저를 쓰지 마세요.** `role` 은 `join` 한 순간에 정해지는데 승격은 `resetRoom` 에서 일어나므로 갱신되지 않습니다. 이것 때문에 승격된 사람의 `player_state`·`tile_step`·`player_death` 가 전부 첫 줄에서 막혀, **발판 위에 굳은 채 매 회차 자동 탈락**(`[stale] … 자동 탈락`)당하고 있었습니다. 사람이 한 명씩 들어오는 행사장에서는 거의 모두가 겪습니다.
+  권한의 근거는 `room.players.has(socket.id)` 입니다 — `isRunner()` 를 쓰세요.
 - **`findOpenRoom` 은 진행 중인 방에도 빈 자리가 있으면 배정**합니다. 새 방을 파버리면 탭 2개로 테스트할 때 서로 다른 방에 갇히기 때문입니다.
 - 20Hz 틱 루프가 매번 끊어진 소켓을 정리하고 `checkRoundEnd` 를 재평가합니다. `started === 0` (전원 새로고침) 을 `abandoned` 로 처리하지 않으면 방이 5분간 playing 에 묶여 이후 접속자가 전부 관전자로 밀립니다.
 
@@ -75,14 +103,45 @@ ended ◀──(최후 1인 / 전멸 / 5분 타임아웃 / 전원 이탈)──�
 
 서버 → 클라이언트: `server_hello`(config), `init`(내 상태 + 맵 전체), `phase`, `round_start`, `pedestals_clear`, `tile_warn`, `tile_break`, `state`(20Hz 스냅샷), `eliminated`, `game_over`, `map_reset`, `booster_spawn`/`booster_expire`, `obstacle_drop`/`obstacle_impact`, `state_correction`, `action_denied`, `toast`, `chat`
 
-`state` 스냅샷은 필드명을 축약합니다(`p`=pos, `v`=vel, `ry`, `l`=layer, `a`=anim, `al`=alive). 클라이언트는 `NET.INTERP_DELAY_MS`(110ms) 만큼 과거를 렌더링하는 보간 버퍼로 원격 플레이어를 그리고, 버퍼가 마르면 `EXTRAPOLATE_CAP_MS` 까지만 외삽합니다.
+`state` 스냅샷은 필드명을 축약합니다(`p`=pos, `v`=vel, `ry`, `l`=layer, `a`=anim, `al`=alive). 클라이언트는 `NET.INTERP_DELAY_MS` 만큼 과거를 렌더링하는 보간 버퍼로 원격 플레이어를 그리고, 버퍼가 마르면 `EXTRAPOLATE_CAP_MS` 까지만 외삽합니다.
+
+**`INTERP_DELAY_MS` 는 고정값이 아닙니다**(`Interp`). 110 은 시작값이고, 스냅샷 **도착 간격의 표준편차**를 재서 `INTERP_MIN_MS`(70)~`INTERP_MAX_MS`(260) 사이로 계속 조절합니다.
+RTT 가 아니라 지터를 보는 이유는, 버퍼가 막아 주는 것이 지연 자체가 아니라 지연의 흔들림이기 때문입니다 — RTT 200ms 라도 일정하면 버퍼는 한 칸이면 됩니다.
+바꿀 때는 **초당 12ms 씩만** 움직입니다. 한 번에 바꾸면 원격 주자 전원의 렌더 시각이 동시에 밀려 모두 순간이동한 것처럼 보입니다.
+사내망(RTT 1~2ms)에서 실측 목표는 약 80ms 로, 고정 110ms 대비 30ms 가량 덜 지연됩니다. F2 패널의 '보간지연' 줄에서 현재값·목표·간격(평균±지터)을 봅니다.
 
 ### 클라이언트 주의사항
 
-- **three.js r128 을 CDN에서 전역 스크립트로 로드**합니다(모듈 아님, importmap 아님). `THREE.CapsuleGeometry` 등 최신 API가 없으므로 대체 지오메트리를 씁니다. 버전을 올릴 때는 `GLTFLoader`/`DRACOLoader`/`SkeletonUtils` CDN URL도 함께 맞춰야 합니다.
+- **타일은 InstancedMesh 로 그립니다**(`TileInst`). 드로우콜 546 → 36, 렌더 6.3 → 2.0ms (실측).
+  판단 근거: 픽셀비를 2 → 0.65 로 낮춰도(픽셀 9.6배 감소) 타일 비용이 4.66 → 4.28ms 로 **8%만** 줄었습니다. 즉 GPU 가 칠하는 값이 아니라 CPU 가 드로우콜을 밀어 넣는 값이고, 그래서 적응형 품질로는 손댈 수 없는 부분이었습니다.
+  - `rec.mesh` 는 **렌더되지 않는 `Object3D`** 입니다. 기존 코드가 `mesh.position.y`/`scale`/`visible` 을 직접 쓰기 때문에 변형 상자로 남겼습니다. **씬에 넣지 마세요** — 1,626개를 매달면 three.js 가 매 프레임 전부 순회합니다.
+  - `rec.mat` 은 `THREE.Material` 이 아니라 값만 담는 대역 객체입니다(`makeTileMat`). 매 프레임 끝의 `TileInst.sync()` 가 버퍼로 올립니다.
+  - 타일마다 다른 값 셋을 인스턴스 속성으로 내려보냅니다: `color`(기본 기능) · `iAlpha`(r128 에 없어서 `onBeforeCompile` 로 주입) · `iEmissive`(경고 점멸·거절 카운트다운이 타일마다 발광을 따로 움직입니다).
+  - **무너지는 타일만** 진짜 메시로 승격됩니다(`TileInst.promote`). 붕괴는 회전 + 반투명이 겹치는데 한 InstancedMesh 안의 인스턴스는 깊이 정렬이 안 됩니다. 낙하가 끝나면 `demote` 로 거둡니다 — 안 거두면 라운드마다 수백 개가 쌓입니다.
+  - `InstancedBufferAttribute.setUsage()` 는 **첫 업로드 전에** 불러야 합니다. 나중에 부르면 이미 만들어진 GL 버퍼에 반영되지 않아 매 프레임 재할당이 일어납니다.
+  - 인스턴스 단위 프러스텀 컬링은 사라집니다(삼각형 12.9만 → 15.6만, +20%). 드로우콜이 병목이라 이득이 훨씬 크지만, 소프트웨어 렌더러에서는 이 부분이 손해일 수 있습니다.
+  - 회전층 타일의 InstancedMesh 는 `rotGroup` 에 들어갑니다 — 좌표가 층 로컬이라 그룹 회전 하나로 따라 돕니다.
+- **적응형 품질**(`Quality` / `QLEVELS`). `probeGpuTier()` 가 WebGL 렌더러 문자열·코어·메모리로 기기를 0(정상)/1(약함)/2(소프트웨어)로 나눕니다.
+  안티앨리어싱·그림자는 **렌더러를 만들 때 한 번만** 정합니다 — 런타임에 끄면 재질 1,683개가 한꺼번에 재컴파일되어 오히려 몇 초 멈춥니다.
+  런타임에 바꾸는 것은 **픽셀비뿐**이고(최저 단계에서만 렌더 프레임 스킵), FPS 1.5초 창으로 판단하며 같은 단계에서 두 번 내려오면 바닥을 고정해 진동을 끊습니다. 정착한 단계는 `localStorage['ipg.quality']` 에 남습니다.
+  F2 진단 패널의 '화질' 줄에서 현재 단계와 기기 등급을 볼 수 있습니다. **아래 층 숨기기는 일부러 넣지 않았습니다** — 재보니 프러스텀 컬링이 이미 걸러내고 있어 효과가 노이즈 이내였습니다.
+  인스턴싱 이후로는 렌더가 실제로 픽셀에 비례합니다(픽셀비 2에서 2.0ms, 0.65에서 0.7ms). 즉 두 수단이 서로 다른 병목을 담당하며, 둘 다 있어야 합니다.
+- **외부 의존이 없습니다.** three.js·로더·글꼴 전부 `public/vendor/` 에서 자체 서빙합니다.
+  사내망에서 cdnjs/jsdelivr 이 막히면 `THREE` 가 없어 **게임이 아예 뜨지 않고**, fonts.googleapis.com 이 응답 없이 막히면 `<link rel=stylesheet>` 가 렌더 차단 자원이라 **첫 화면이 수십 초 비어 있게** 됩니다. 둘 다 사내 행사에서 실제로 겪을 수 있는 실패라 의존을 끊었습니다.
+  `THREE` 가 없으면 빈 화면 대신 원인을 적은 안내가 뜹니다(`index.html` 상단 방어 블록).
+  글꼴은 **쓰는 글자에 해당하는 서브셋만**(woff2 37개 709KB) 받아 둡니다. 플레이어가 이름에 아주 드문 음절을 쓰면 그 글자만 시스템 글꼴(맑은 고딕 등)로 나옵니다 — `--kr` 폴백 스택이 받아 줍니다.
+- **three.js r128 을 전역 스크립트로 로드**합니다(모듈 아님, importmap 아님). `THREE.CapsuleGeometry` 등 최신 API가 없으므로 대체 지오메트리를 씁니다. 버전을 올릴 때는 `tools/fetch_vendor.js` 의 `THREE_VER` 과 `index.html` `<script src>` 의 `?v=` 를 함께 바꾸세요.
 - socket.io 연결은 `transports: ['polling', 'websocket']` + `tryAllTransports: true` 로 고정되어 있습니다. websocket 을 첫 transport 로 두면 사내 프록시/방화벽이 업그레이드를 막을 때 연결 자체가 실패합니다.
-- 서버가 HTML 에는 `no-cache` 를, 나머지 정적 파일에는 `max-age=3600` 을 붙입니다. 에셋을 교체했는데 반영이 안 되면 하드 리프레시가 필요합니다.
+- 정적 파일은 gzip/br 로 나갑니다(`compression`). 이미 압축된 것(glb·png·mp3 등)은 `PRECOMPRESSED` 정규식으로 건너뜁니다.
+- 캐시: HTML 은 `no-cache`, `?v=` 가 붙은 에셋은 `max-age=31536000, immutable`, 버전 없는 요청은 `max-age=3600`. 클라이언트는 `assetUrl()` 로 모든 에셋에 `?v=ASSET_VER` 을 붙입니다.
+  **`public/assets/` 의 파일을 갈아끼웠다면 `index.html` 의 `ASSET_VER` 을 반드시 올리세요.** 안 올리면 이미 받은 브라우저는 1년 동안 옛 파일을 씁니다.
+- 캐릭터 GLB 내려받기는 대기 화면 미리보기에 **진행률로 보입니다**(`CHAR.progress` → `updateAvLoading`). 느린 회선에서 '기본 캐릭터가 보이다가 한참 뒤에 바뀌는' 것이 고장으로 읽혔기 때문입니다. `Content-Length` 가 없으면(프록시가 떼는 경우) 0% 에 멈추는 대신 흐르는 막대로 바뀝니다. GLB 를 압축하지 않는 덕에(`PRECOMPRESSED`) 진행률이 실제로 계산됩니다.
+- **HUD 글자는 타일 위에 얹힙니다.** 타일을 밝게 만든 뒤 `#hint` 의 실측 대비비가 **1.04** 였습니다(WCAG 최소 4.5, 1.0 은 '명도가 완전히 같다'). 색만 올리면 층마다 배경이 달라 또 묻히므로 **어두운 판을 깔았습니다**(지금 6.4~9.8). 타일 색·밝기를 건드릴 때는 HUD 대비도 같이 재세요.
+  `#toasts` 의 `bottom` 은 `#hint` 높이 위로 유지해야 합니다 — 안내가 두 줄이 되면서 겹쳤던 적이 있습니다.
+- 화면에 나가는 규칙 문구는 **`TILE_MIX` 로 걸러야** 합니다. `TILE_KINDS` 에는 지금 쓰지 않는 `normal`·`fragile` 이 비율 0 으로 남아 있어서, 거르지 않으면 **존재하지 않는 타일을 설명**하게 됩니다(실제로 하단 한 줄이 그랬습니다). 이름도 내부 키가 아니라 화면에서 보이는 말로 부르세요 — '강화'는 게임 어디에도 안 나옵니다.
+- 학습 문구(`TIP_GAP_MS`)는 **2.5초 간격**입니다. 토스트가 3.6초 떠 있고 동시 표시가 2개라, 이보다 짧으면 앞 줄을 읽는 중에 밀려납니다.
 - 오디오는 브라우저 자동재생 정책 때문에 반드시 첫 사용자 클릭(참가 버튼)에서 `Sound.unlock()` 으로 열어야 합니다.
+  오디오 요소를 버릴 때는 반드시 `Sound.retire()` 를 거치세요. `src=''` 로 비우면 브라우저가 error 이벤트를 쏘는데, 그걸 '파일 없음'으로 받으면 세 페이즈가 같은 파일을 쓰는 지금 구성에서 **첫 크로스페이드 한 번에 배경음이 영영 꺼집니다**(실제로 그랬습니다).
 - 배경 테마는 이미지가 아니라 셰이더 스카이돔 + 절차적 구름/소품입니다(`applyTheme`, `THEMES`). 서버 `THEME_COUNT` 와 클라이언트 `THEMES` 배열 길이를 함께 맞추세요.
 
 ## 언어

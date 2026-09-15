@@ -136,15 +136,15 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
     <div class="eyebrow">IP GUARDIANS · NARRATIVE MASTER DOCUMENT</div>
     <h1>특허의 <em>전주기</em>를 발밑에 깔다<br>— 통합 스토리텔링 기획서</h1>
     <p class="sub">
-      특허의 출원부터 등록까지, 실무에서 실제로 벌어지는 절차를 다섯 개 층에 담았습니다.
+      특허의 출원부터 등록까지, 실무에서 실제로 벌어지는 절차를 여섯 개 층에 담았습니다.
       발판이 무너져 아래로 떨어지는 게임의 하강 구조가 곧 권리가 깎여 내려가는 과정이 되도록
       설계했으며, 모든 층 특성과 특수 타일에 법적 근거를 부여했습니다.
     </p>
     <div class="metabar">
-      <span class="chip">5 LAYERS</span>
-      <span class="chip">4 TILE KINDS</span>
-      <span class="chip">6 SPECIAL TILES</span>
-      <span class="chip">3 LAYER TRAITS</span>
+      <span class="chip">6 LAYERS</span>
+      <span class="chip">2 TILE KINDS</span>
+      <span class="chip">4 SPECIAL TILES</span>
+      <span class="chip">1 LAYER TRAIT</span>
       <span class="chip">특허법 기반</span>
     </div>
   </div>
@@ -162,6 +162,7 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
   <a href="#s6"><b>07</b><span>한 라운드의 서사</span></a>
   <a href="#s7"><b>08</b><span>용어 사전</span></a>
   <a href="#s8"><b>09</b><span>구현 메모</span></a>
+  <a href="#s10"><b>10</b><span>행사장에서 돌리기</span></a>
 </nav>
 
 <!-- ══════════════════════════════════════════════ 03 -->
@@ -857,7 +858,8 @@ const LAYER_DEFS = [
     <tr><td>기믹 탐색</td><td>층 번호 하드코딩 없이 <code>special</code>/<code>trait</code> 태그로 찾는가</td></tr>
     <tr><td>문구</td><td>본 문서 8절의 시스템 문구가 해당 시점에 출력되는가</td></tr>
     <tr><td>성능</td><td>층 추가 후 타일 수 증가에 따른 FPS 측정
-      <span class="tiny">(6층 × 271장 = 1,626개. 시야 밖은 컬링되어 실측 드로우콜은 560)</span></td></tr>
+      <span class="tiny">(6층 × 271장 = 1,626개. 타일은 InstancedMesh 로 묶여
+      드로우콜 <b>36</b> 개로 그립니다 — 10절 참고)</span></td></tr>
   </table>
 
   <div class="note">
@@ -868,6 +870,138 @@ const LAYER_DEFS = [
     타일 넓이는 <code>TILE_AREA_SCALE</code>, 맵 크기는 <code>TILES_PER_PLAYER</code> 로
     환경변수에서도 바꿀 수 있습니다.
   </div>
+</section>
+
+<!-- ══════════════════════════════════════════════ 10 -->
+<section id="s10">
+  <div class="shead"><span class="snum">10</span><h2>행사장에서 돌리기</h2></div>
+
+  <p>기획이 아니라 <b>운영</b>에 대한 절입니다. 사내 행사에서 이 게임이 실제로
+  돌아가려면 넘어야 하는 것이 둘 있었고, 둘 다 실측해서 고쳤습니다 —
+  <b>사무용 PC의 성능</b>과 <b>사내망</b>입니다.</p>
+
+  <div class="warn">
+    <b>개발 노트북에서 멀쩡하다는 것은 아무 근거가 되지 못했습니다.</b><br>
+    업무 환경 PC에서 테스트했더니 화면이 툭툭 끊기고, 대기 화면에서 기본
+    캐릭터가 보이다가 한참 뒤에야 진짜 캐릭터로 바뀌었습니다.
+    증상은 하나로 보였지만 원인은 서로 다른 셋이었습니다.
+  </div>
+
+  <h3>첫 진입까지 받는 양</h3>
+  <table>
+    <tr><th>자원</th><th>종전</th><th>지금</th></tr>
+    <tr><td>index.html</td><td>491 KB</td><td><b>159 KB</b> (br 압축)</td></tr>
+    <tr><td>socket.io.js</td><td>157 KB</td><td><b>37 KB</b></td></tr>
+    <tr><td>캐릭터 모델</td><td>7,631 KB</td><td><b>2,975 KB</b></td></tr>
+    <tr><td>three.js·글꼴</td><td class="tiny">외부 CDN</td><td><b>557 KB</b> (자체 서빙)</td></tr>
+    <tr><td><b>합계</b></td><td><b>8.08 MB</b></td><td><b>3.64 MB</b></td></tr>
+    <tr><td>두 번째 방문</td><td class="tiny">대부분 다시 받음</td><td><b>36 KB</b> (실측)</td></tr>
+  </table>
+  <div class="note">
+    캐릭터 모델은 <b>형상을 그대로 두고 텍스처 해상도만</b> 낮췄습니다.
+    삼각형 37,237 · 메시 13 · 애니메이션 4개가 전부 동일합니다.
+    무거웠던 것이 형상이 아니라 텍스처였기 때문입니다 —
+    이미지 20장이 5.33MB 로 파일의 72% 였고, 그중 몸통 노멀맵 한 장이
+    2048²·2.7MB 였습니다. 옷에 거의 다 가려지는 맵입니다.<br><br>
+    <b>근거:</b> 게임 카메라에서 캐릭터는 화면에 <b>65px</b>, 얼굴은 17px 입니다.
+    65px 짜리에 2048² 는 화면 해상도의 31배입니다.
+    얼굴 계열만 원본 해상도로 남겼습니다 — 이 캐릭터가 싸 보이게 되는 지점은
+    몸통이 아니라 눈·눈썹·아이라인이라서입니다.
+    <span class="tiny">원본과의 화소차는 게임 크기에서 평균 0.04/255 였습니다.</span>
+  </div>
+
+  <h3>사내망 — 외부에 의존하지 않습니다</h3>
+  <p>종전에는 three.js 와 글꼴을 외부 CDN 에서 받았습니다. 사내망에서 그 주소가
+  막히면 어떻게 되는지가 문제였습니다.</p>
+  <table>
+    <tr><th>막히는 것</th><th>종전 결과</th><th>지금</th></tr>
+    <tr><td>cdnjs / jsdelivr</td>
+        <td><b style="color:var(--stamp)">게임이 아예 뜨지 않음</b>
+            <span class="tiny">(3D 엔진이 없으면 첫 줄에서 죽습니다)</span></td>
+        <td>자체 서빙 — 영향 없음</td></tr>
+    <tr><td>fonts.googleapis.com</td>
+        <td><b style="color:var(--stamp)">첫 화면이 수십 초 빈 채로 대기</b>
+            <span class="tiny">(응답이 오지 않는 방식으로 막히면 글꼴 요청이 렌더를 붙잡습니다)</span></td>
+        <td>자체 서빙 — 영향 없음</td></tr>
+  </table>
+  <div class="note">
+    한 라운드를 끝까지 돌리며 <b>외부 호스트 요청 0건</b>을 확인했습니다.
+    글꼴은 이 게임이 실제로 화면에 쓰는 글자(한글 656자)에 해당하는 서브셋만
+    받아 둡니다. 참가자가 이름에 아주 드문 음절을 쓰면 그 글자만 시스템 글꼴
+    (맑은 고딕 등)로 나옵니다 — 깨지지는 않습니다.<br><br>
+    3D 엔진을 못 불러온 경우에도 빈 화면 대신 <b>원인과 복구 방법이 적힌 안내</b>가
+    뜹니다. 행사 당일 무엇이 잘못됐는지 화면만 보고 알 수 있어야 합니다.
+  </div>
+
+  <h3>저사양 PC — 두 가지 다른 병목</h3>
+  <p>"느리다"는 한마디 안에 성격이 다른 두 문제가 있었고, 각각 다른 수단이
+  필요했습니다.</p>
+
+  <div class="grid2">
+    <div class="box">
+      <div class="blabel">① 드로우콜 — CPU 쪽</div>
+      타일 1,626장을 하나씩 그리느라 <b>드로우콜이 546개</b>였습니다.
+      GPU 가 칠하는 비용이 아니라 CPU 가 명령을 밀어 넣는 비용입니다.
+      <span class="tiny">— 증거: 해상도를 <b>9.6배</b> 낮춰도 타일 비용이
+      4.66 → 4.28ms 로 <b>8%</b>밖에 안 줄었습니다.
+      화질을 낮춰서는 못 고치는 종류의 문제였습니다.</span><br><br>
+      <b>해결</b> — 타일을 InstancedMesh 로 묶었습니다.
+      드로우콜 546 → <b>36</b>, 렌더 6.3ms → <b>2.0ms</b>.
+      화면은 그대로입니다 <span class="tiny">(같은 방·같은 시점으로 찍어
+      비교했을 때 타일 영역의 화소차 평균 0.07/255)</span>
+    </div>
+    <div class="box">
+      <div class="blabel">② 칠하는 양 — GPU 쪽</div>
+      그래픽 드라이버가 없거나 정책으로 막힌 PC 에서는 브라우저가
+      <b>소프트웨어 렌더러</b>로 떨어집니다.
+      사무용 PC 에서 "툭툭 끊긴다"의 가장 흔한 정체입니다.
+      <br><br>
+      <b>해결</b> — 시작할 때 기기 등급(정상 / 약함 / <b>소프트웨어</b>)을 재서
+      안티앨리어싱·그림자를 정하고, 프레임이 모자라면 <b>해상도만</b> 단계적으로
+      낮춥니다(최고 · 높음 · 보통 · 절약 · 최소). 최소 단계에서는 30fps 로
+      고정합니다 — 흔들리는 것보다 고정이 덜 끊겨 보입니다.
+      <span class="tiny">— 그림자를 런타임에 끄지 않는 이유: 재질 1,683개가
+      한꺼번에 다시 컴파일되어 끊김을 없애려다 몇 초짜리 정지를 만듭니다.</span>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>두 수단은 서로를 대신하지 못합니다.</b>
+    인스턴싱 전에는 해상도를 낮춰도 렌더가 6.3 → 5.75ms 로 8%만 줄었습니다
+    (CPU 가 병목이라 화질 조절이 듣지 않았습니다).
+    인스턴싱 후에는 2.0 → 0.7ms 로 제대로 줄어듭니다.
+    <b>즉 화질 조절은 인스턴싱을 하고 나서야 제 역할을 하게 됐습니다.</b>
+  </div>
+
+  <h3>네트워크 — 회선에 맞춰 스스로 조절</h3>
+  <p>원격 주자는 약간 과거로 그립니다. 패킷이 늦게 와도 끊기지 않게 두는
+  여유인데, 이 값이 <b>110ms 로 고정</b>되어 있었습니다.</p>
+  <div class="note">
+    사내망(RTT 1~2ms)에서는 110ms 가 과하고, 그만큼 남의 캐릭터가 실제보다
+    늦게 보입니다 — 마주 달릴 때 밀치기 판정이 어긋나 보이는 원인입니다.
+    반대로 회선이 흔들리면 110ms 로는 모자라 뚝뚝 끊깁니다.<br><br>
+    지금은 <b>스냅샷 도착 간격의 흔들림</b>을 재서 70~260ms 사이로 계속
+    조절합니다. RTT 가 아니라 흔들림을 보는 이유는, 버퍼가 막아 주는 것이
+    지연 자체가 아니라 지연의 흔들림이기 때문입니다.
+    바꿀 때는 초당 12ms 씩만 움직입니다 — 한 번에 바꾸면 원격 주자 전원이
+    동시에 순간이동한 것처럼 보입니다.
+    <span class="tiny">사내망 실측 목표는 약 80ms 로, 고정값보다 30ms 덜 지연됩니다.</span>
+  </div>
+
+  <h3>당일 확인 방법</h3>
+  <p>게임 화면에서 <b>F2</b> 를 누르면 진단 패널이 열립니다. 문제가 생겼을 때
+  볼 곳은 세 줄입니다.</p>
+  <table>
+    <tr><th>줄</th><th>읽는 법</th></tr>
+    <tr><td><code>화질</code></td>
+        <td><b>기기 소프트웨어</b> 가 뜨면 그 PC 의 그래픽 드라이버 문제입니다
+        — 게임 문제가 아닙니다</td></tr>
+    <tr><td><code>보간지연</code></td>
+        <td>간격의 <b>±</b> 값이 크면 회선이 흔들리는 것입니다.
+        그때 지연이 커져 있는 것이 정상 동작입니다</td></tr>
+    <tr><td><code>타일</code></td>
+        <td>인스턴스 묶음 수와 붕괴 중인 타일 수</td></tr>
+  </table>
 </section>
 
 <footer>
