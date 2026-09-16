@@ -152,20 +152,14 @@ const COUNTDOWN_MS = 5000;      // "심사 착수" countdown before the run
  * 사라지는' 바닥을 전제한 값이라 그대로 두면 정상적인 라운드가 무승부로
  * 끝납니다. 타일 규칙을 되돌리면 여기도 같이 되돌리세요.              */
 const ROUND_MAX_MS = parseInt(process.env.ROUND_MAX_MS, 10) || 360000;   // 6 minutes
-/* 연습 모드(단독 심사)의 상한.
+/* 혼자일 때의 상한.
  *
  * ★ 혼자면 '마지막 한 명'이 성립하지 않습니다. 버틸 상대가 없으니
- *   본래는 시간이 상대였고, 그래서 2분이라는 '도달 가능한 목표'를
- *   따로 뒀습니다.
- *
- * ★ 그런데 2026-09-16 바닥 규칙 변경(두 번 밟기)으로 한 층이 70~90초를
- *   버티게 되면서, 2분으로는 한 층도 겨우 내려갑니다. 목표로 삼을 수
- *   있는 길이가 아니라 그냥 '아무 일도 안 일어나는 2분'이 됩니다.
- *   그래서 연습 모드의 목표를 시간 만료가 아니라 <b>기록</b>으로
- *   바꿨습니다 — 몇 층까지 내려갔고 얼마나 버텼나. 이 값은 이제
- *   목표가 아니라 상한일 뿐이라 정식 회차와 같게 둡니다.
- *   (ROUND_MAX_MS 를 바꾸면 같이 따라오게 기본값을 묶어 둡니다)     */
-const SOLO_ROUND_MS = parseInt(process.env.SOLO_ROUND_MS, 10) || ROUND_MAX_MS;
+ *   시간이 상대입니다. 그런데 6분을 그대로 쓰면 사실상 끝낼 수 없는
+ *   목표라 승리 조건이 있으나 마나 합니다 — 행사장에서 혼자 와서
+ *   해 보는 사람은 늘 실패 화면만 보게 됩니다.
+ *   2분은 실제로 도달 가능하면서, 대충 뛰어서는 안 되는 길이입니다.  */
+const SOLO_ROUND_MS = parseInt(process.env.SOLO_ROUND_MS, 10) || 120000;
 const RESET_DELAY_MS = 8000;    // podium screen duration before the next map
 
 /* ── 타일 종류 체계 (TILE_MIX / TILE_KINDS) ───────────────────────────
@@ -232,33 +226,12 @@ const TILE_KINDS = {
   fragile:    { hits: 1,
                 fuseMin: Math.round(200 * TILE_LINEAR),
                 fuseMax: Math.round(300 * TILE_LINEAR), autoMs: 0    },
-  /* ── 바닥 (2026-09-16 규칙 변경) ────────────────────────────────
-   *   1번 밟으면 금이 가고 — 그대로 둡니다(무기한).
-   *   2번째로 밟히면 그때부터 2.5초 뒤에 무너집니다.
-   *
-   * ★ 왜 바꿨나 — 라운드가 너무 짧았습니다
-   *   종전에는 autoMs 가 **첫 밟기**에 시계를 걸어서, 두 번째 사람이
-   *   2.5초 안에 오지 않으면 어차피 무너졌습니다. 즉 hits:2 는 사실상
-   *   장식이었고 실효 규칙은 "1번 밟으면 2.5초 뒤"였습니다.
-   *   아래 1028행 주석의 라운드 길이 공식에는
-   *       T ∝ 층 수 × 층당 타일 수 × 한 칸 통과 시간 ÷ 동시 주자 수
-   *   이렇게 네 항만 있었는데, 여기에 없던 다섯째 항이 **타일당 필요
-   *   밟기 수** 입니다. 층도 아레나도 이동 속도도 건드리지 않고
-   *   총량만 바꾸는 유일한 지렛대라 이쪽을 골랐습니다.
-   *   실측(반경 9·271장·한 칸 243ms·200회 중앙값, 한 층이 버티는 시간):
-   *       1인 21.1초 → 72~93초 · 2인 22.4초 → 57~64초
-   *       4인 17.5초 → 42.0초  (6층 환산 1.7분 → 4.2분)
-   *
-   * ★ fuse 를 2500 으로 올린 이유 (종전 0 = '두 번째에 즉시')
-   *   두 번째로 밟는 순간 발밑이 사라지면 피할 방법이 없습니다.
-   *   같은 2.5초를 첫 밟기가 아니라 **마지막 밟기**에 붙여, 금 간 자리를
-   *   건널 수는 있지만 오래는 못 버티게 합니다 — 종전 주석의 '한 번
-   *   지나간 자리를 다시 지날 수는 있지만 오래는 못 버틴다' 를 그대로
-   *   두 번째 밟기로 옮긴 것입니다.
-   *
-   * ★ autoMs 를 0 으로 둔 대신 STAND_ROT_MS 가 있습니다.
-   *   이 값을 없애면 '가만히 서 있기'가 최적 전략이 됩니다(아래 참고). */
-  reinforced: { hits: 2, fuseMin: 2500, fuseMax: 2500, autoMs: 0    },
+  /* autoMs 3000 → 2500.
+   * 강화 타일이 바닥 전체가 되면서 층이 죽는 속도를 이 값 하나가
+   * 결정하게 됐습니다. 종전 일반 타일은 밟고 0.7~1.0초였으니 3초는
+   * 3배 이상 느립니다. 2.5초면 '한 번 지나간 자리를 다시 지날 수는
+   * 있지만 오래는 못 버틴다' 정도로, 층이 제시간에 정리됩니다. */
+  reinforced: { hits: 2, fuseMin: 0,    fuseMax: 0,    autoMs: 2500 },
   special:    { hits: 1, fuseMin: 700,  fuseMax: 1000, autoMs: 0    }
 };
 
@@ -267,30 +240,6 @@ const TILE_KINDS = {
 * 'normal' 로 함께 바꾸세요 — 두 군데가 어긋나면 스폰 링만 다른 타일이
 * 깔려 보호가 아니라 함정이 됩니다.                                   */
 const BASE_TILE_KIND = 'reinforced';
-
-/* ── 머무름 시계 (STAND_ROT_MS) ──────────────────────────────────────
- *
- * ★ 이 값이 없으면 게임이 성립하지 않습니다.
- *   바닥이 "두 번 밟아야 무너진다" 로 바뀌면서, 내가 서 있는 타일은
- *   금만 간 채 영원히 버팁니다. 그런데 승리 조건이 "시간 만료 시
- *   생존자 전원 승리" 라서, 전원이 가만히 서 있으면 전원 공동 1위가
- *   됩니다. 행사장에서 한 명이 이걸 발견하면 그 회차는 거기서 끝입니다.
- *
- *   종전에는 autoMs 가 이 역할을 겸하고 있었습니다 — 멈추면 2.5초 뒤
- *   발밑이 사라져 한 층 떨어졌고, 그래서 '가만히 있을 수 없다' 가
- *   강제됐습니다. 무너지는 타일 장르의 전제입니다.
- *
- * ★ 그래서 시계를 없애지 않고 '서 있는 동안' 으로 옮겼습니다.
- *   달릴 때는 한 칸에 243ms 라 시계가 찰 틈이 없으므로 위 이득은
- *   그대로 남고, 멈추면 종전과 똑같이 2.5초입니다.
- *   서사도 맞습니다 — 머무르면 깎입니다.
- *
- * ★ '지금 서 있는 타일' 은 따로 계산하지 않습니다.
- *   클라이언트가 타일에 **들어갈 때마다** tile_step 을 보내므로
- *   (index.html onSteppedOn 의 contactTile 판정), 마지막 tile_step 이
- *   곧 그 사람이 서 있는 타일입니다. 서버가 좌표로 다시 찾으면
- *   20Hz × 인원 × 271장을 매 틱 훑게 됩니다.                       */
-const STAND_ROT_MS = parseInt(process.env.STAND_ROT_MS, 10) || 2500;
 
 const TILE_KIND_ORDER = Object.keys(TILE_KINDS);
 const TILE_MIX_TOTAL =
@@ -1557,10 +1506,6 @@ function makePlayer(id, name, seat, room) {
      * 아직 살아 있다는 뜻이고, deepest 는 층 번호라 작을수록 깊습니다. */
     diedAt: 0,
     deepest: TOP_LAYER.index,
-    /* 머무름 시계 — 마지막 tile_step 이 곧 지금 서 있는 타일입니다
-     * (STAND_ROT_MS 주석 참고).                                    */
-    standTile: null,
-    standSince: 0,
     layer: TOP_LAYER.index,
     anim: 'idle',
     pos: { x: spawn.x, y: spawn.y, z: spawn.z },
@@ -1689,10 +1634,6 @@ function roomSnapshotMeta(room) {
     alive: aliveCount(room),
     total: room.players.size,
     seats: MAX_PLAYERS,
-    /* 연습 모드(단독 심사)인가. 대기 중에는 '혼자면 이렇게 됩니다'를
-     * 미리 알리는 용도로, 회차가 시작된 뒤에는 그 회차의 성격으로
-     * 쓰입니다 — 결과 화면의 문구가 이 값에 따라 달라집니다.       */
-    solo: room.phase === 'waiting' ? room.players.size <= 1 : !!room.solo,
     spectators: room.spectators.size,
     winnerId: room.winnerId
   };
@@ -1720,26 +1661,13 @@ function evaluateLobby(room) {
     broadcastPhase(room);
     roomTimeout(room, () => {
       room.lobbyDeadline = null;
-      if (room.phase !== 'waiting' || room.players.size === 0) return;
-      /* ★ 여기서 아무 말 없이 시작하면 "왜 혼자 시작하지" 가 됩니다.
-       *   기다린 끝에 아무도 오지 않았다는 사실 자체가 안내입니다. */
-      if (room.players.size === 1) {
-        io.to(room.id).emit('toast', {
-          kind: 'cheer',
-          text: '함께할 출원인이 없습니다 — 연습 모드로 단독 심사를 시작합니다'
-        });
-      }
-      startCountdown(room);
+      if (room.phase === 'waiting' && room.players.size > 0) startCountdown(room);
     }, wait);
   }
 }
 
 function startCountdown(room) {
   if (room.phase !== 'waiting') return;
-  /* ★ 이 회차가 연습인지를 카운트다운 시작 시점에 확정합니다.
-   *   players.size 로 매번 다시 보면, 라운드 중 누가 들어왔다 나가는
-   *   동안 같은 회차의 성격이 오락가락합니다.                      */
-  room.solo = room.players.size === 1;
   room.phase = 'countdown';
   room.phaseEndsAt = Date.now() + COUNTDOWN_MS;
   broadcastPhase(room);
@@ -1755,7 +1683,7 @@ function startRound(room) {
   /* 화면의 '남은 시간'도 같은 상한을 따라야 합니다 — 혼자일 때 6분으로
    * 표시하면 2분에 끝나는 이유를 알 수 없습니다.                     */
   room.phaseEndsAt = room.roundStartedAt +
-    (room.solo ? SOLO_ROUND_MS : ROUND_MAX_MS);
+    (room.players.size === 1 ? SOLO_ROUND_MS : ROUND_MAX_MS);
   room.winnerId = null;
   /* 위상 타일은 라운드 시작 순간 ON 으로 출발합니다.
    * 시작 시각을 그대로 기준으로 삼으므로 elapsed 0 → ON 입니다.      */
@@ -1782,8 +1710,6 @@ function startRound(room) {
    * 발판만 치우면 그 자리에서 최상층으로 떨어지며 게임이 시작됩니다. */
   /* 관전자의 '보정 기회'는 회차당 1회입니다 — 새 회차에 돌려줍니다. */
   for (const spec of room.spectators.values()) spec.amendUsed = false;
-  /* 지난 회차의 발자국이 새 맵의 같은 id 타일을 부수지 않게 합니다. */
-  for (const p of room.players.values()) { p.standTile = null; p.standSince = 0; }
 
   for (const p of room.players.values()) {
     p.alive = true;
@@ -1824,7 +1750,7 @@ function startRound(room) {
     if (left.length === 1) endRound(room, left[0], 'survived');
     else if (left.length > 1) endRound(room, null, 'survived');
     else endRound(room, null, 'timeout');
-  }, room.solo ? SOLO_ROUND_MS : ROUND_MAX_MS);
+  }, room.players.size === 1 ? SOLO_ROUND_MS : ROUND_MAX_MS);
 }
 
 /**
@@ -1838,9 +1764,6 @@ function eliminateStale(room, p, cause) {
   p.vel.x = 0; p.vel.y = 0; p.vel.z = 0;
   p.placement = aliveCount(room) + 1;
   p.diedAt = Date.now();
-  /* 떨어진 사람의 마지막 발자국이 뒤늦게 타일을 부수면, 아무도 없는
-   * 자리가 혼자 무너져 보입니다.                                    */
-  p.standTile = null;
 
   io.to(room.id).emit('eliminated', {
     id: p.id,
@@ -1897,9 +1820,6 @@ function endRound(room, winner, reason) {
   /* 시간 만료로 끝났으면 살아남은 사람 전원이 공동 1위입니다.
    * 순위 칸에 쓸 특수 기호(♛ 등)를 따로 두지 않는 이유: 글꼴 서브셋에
    * 없어 시스템 글꼴로 폴백하면 그 글자만 서체가 달라집니다.       */
-  /* ★ yield(연습 양보)는 승패가 아닙니다. 살아 있던 사람을 승자로
-   *   올리지도, 탈락으로 내리지도 않습니다 — 결과 화면이 '연습 기록'
-   *   으로 읽어 갑니다.                                            */
   if (reason === 'survived') {
     for (const p of room.players.values()) if (p.alive) p.placement = 1;
   }
@@ -1921,9 +1841,6 @@ function endRound(room, winner, reason) {
   if (reason === 'abandoned') room.phaseEndsAt = Date.now() + 1500;
 
   io.to(room.id).emit('game_over', {
-    /* 혼자였는지. 없으면 결과 화면이 '전원 탈락'이라고 말합니다 —
-     * 그 '전원'이 나 하나입니다.                                    */
-    solo: !!room.solo,
     winnerId: room.winnerId,
     winnerName: winner ? winner.name : null,
     reason,
@@ -2572,26 +2489,6 @@ function accelScaledMs(room, tile, ms, now) {
   return Math.max(1, Math.round(ms / ACCEL_SPEED));
 }
 
-/* 금 간 타일 위에 머무르는 사람을 떨어뜨립니다 (STAND_ROT_MS 주석 참고).
- *
- * hits >= 1 만 봅니다. 위상 타일과 거절이유 타일은 requestTileBreak 가
- * hits 를 올리기 전에 돌아가므로 여기에 걸리지 않습니다 — 위상 타일은
- * 원래 밟아도 안 무너지고, 거절이유 타일은 자기 폭발 예약이 따로
- * 있어서 여기서 먼저 부수면 폭발이 사라집니다.                       */
-function tickStanding(room, now) {
-  if (room.phase !== 'playing') return;
-  for (const p of room.players.values()) {
-    if (!p.alive || !p.standTile) continue;
-    const st = room.tileState.get(p.standTile);
-    if (!st || st.phase !== 'idle' || st.hits < 1) continue;
-    const tile = tileById(room.map, p.standTile);
-    /* 심사 가속 중이면 머무를 수 있는 시간도 같이 줄어듭니다 —
-     * '그 층 타일의 파괴가 빨라진다' 가 경로마다 달라지면 안 됩니다. */
-    if (now - p.standSince < accelScaledMs(room, tile, STAND_ROT_MS, now)) continue;
-    scheduleTileBreak(room, p.standTile, 0, p.id);
-  }
-}
-
 function tickTiles(room, now) {
   if (room.phase !== 'playing') return;
   for (const [id, st] of room.tileState) {
@@ -2889,22 +2786,13 @@ function requestTileBreak(room, tileId, sourceId, reason) {
   const now = Date.now();
   st.hits++;
 
-  /* ★ 여기에 있던 "첫 밟기에 자동 파괴 시계" 는 제거했습니다.
-   *   그 한 줄 때문에 hits:2 가 무의미했습니다 — 두 번째 사람이 2.5초
-   *   안에 오지 않으면 어차피 무너졌으니까요(TILE_KINDS 주석 참고).
-   *   지금은 금 간 채로 남고, 마지막 밟기에서 fuse 가 걸립니다.
-   *   아무도 다시 밟지 않으면 그 자리는 계속 서 있습니다 — 대신
-   *   그 위에 머무르면 STAND_ROT_MS 가 무너뜨립니다(tickStanding).
-   *
-   *   autoMs 를 쓰는 타일이 다시 생길 수 있으므로 분기는 남깁니다. */
+  /* 강화 타일: 첫 밟기에 자동 파괴 시계를 겁니다.
+   * 아무도 두 번째로 밟지 않아도 autoMs 뒤에 무너집니다. phase 는 'idle'
+   * 그대로라 그 사이 누가 밟으면 아래 분기가 더 이른 breakAt 으로 덮습니다. */
+  /* 심사 가속 중이면 이 자동 파괴 시계도 절반으로 줄입니다 — '그 층
+   * 타일의 파괴가 빨라진다'는 규칙이 종류마다 달라지면 안 됩니다.    */
   if (tile.autoMs > 0 && st.hits === 1) {
     st.breakAt = now + accelScaledMs(room, tile, tile.autoMs, now);
-  }
-
-  /* 이 사람이 지금 이 타일 위에 있습니다. 머무름 시계의 기준점입니다. */
-  if (sourceId) {
-    const stepper = room.players.get(sourceId);
-    if (stepper) { stepper.standTile = tileId; stepper.standSince = now; }
   }
 
   if (st.hits < maxHits) {
@@ -3053,9 +2941,6 @@ function publicConfig() {
      * 지오메트리와 HUD 를 만들고 아무것도 하드코딩하지 않습니다.     */
     SEA_Y, LAYERS, LAYER_GAP, LAYER_BASE_Y,
     TILE_MIX, TILE_KINDS, PHASE_TILE, DASH, REJECT_TILE, OFFICE_SPECIAL_MIX, JUMP_TILE,
-    /* 머무름 시계도 규격입니다 — 화면에 안 적으면 "왜 가만히 있는데
-     * 발밑이 꺼지지" 가 됩니다.                                      */
-    STAND_ROT_MS,
     /* 안내 문구도 서버가 내려줍니다 — 층 구성과 문구가 한 파일에 있어야
      * 기믹을 바꿀 때 설명이 같이 따라옵니다.                          */
     SPECIAL_TIPS, BASE_TILE_KIND,
@@ -3220,22 +3105,6 @@ io.on('connection', (socket) => {
       socket.to(room.id).emit('spectator_joined', {
         id: socket.id, name, wantsPlay: !wantSpectate && !preview
       });
-
-      /* ★ 연습 회차는 사람에게 양보합니다.
-       *   행사장에서 제일 나쁜 상황은 "사람이 왔는데 혼자 도는 연습이
-       *   끝나기를 6분 기다리는 것" 입니다. 연습은 끊겨도 잃는 것이
-       *   없고, 기록은 그때까지 버틴 값 그대로 남습니다.
-       *   preview(대기 화면 뒤에서 구경만 하는 상태)는 제외합니다 —
-       *   페이지를 열어만 둬도 남의 회차가 끊기면 안 됩니다.        */
-      if (room.solo && room.phase === 'playing' && !wantSpectate && !preview) {
-        const runner = [...room.players.values()].find((p) => p.alive);
-        io.to(room.id).emit('toast', {
-          kind: 'cheer',
-          text: name + ' 님이 도착했습니다 — 연습을 마치고 정식 심사를 준비합니다'
-        });
-        endRound(room, null, 'yield');
-        void runner;
-      }
     }
 
     socket.emit('init', {
@@ -3353,11 +3222,7 @@ io.on('connection', (socket) => {
     /* 층 번호는 클라이언트가 보내는 값이라 범위를 막습니다.
      * 안 막으면 0 이나 음수가 그대로 들어오고, 그 값이 결과 화면의
      * '내려간 곳'에 '0층' 같은 이름 없는 층으로 나옵니다.           */
-    const prevLayer = p.layer;
-  p.layer = Math.max(BOTTOM_LAYER.index, Math.min(TOP_LAYER.index, s.layer | 0));
-  /* 아래층으로 떨어지는 동안(착지 전까지) 위층에 두고 온 마지막 타일의
-   * 시계가 계속 돌면, 지나가기만 한 자리가 혼자 무너집니다.         */
-  if (p.layer !== prevLayer) p.standTile = null;
+    p.layer = Math.max(BOTTOM_LAYER.index, Math.min(TOP_LAYER.index, s.layer | 0));
     /* 층 번호는 위가 큽니다(6F=6). 가장 작은 값이 가장 깊이 내려간 것. */
     if (p.layer < p.deepest) p.deepest = p.layer;
     p.anim = typeof s.anim === 'string' ? s.anim.slice(0, 12) : 'idle';
@@ -3429,9 +3294,6 @@ io.on('connection', (socket) => {
     p.anim = 'dead';
     p.placement = aliveCount(room) + 1;
     p.diedAt = Date.now();
-  /* 떨어진 사람의 마지막 발자국이 뒤늦게 타일을 부수면, 아무도 없는
-   * 자리가 혼자 무너져 보입니다.                                    */
-  p.standTile = null;
 
     /* 밀어서 떨어뜨린 사람. 클라이언트가 by 로 보내오지만 그대로 믿지 않고
      * 같은 방에 살아 있는 주자인지만 확인합니다 — 자기 자신을 넣거나
@@ -3622,8 +3484,6 @@ setInterval(() => {
      * 순서가 바뀌면 발동과 동시에 무너져야 할 타일이 한 틱(50ms) 늦습니다. */
     tickLayerEvents(room, now);
 
-    /* 머무름 판정이 붕괴 실행보다 먼저여야 같은 틱에 반영됩니다. */
-    tickStanding(room, now);
     tickTiles(room, now);
 
     /* ── 보고가 끊긴 플레이어 처리 (STALE) ──────────────────────────

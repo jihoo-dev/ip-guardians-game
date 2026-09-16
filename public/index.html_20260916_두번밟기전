@@ -3436,9 +3436,7 @@ function buildMap(map, cfg) {
       /* 밟기 누적. 종전 '3회 규칙' 구조를 강화 타일이 그대로 물려받았습니다.
        *   hits        : 서버가 확정한 히트 수 (낙관적으로 올리지 않습니다)
        *   maxHits     : 이 타일이 버티는 횟수 (강화 2, 나머지 1)
-       *   autoMs      : 첫 밟기 뒤 자동 파괴까지. 2026-09-16 규칙 변경으로
-       *                 바닥은 0 이 됐습니다(다시 밟기 전까지 안 무너짐).
-       *                 값을 쓰는 타일이 다시 생길 수 있어 필드는 남깁니다.
+       *   autoMs      : 첫 밟기 뒤 자동 파괴까지 (강화 3000, 나머지 0)
        *   wear        : hits/maxHits 를 0~1 로 정규화한 마모도
        *   myLastHitAt : 내가 마지막으로 이 타일을 때린 시각 (연타 방지)  */
       hits: 0, maxHits: t.maxHits || 1, autoMs: t.autoMs || 0,
@@ -6368,9 +6366,7 @@ const TILE_HIT_COOLDOWN_MS = 400;
  * 세면 안 되게 됐습니다. 쿨다운만으로는 가만히 서 있어도 0.4초 뒤
  * 두 번째 히트가 들어가 강화 타일이 일반 타일보다 빨리 꺼집니다.
  * 그래서 '발이 떨어졌다가 다시 닿았을 때'만 한 번 셉니다.
- * 계속 서 있는 경우는 서버의 머무름 시계(STAND_ROT_MS)가 처리합니다 —
- * 2026-09-16 규칙 변경으로 첫 밟기 자동 파괴(autoMs)가 없어졌고, 대신
- * '그 위에 머무르면 무너진다' 가 그 역할을 이어받았습니다.            */
+ * 계속 서 있는 경우는 서버의 autoMs(3초 자동 파괴)가 처리합니다.       */
 let contactTile = null;
 
 /**
@@ -9067,10 +9063,6 @@ function buildRulesText() {
   const MIX = cfg.TILE_MIX || {};
   const used = (k) => !!K[k] && (MIX[k] === undefined || MIX[k] > 0);
   const baseKind = cfg.BASE_TILE_KIND || 'normal';
-  /* 마지막 밟기부터 붕괴까지. 2026-09-16 규칙 변경으로 이 값이 0 에서
-   * 2.5초가 됐습니다 — 두 번째로 밟는 순간 발밑이 사라지면 피할
-   * 방법이 없기 때문입니다.                                        */
-  const baseSpan = (K[baseKind] && K[baseKind].fuseMax > 0) ? span(baseKind) : '';
 
   /* ── 심사 규격 만들기 ──────────────────────────────────────────────
    *
@@ -9133,24 +9125,15 @@ function buildRulesText() {
   const kBase = K[baseKind] || K.reinforced || {};
   step('s1', '온전', '아직 아무도 밟지 않음');
   flow.appendChild(mk('i', 'rgArrow'));
-  /* 금 간 상태는 이제 '무기한'입니다 — 다시 밟기 전까지 버팁니다.
-   * 이 점이 규칙 변경의 핵심이라 단계 설명에 그대로 적습니다.      */
-  step('s2', '금', '1번 밟음 · 다시 밟기 전까지 버팀', true);
+  step('s2', '금', '1번 밟음', true);
   flow.appendChild(mk('i', 'rgArrow'));
   step('s3', '붕괴',
     (kBase.hits ? kBase.hits + '번째로 밟히면' : '다시 밟히면') +
-    (baseSpan ? ' ' + baseSpan + ' 뒤' : ''));
+    (kBase.autoMs ? ' · 금 간 뒤 ' + sec(kBase.autoMs) : ''));
   floorSec.appendChild(flow);
   const floorNote = mk('div', 'rgDesc');
   floorNote.style.marginTop = '7px';
   floorNote.textContent = '금은 누가 밟았는지를 가리지 않습니다 — 남이 지나간 자리는 이미 한 번 깎여 있습니다.';
-  /* ★ 이 한 줄이 없으면 '왜 가만히 있는데 발밑이 꺼지지' 가 됩니다.
-   *   바닥이 두 번 밟아야 무너지게 되면서, 멈춰 서 있는 것을 막는
-   *   규칙이 별도로 생겼습니다(서버 STAND_ROT_MS).                 */
-  if (cfg.STAND_ROT_MS) {
-    floorNote.appendChild(mk('span', 'rgWarn',
-      '한자리에 ' + sec(cfg.STAND_ROT_MS) + ' 머무르면 그 자리가 무너집니다 — 멈출 수 없습니다'));
-  }
   floorSec.appendChild(floorNote);
 
   /* 지금 쓰이지 않는 타일 종류는 적지 않습니다(TILE_MIX 로 거릅니다). */
@@ -9291,9 +9274,6 @@ function buildRulesText() {
   }
   /* 각 항목이 '…붕괴'로 끝나므로 꼬리를 또 붙이면 겹칩니다
    * (종전 문구는 항목이 '강화 2회' 처럼 끝나서 꼬리가 필요했습니다). */
-  /* 머무름 규칙은 타일 종류가 아니라 '나'에 걸리는 규칙이라 맨 뒤에
-   * 따로 답니다 — 종류 설명 사이에 끼면 그 타일만의 성질로 읽힙니다. */
-  if (cfg.STAND_ROT_MS) bits.push('한자리에 ' + sec(cfg.STAND_ROT_MS) + ' 머무르면 발밑이 무너짐');
   hint.textContent = bits.join(' · ');
 }
 
@@ -9760,16 +9740,12 @@ function updateCountdown() {
     if (sec !== lastCountdownSec && sec > 0 && sec <= 5) Sound.sfx('tick');
     lastCountdownSec = sec;
     dom.cdNum.textContent = sec;
-    dom.cdLabel.textContent = G.solo ? '단독 심사 착수까지' : '심사 착수까지';
+    dom.cdLabel.textContent = '심사 착수까지';
     if (!cdVisible) { dom.countdown.classList.add('show'); cdVisible = true; }
   } else if (G.phase === 'waiting' && G.phaseEndsAt) {
     const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
     dom.cdNum.textContent = Math.ceil(left / 1000);
-    /* ★ 아무 말 없이 혼자 시작되면 "왜 나 혼자지" 가 됩니다.
-     *   기다리는 동안 미리 알려 두면 같은 일이 '고장'이 아니라
-     *   '예정된 전환'으로 읽힙니다.                                */
-    dom.cdLabel.textContent = '출원인 모집 중 · ' + (G.roster || 0) + '/' + G.seats +
-      (G.solo ? ' · 아무도 오지 않으면 연습 모드' : '');
+    dom.cdLabel.textContent = '출원인 모집 중 · ' + (G.roster || 0) + '/' + G.seats;
     if (!cdVisible) { dom.countdown.classList.add('show'); cdVisible = true; }
   } else if (cdVisible) {
     dom.countdown.classList.remove('show');
@@ -9784,54 +9760,13 @@ function updateCountdown() {
  * ★ 그리고 서버가 보내주는 durationMs 를 한 번도 쓰지 않았습니다.
  *   한 판이 30초~2분인 게임에서 '다시 해 볼까'를 만드는 건 내가
  *   얼마나 버텼고 어디까지 내려갔는지입니다.                        */
-/* 연습 모드 개인 최고 기록.
- *
- * 기준은 '더 깊이, 같은 깊이면 더 오래'입니다. 이 게임에서 아래로
- * 내려가는 것이 곧 권리가 깎이는 것이므로 깊이가 먼저입니다 —
- * 버틴 시간만 보면 맨 위층에서 얌전히 도는 쪽이 최고 기록이 됩니다.
- *
- * localStorage 는 없을 수도, 던질 수도 있습니다(사생활 보호 창·정책).
- * 기록은 부가 기능이므로 실패하면 조용히 비웁니다.                 */
-function updateSoloBest(me, layerName) {
-  const KEY = 'ipg.soloBest';
-  let prev = null;
-  try { prev = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
-  const mmss = (ms) => { const t = Math.max(0, Math.round(ms / 1000));
-    return Math.floor(t / 60) + '분 ' + String(t % 60).padStart(2, '0') + '초'; };
-
-  const now = { deepest: me.deepest, survivedMs: me.survivedMs };
-  const better = !prev || now.deepest < prev.deepest ||
-    (now.deepest === prev.deepest && now.survivedMs > prev.survivedMs);
-  if (better) { try { localStorage.setItem(KEY, JSON.stringify(now)); } catch (e) {} }
-
-  if (!prev) return '<span>첫 기록 <b>저장했습니다</b></span>';
-  if (better) {
-    return '<span>이전 최고 <b>' + escapeHtml(layerName(prev.deepest)) + ' · ' +
-           mmss(prev.survivedMs) + '</b> — 경신</span>';
-  }
-  return '<span>최고 기록 <b>' + escapeHtml(layerName(prev.deepest)) + ' · ' +
-         mmss(prev.survivedMs) + '</b></span>';
-}
-
 function showResult(data) {
   const me = (data.standings || []).find((s) => s.id === G.selfId);
   const survived = data.reason === 'survived';
-  const solo = !!data.solo;
-  const yielded = data.reason === 'yield';
   const won = data.winnerId === G.selfId || (survived && me && me.alive);
 
-  /* ★ 연습 모드에서는 '전원 탈락'이라고 말하면 안 됩니다 — 그 '전원'이
-   *   나 하나입니다. 실패가 아니라 기록이 남는 판이므로 말도 그렇게.
-   * ★ yield 는 승패가 아닙니다(사람이 와서 양보한 회차).            */
-  dom.resultEyebrow.textContent =
-    yielded ? '연습 종료 · PRACTICE'
-    : won ? '최종 처분 · REGISTERED'
-    : solo ? '연습 종료 · PRACTICE'
-    : '최종 처분 · REJECTED';
-  dom.resultTitle.innerHTML =
-    yielded ? '연습 종료'
-    : won ? '등록결정'
-    : solo ? '단독 심사 종료'
+  dom.resultEyebrow.textContent = won ? '최종 처분 · REGISTERED' : '최종 처분 · REJECTED';
+  dom.resultTitle.innerHTML = won ? '등록결정'
     : (data.winnerName ? '거절결정' : (survived ? '심사 기간 만료' : '전원 탈락'));
 
   const mmss = (ms) => { const t = Math.max(0, Math.round(ms / 1000));
@@ -9839,22 +9774,10 @@ function showResult(data) {
   const layerName = (idx) => { const Ls = (G.cfg && G.cfg.LAYERS) || [];
     const f = Ls.find((L) => L.index === idx); return f ? f.name : idx + '층'; };
 
-  const layerCount = ((G.cfg && G.cfg.LAYERS) || []).length;
-  if (yielded) {
-    dom.resultSub.textContent = '새 출원인이 도착해 연습을 마쳤습니다. 다음은 정식 심사입니다.';
-  } else if (won && solo) {
-    dom.resultSub.textContent = '혼자서 심사 기간을 끝까지 버텼습니다. 등록결정서가 발부되었습니다.';
-  } else if (won && survived) {
+  if (won && survived) {
     dom.resultSub.textContent = '심사 기간이 끝날 때까지 바닥을 지켜냈습니다. 패스트트랙 심사를 통과했습니다.';
   } else if (won) {
     dom.resultSub.textContent = '마지막까지 바닥을 지켜냈습니다. 패스트트랙 심사를 통과했습니다.';
-  } else if (solo && me) {
-    /* 몇 층까지 갔는가를 먼저 말합니다 — 연습에서 남는 것은 등수가
-     * 아니라 도달 지점입니다.                                      */
-    const gone = layerCount ? (layerCount - me.deepest + 1) : 0;
-    dom.resultSub.textContent = layerCount
-      ? (layerCount + '개 층 중 ' + gone + '개 층을 내려갔습니다. 다시 해 보세요.')
-      : '다시 해 보세요.';
   } else if (data.winnerName) {
     dom.resultSub.textContent = escapeHtml(data.winnerName) + ' 님이 등록결정을 받았습니다.';
   } else if (survived) {
@@ -9866,17 +9789,10 @@ function showResult(data) {
   /* 내 기록 한 줄. 살아남았으면 라운드 전체 시간이 곧 내 기록입니다. */
   if (dom.resultMine) {
     if (me) {
-      /* ★ 연습 모드에는 등수가 없습니다. 다시 할 이유를 만들려면
-       *   비교할 대상이 있어야 하고, 그 대상은 지난번의 나입니다.
-       *   서버에 남기지 않는 이유: 이 게임에 계정이 없고, 행사장에서
-       *   같은 PC 를 여러 사람이 씁니다 — 브라우저에만 둡니다.      */
-      let best = '';
-      if (solo && !yielded) best = updateSoloBest(me, layerName);
       dom.resultMine.innerHTML =
         '<span>버틴 시간 <b>' + mmss(me.survivedMs) + '</b></span>' +
         '<span>내려간 곳 <b>' + escapeHtml(layerName(me.deepest)) + '</b></span>' +
-        (solo ? best
-              : (data.durationMs ? '<span>이번 회차 <b>' + mmss(data.durationMs) + '</b></span>' : ''));
+        (data.durationMs ? '<span>이번 회차 <b>' + mmss(data.durationMs) + '</b></span>' : '');
       dom.resultMine.style.display = '';
     } else {
       dom.resultMine.style.display = 'none';      // 관전자
@@ -10540,9 +10456,6 @@ function applyMeta(meta) {
   if (meta.theme !== undefined) applyTheme(meta.theme);
   if (meta.seats) G.seats = meta.seats;
   G.roster = meta.total;
-  /* 대기 중에는 '지금 혼자인가', 회차가 시작된 뒤에는 '이 회차가
-   * 연습이었나'. 결과 화면 문구가 이 값을 봅니다.                 */
-  G.solo = !!meta.solo;
   dom.vAlive.textContent = meta.alive + '/' + meta.total;
   dom.vSpec.textContent = meta.spectators;
   dom.vRoom.textContent = meta.roomId || G.roomId;

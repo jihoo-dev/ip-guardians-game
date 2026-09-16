@@ -113,6 +113,10 @@ function makeBot(i) {
      * 없으므로 스스로 움직이면 검증에 걸립니다.                      */
     const me = (snap.players || []).find((p) => p.id === sock.id);
     if (me && me.p) b.pos = { x: me.p[0], y: me.p[1], z: me.p[2] };
+    /* 서버가 말해 주는 층을 그대로 되돌려 보냅니다. 안 보내면 서버가
+     * 0 으로 읽어 맨 아래 층으로 고정되고, 관전자 투하가 봇이 서 있는
+     * 층이 아니라 엉뚱한 층에 떨어집니다.                          */
+    if (me && me.l !== undefined) b.layer = me.l;
     if (me) b.alive = !!me.al;
     b.others = (snap.players || []).filter((p) => p.id !== sock.id && p.al).map((p) => p.id);
   });
@@ -135,7 +139,8 @@ const reporter = setInterval(() => {
   for (const b of bots) {
     if (!b.sock.connected || !b.pos || b.dead || b.role !== 'player') continue;
     b.sock.emit('player_state', {
-      p: [b.pos.x, b.pos.y, b.pos.z], v: [0, 0, 0], ry: 0, anim: 'idle', g: 1
+      p: [b.pos.x, b.pos.y, b.pos.z], v: [0, 0, 0], ry: 0,
+      layer: b.layer, anim: 'idle', g: 1
     });
   }
 }, 50);
@@ -158,9 +163,12 @@ const timer = setInterval(() => {
     const b = bots[0];
     if (b.dead && !b.intervened && t >= (DIE[0] || 0) + 1.5) {
       b.intervened = true;
-      const target = (b.others || [])[0];
-      b.sock.emit('cheer_booster', { target });
-      b.sock.emit('drop_obstacle', { target });
+      /* 서버가 읽는 필드 이름은 targetId 입니다. target 으로 보내면
+       * '대상 없음'으로 처리돼 아무나 고르는 폴백을 타므로, 타게팅이
+       * 되는지 검증할 수 없습니다.                                 */
+      const targetId = (b.others || [])[0];
+      b.sock.emit('cheer_booster', { targetId });
+      b.sock.emit('drop_obstacle', { targetId });
       log.push('  ' + b.name + ' 개입 시도 @ ' + t.toFixed(1) + '초');
     }
   }

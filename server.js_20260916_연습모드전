@@ -152,20 +152,14 @@ const COUNTDOWN_MS = 5000;      // "심사 착수" countdown before the run
  * 사라지는' 바닥을 전제한 값이라 그대로 두면 정상적인 라운드가 무승부로
  * 끝납니다. 타일 규칙을 되돌리면 여기도 같이 되돌리세요.              */
 const ROUND_MAX_MS = parseInt(process.env.ROUND_MAX_MS, 10) || 360000;   // 6 minutes
-/* 연습 모드(단독 심사)의 상한.
+/* 혼자일 때의 상한.
  *
  * ★ 혼자면 '마지막 한 명'이 성립하지 않습니다. 버틸 상대가 없으니
- *   본래는 시간이 상대였고, 그래서 2분이라는 '도달 가능한 목표'를
- *   따로 뒀습니다.
- *
- * ★ 그런데 2026-09-16 바닥 규칙 변경(두 번 밟기)으로 한 층이 70~90초를
- *   버티게 되면서, 2분으로는 한 층도 겨우 내려갑니다. 목표로 삼을 수
- *   있는 길이가 아니라 그냥 '아무 일도 안 일어나는 2분'이 됩니다.
- *   그래서 연습 모드의 목표를 시간 만료가 아니라 <b>기록</b>으로
- *   바꿨습니다 — 몇 층까지 내려갔고 얼마나 버텼나. 이 값은 이제
- *   목표가 아니라 상한일 뿐이라 정식 회차와 같게 둡니다.
- *   (ROUND_MAX_MS 를 바꾸면 같이 따라오게 기본값을 묶어 둡니다)     */
-const SOLO_ROUND_MS = parseInt(process.env.SOLO_ROUND_MS, 10) || ROUND_MAX_MS;
+ *   시간이 상대입니다. 그런데 6분을 그대로 쓰면 사실상 끝낼 수 없는
+ *   목표라 승리 조건이 있으나 마나 합니다 — 행사장에서 혼자 와서
+ *   해 보는 사람은 늘 실패 화면만 보게 됩니다.
+ *   2분은 실제로 도달 가능하면서, 대충 뛰어서는 안 되는 길이입니다.  */
+const SOLO_ROUND_MS = parseInt(process.env.SOLO_ROUND_MS, 10) || 120000;
 const RESET_DELAY_MS = 8000;    // podium screen duration before the next map
 
 /* ── 타일 종류 체계 (TILE_MIX / TILE_KINDS) ───────────────────────────
@@ -1689,10 +1683,6 @@ function roomSnapshotMeta(room) {
     alive: aliveCount(room),
     total: room.players.size,
     seats: MAX_PLAYERS,
-    /* 연습 모드(단독 심사)인가. 대기 중에는 '혼자면 이렇게 됩니다'를
-     * 미리 알리는 용도로, 회차가 시작된 뒤에는 그 회차의 성격으로
-     * 쓰입니다 — 결과 화면의 문구가 이 값에 따라 달라집니다.       */
-    solo: room.phase === 'waiting' ? room.players.size <= 1 : !!room.solo,
     spectators: room.spectators.size,
     winnerId: room.winnerId
   };
@@ -1720,26 +1710,13 @@ function evaluateLobby(room) {
     broadcastPhase(room);
     roomTimeout(room, () => {
       room.lobbyDeadline = null;
-      if (room.phase !== 'waiting' || room.players.size === 0) return;
-      /* ★ 여기서 아무 말 없이 시작하면 "왜 혼자 시작하지" 가 됩니다.
-       *   기다린 끝에 아무도 오지 않았다는 사실 자체가 안내입니다. */
-      if (room.players.size === 1) {
-        io.to(room.id).emit('toast', {
-          kind: 'cheer',
-          text: '함께할 출원인이 없습니다 — 연습 모드로 단독 심사를 시작합니다'
-        });
-      }
-      startCountdown(room);
+      if (room.phase === 'waiting' && room.players.size > 0) startCountdown(room);
     }, wait);
   }
 }
 
 function startCountdown(room) {
   if (room.phase !== 'waiting') return;
-  /* ★ 이 회차가 연습인지를 카운트다운 시작 시점에 확정합니다.
-   *   players.size 로 매번 다시 보면, 라운드 중 누가 들어왔다 나가는
-   *   동안 같은 회차의 성격이 오락가락합니다.                      */
-  room.solo = room.players.size === 1;
   room.phase = 'countdown';
   room.phaseEndsAt = Date.now() + COUNTDOWN_MS;
   broadcastPhase(room);
@@ -1755,7 +1732,7 @@ function startRound(room) {
   /* 화면의 '남은 시간'도 같은 상한을 따라야 합니다 — 혼자일 때 6분으로
    * 표시하면 2분에 끝나는 이유를 알 수 없습니다.                     */
   room.phaseEndsAt = room.roundStartedAt +
-    (room.solo ? SOLO_ROUND_MS : ROUND_MAX_MS);
+    (room.players.size === 1 ? SOLO_ROUND_MS : ROUND_MAX_MS);
   room.winnerId = null;
   /* 위상 타일은 라운드 시작 순간 ON 으로 출발합니다.
    * 시작 시각을 그대로 기준으로 삼으므로 elapsed 0 → ON 입니다.      */
@@ -1824,7 +1801,7 @@ function startRound(room) {
     if (left.length === 1) endRound(room, left[0], 'survived');
     else if (left.length > 1) endRound(room, null, 'survived');
     else endRound(room, null, 'timeout');
-  }, room.solo ? SOLO_ROUND_MS : ROUND_MAX_MS);
+  }, room.players.size === 1 ? SOLO_ROUND_MS : ROUND_MAX_MS);
 }
 
 /**
@@ -1897,9 +1874,6 @@ function endRound(room, winner, reason) {
   /* 시간 만료로 끝났으면 살아남은 사람 전원이 공동 1위입니다.
    * 순위 칸에 쓸 특수 기호(♛ 등)를 따로 두지 않는 이유: 글꼴 서브셋에
    * 없어 시스템 글꼴로 폴백하면 그 글자만 서체가 달라집니다.       */
-  /* ★ yield(연습 양보)는 승패가 아닙니다. 살아 있던 사람을 승자로
-   *   올리지도, 탈락으로 내리지도 않습니다 — 결과 화면이 '연습 기록'
-   *   으로 읽어 갑니다.                                            */
   if (reason === 'survived') {
     for (const p of room.players.values()) if (p.alive) p.placement = 1;
   }
@@ -1921,9 +1895,6 @@ function endRound(room, winner, reason) {
   if (reason === 'abandoned') room.phaseEndsAt = Date.now() + 1500;
 
   io.to(room.id).emit('game_over', {
-    /* 혼자였는지. 없으면 결과 화면이 '전원 탈락'이라고 말합니다 —
-     * 그 '전원'이 나 하나입니다.                                    */
-    solo: !!room.solo,
     winnerId: room.winnerId,
     winnerName: winner ? winner.name : null,
     reason,
@@ -3220,22 +3191,6 @@ io.on('connection', (socket) => {
       socket.to(room.id).emit('spectator_joined', {
         id: socket.id, name, wantsPlay: !wantSpectate && !preview
       });
-
-      /* ★ 연습 회차는 사람에게 양보합니다.
-       *   행사장에서 제일 나쁜 상황은 "사람이 왔는데 혼자 도는 연습이
-       *   끝나기를 6분 기다리는 것" 입니다. 연습은 끊겨도 잃는 것이
-       *   없고, 기록은 그때까지 버틴 값 그대로 남습니다.
-       *   preview(대기 화면 뒤에서 구경만 하는 상태)는 제외합니다 —
-       *   페이지를 열어만 둬도 남의 회차가 끊기면 안 됩니다.        */
-      if (room.solo && room.phase === 'playing' && !wantSpectate && !preview) {
-        const runner = [...room.players.values()].find((p) => p.alive);
-        io.to(room.id).emit('toast', {
-          kind: 'cheer',
-          text: name + ' 님이 도착했습니다 — 연습을 마치고 정식 심사를 준비합니다'
-        });
-        endRound(room, null, 'yield');
-        void runner;
-      }
     }
 
     socket.emit('init', {

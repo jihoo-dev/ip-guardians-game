@@ -416,70 +416,6 @@ h1 em{font-style:normal;color:var(--l3)}
 #joinRules{margin-top:12px}
 #joinRules[hidden]{display:none}
 
-/* ══════════════════════════════════════════════════════════════════
- * 심사 규격 — 표와 그림으로
- * ────────────────────────────────────────────────────────────────
- * ★ 종전에는 규격 전체가 한 문단이었습니다(parts.join(' ')). 층·타일·
- *   층 특성·승패가 성격이 전혀 다른데 한 덩어리로 흘러서, 참가 직전에
- *   읽으라고 내놓기에는 찾을 수가 없었습니다. 내용은 그대로 두고
- *   "무엇에 대한 규칙인가" 로 끊어 표로 세웁니다.
- * ★ 카드 폭이 min(500px,92vw) 라 3열이 한계입니다 — 층 칩 / 이름 /
- *   효과. 주의사항은 넷째 열이 아니라 효과 아래 줄로 답니다.  */
-.rgSec{margin-top:14px}
-.rgHead{display:flex;align-items:center;gap:8px;margin-bottom:7px;
-  font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;
-  color:rgba(236,231,216,.44)}
-.rgHead::after{content:"";flex:1;height:1px;background:rgba(236,231,216,.12)}
-
-/* 바닥 3단계. 글로 "2번 밟거나 2.5초" 라고 적는 것보다, 같은 타일이
-   단계를 거쳐 사라지는 그림이 한 번에 읽힙니다.                     */
-.rgFlow{display:flex;align-items:stretch;gap:6px}
-.rgStep{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;
-  gap:5px;padding:9px 4px;border:1px solid rgba(236,231,216,.10);
-  background:rgba(236,231,216,.02);text-align:center}
-.rgHex{width:34px;height:30px;display:block}
-.rgHex polygon{fill:rgba(236,231,216,.16);stroke:rgba(236,231,216,.5);stroke-width:1.2}
-.rgStep.s2 .rgHex polygon{fill:rgba(236,231,216,.09);stroke:rgba(236,231,216,.34)}
-.rgHex path{stroke:var(--stamp);stroke-width:1.3;fill:none}
-.rgStep.s3 .rgHex{opacity:.34;transform:rotate(14deg)}
-.rgStep.s3 .rgHex polygon{fill:none;stroke-dasharray:3 3}
-.rgStep b{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--paper)}
-.rgStep span{font-size:10px;line-height:1.55;color:rgba(236,231,216,.5)}
-.rgStep.s3 b{color:var(--stamp)}
-/* 화살표는 글자가 아니라 도형입니다 — 글꼴 서브셋에 없는 글자를 쓰면
-   그 한 칸만 시스템 글꼴로 튀어 크기·색이 어긋납니다.             */
-.rgArrow{flex:0 0 auto;align-self:center;width:0;height:0;
-  border-top:4px solid transparent;border-bottom:4px solid transparent;
-  border-left:6px solid rgba(236,231,216,.3)}
-
-/* 표. 층 색을 그대로 쓰는 세로 막대가 "몇 층 이야기인가" 를 답합니다. */
-.rgTable{display:flex;flex-direction:column;gap:3px}
-.rgRow{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;
-  border:1px solid rgba(236,231,216,.09);background:rgba(236,231,216,.02)}
-.rgChip{flex:0 0 auto;display:flex;align-items:center;gap:5px;min-width:30px}
-.rgChip i{width:3px;align-self:stretch;min-height:14px;background:currentColor;opacity:.8}
-.rgChip b{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:currentColor}
-.rgName{flex:0 0 62px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;
-  color:var(--paper);line-height:1.5}
-.rgDesc{flex:1;min-width:0;font-size:10.5px;line-height:1.6;color:rgba(236,231,216,.62)}
-.rgDesc b{color:var(--paper);font-weight:600}
-.rgWarn{display:block;margin-top:2px;font-size:9.5px;color:rgba(255,95,109,.82)}
-
-/* 승패는 표가 아니라 한 줄짜리 결론 셋입니다. */
-.rgEnd{display:flex;flex-direction:column;gap:4px}
-.rgEnd div{display:flex;gap:7px;font-size:10.5px;line-height:1.6;
-  color:rgba(236,231,216,.62)}
-.rgEnd em{flex:0 0 auto;font-style:normal;font-family:var(--mono);font-size:9px;
-  letter-spacing:.1em;padding:1px 5px;border:1px solid currentColor;
-  align-self:flex-start;margin-top:1px}
-.rgEnd .win{color:var(--l3)} .rgEnd .lose{color:#ff5f6d}
-.rgEnd .neutral{color:rgba(236,231,216,.4)}
-
-@media (max-width:420px){
-  .rgName{flex-basis:54px;font-size:9.5px}
-  .rgStep span{font-size:9px}
-}
-
 /* ── 대기 화면: 층 스택 + 시놉시스 2단 ────────────────────────────────
  * 좁은 화면에서는 세로로 떨어집니다. 카드가 min(500px,92vw) 라 모바일에서
  * 2단을 유지하면 두 칸 다 못 읽는 폭이 됩니다.                        */
@@ -1036,12 +972,12 @@ body.touch-run #touch{display:block}
     </div>
     <button class="rulesToggle" id="btnRules" type="button" aria-expanded="false"
             aria-controls="joinRules">심사 규격 보기 +</button>
-    <div id="joinRules" hidden><p class="sub">심사 규격을 불러오는 중…</p></div>
+    <p class="sub" id="joinRules" hidden>심사 규격을 불러오는 중…</p>
     <div class="field">
       <label for="nameInput">출원인 이름</label>
       <!-- 이름 + 캐릭터 미리보기. 이름을 적으면 명찰에 그대로 붙습니다. -->
       <div class="namePrev">
-        <input type="text" id="nameInput" maxlength="14" placeholder="예: 김출원" autocomplete="off" />
+        <input type="text" id="nameInput" maxlength="14" placeholder="예: 김심사" autocomplete="off" />
         <div class="avBox" id="avBox">
           <canvas id="avCanvas"></canvas>
           <div class="avSeat" id="avSeat">—</div>
@@ -1066,9 +1002,8 @@ body.touch-run #touch{display:block}
     </div>
     <button class="cta" id="btnJoin">심사 대기열 입장</button>
     <div class="keys">
-      <!-- 터치 기기에서는 Touch.init 이 .kbd 를 지우고 터치용으로 갈아끼웁니다. -->
-      <span class="kbd"><b>WASD</b> 이동</span><span class="kbd"><b>SPACE</b> 점프</span><span class="kbd"><b>SHIFT</b> 질주</span>
-      <span class="kbd"><b>드래그</b> 시점</span><span class="kbd"><b>휠</b> 줌</span>
+      <span><b>WASD</b> 이동</span><span><b>SPACE</b> 점프</span><span><b>SHIFT</b> 질주</span>
+      <span><b>드래그</b> 시점</span><span><b>휠</b> 줌</span>
       <!-- 상단 HUD 의 소리 버튼은 참가 화면에 가려 누를 수 없습니다.
            대기 화면에서도 끌 수 있어야 하므로 여기에 하나 둡니다. -->
       <button class="sndBtn" id="btnJoinSnd" type="button" aria-pressed="false">
@@ -3436,9 +3371,7 @@ function buildMap(map, cfg) {
       /* 밟기 누적. 종전 '3회 규칙' 구조를 강화 타일이 그대로 물려받았습니다.
        *   hits        : 서버가 확정한 히트 수 (낙관적으로 올리지 않습니다)
        *   maxHits     : 이 타일이 버티는 횟수 (강화 2, 나머지 1)
-       *   autoMs      : 첫 밟기 뒤 자동 파괴까지. 2026-09-16 규칙 변경으로
-       *                 바닥은 0 이 됐습니다(다시 밟기 전까지 안 무너짐).
-       *                 값을 쓰는 타일이 다시 생길 수 있어 필드는 남깁니다.
+       *   autoMs      : 첫 밟기 뒤 자동 파괴까지 (강화 3000, 나머지 0)
        *   wear        : hits/maxHits 를 0~1 로 정규화한 마모도
        *   myLastHitAt : 내가 마지막으로 이 타일을 때린 시각 (연타 방지)  */
       hits: 0, maxHits: t.maxHits || 1, autoMs: t.autoMs || 0,
@@ -5647,25 +5580,6 @@ const Touch = {
      * 화면 어디에도 없습니다.                                     */
     const hk = $('hintKeys');
     if (hk) hk.textContent = '왼쪽을 밀어 이동 · 많이 밀수록 빠르게 · 오른쪽 드래그로 시점 · 두 손가락으로 줌';
-
-    /* 참가 화면 아래 줄도 같이 바꿉니다. 여기만 두면 폰 사용자는 참가를
-     * 누르기 전에 이미 '키보드가 필요한 게임'으로 읽습니다.          */
-    const keyRow = document.querySelector('.keys');
-    if (keyRow) {
-      const old = keyRow.querySelectorAll('.kbd');
-      if (old.length) {
-        const anchor = old[0];
-        for (const [k, v] of [['왼쪽', '이동'], ['기울기', '속도'], ['오른쪽', '시점'],
-                              ['두 손가락', '줌'], ['버튼', '점프']]) {
-          const sp = document.createElement('span');
-          const b = document.createElement('b');
-          b.textContent = k;
-          sp.append(b, document.createTextNode(' ' + v));
-          keyRow.insertBefore(sp, anchor);
-        }
-        old.forEach((e) => e.remove());
-      }
-    }
   },
 
   apply(x, y) {
@@ -6368,9 +6282,7 @@ const TILE_HIT_COOLDOWN_MS = 400;
  * 세면 안 되게 됐습니다. 쿨다운만으로는 가만히 서 있어도 0.4초 뒤
  * 두 번째 히트가 들어가 강화 타일이 일반 타일보다 빨리 꺼집니다.
  * 그래서 '발이 떨어졌다가 다시 닿았을 때'만 한 번 셉니다.
- * 계속 서 있는 경우는 서버의 머무름 시계(STAND_ROT_MS)가 처리합니다 —
- * 2026-09-16 규칙 변경으로 첫 밟기 자동 파괴(autoMs)가 없어졌고, 대신
- * '그 위에 머무르면 무너진다' 가 그 역할을 이어받았습니다.            */
+ * 계속 서 있는 경우는 서버의 autoMs(3초 자동 파괴)가 처리합니다.       */
 let contactTile = null;
 
 /**
@@ -9067,208 +8979,85 @@ function buildRulesText() {
   const MIX = cfg.TILE_MIX || {};
   const used = (k) => !!K[k] && (MIX[k] === undefined || MIX[k] > 0);
   const baseKind = cfg.BASE_TILE_KIND || 'normal';
-  /* 마지막 밟기부터 붕괴까지. 2026-09-16 규칙 변경으로 이 값이 0 에서
-   * 2.5초가 됐습니다 — 두 번째로 밟는 순간 발밑이 사라지면 피할
-   * 방법이 없기 때문입니다.                                        */
-  const baseSpan = (K[baseKind] && K[baseKind].fuseMax > 0) ? span(baseKind) : '';
 
-  /* ── 심사 규격 만들기 ──────────────────────────────────────────────
-   *
-   * ★ 왜 문단을 표로 바꿨나
-   *   종전에는 아래 내용 전부가 parts.join(' ') 로 한 문단이었습니다.
-   *   층 구성 · 바닥 규칙 · 특수 타일 · 층 특성 · 승패는 성격이 전혀
-   *   다른데 한 덩어리로 흘러서, 참가 직전 10초 동안 읽으라고 내놓기에는
-   *   찾을 수가 없었습니다. 내용은 그대로 두고 "무엇에 대한 규칙인가"
-   *   로 끊습니다.
-   *
-   * ★ 층 색을 표에 그대로 씁니다. 화면에서 타일을 볼 때 층을 구분하는
-   *   단서가 색이므로, 규격에서도 같은 색을 써야 "그 색 층 이야기"가
-   *   바로 연결됩니다. 이름으로만 적으면 규격과 화면이 따로 놉니다.
-   *
-   * ★ 모든 값은 여전히 config 파생입니다 — 하드코딩한 숫자가 없어야
-   *   server.js 를 고쳤을 때 규격만 거짓말하는 일이 없습니다.     */
-  el.innerHTML = '';
-  const mk = (tag, cls, text) => {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
-    return e;
-  };
-  /* 절 제목 + 내용 상자를 한 벌로. */
-  const section = (title) => {
-    const box = mk('div', 'rgSec');
-    box.appendChild(mk('div', 'rgHead', title));
-    el.appendChild(box);
-    return box;
-  };
-  /* 표 한 줄. 층을 모르는 규칙(층 특성 등)은 layer 를 null 로 넘깁니다. */
-  const row = (host, layer, name, desc, warn) => {
-    const r = mk('div', 'rgRow');
-    const chip = mk('div', 'rgChip');
-    chip.style.color = (layer && layer.color) || 'rgba(236,231,216,.35)';
-    chip.appendChild(mk('i'));
-    chip.appendChild(mk('b', null, layer ? 'L' + layer.index : '—'));
-    const d = mk('div', 'rgDesc');
-    d.appendChild(document.createTextNode(desc));
-    if (warn) d.appendChild(mk('span', 'rgWarn', warn));
-    r.append(chip, mk('div', 'rgName', name), d);
-    host.appendChild(r);
-    return r;
-  };
-
-  /* ── 1. 바닥: 같은 타일이 사라지는 3단계 ── */
-  const floorSec = section('바닥 — 밟을수록 사라집니다');
-  const flow = mk('div', 'rgFlow');
-  const HEX = '2,15 9.5,2 24.5,2 32,15 24.5,28 9.5,28';
-  const step = (cls, label, sub, crack) => {
-    const st = mk('div', 'rgStep ' + cls);
-    st.innerHTML = '<svg class="rgHex" viewBox="0 0 34 30" aria-hidden="true">' +
-      '<polygon points="' + HEX + '"/>' +
-      (crack ? '<path d="M13 3 L17 13 L12 18 L19 27"/>' : '') + '</svg>';
-    st.appendChild(mk('b', null, label));
-    st.appendChild(mk('span', null, sub));
-    flow.appendChild(st);
-    return st;
-  };
-  const kBase = K[baseKind] || K.reinforced || {};
-  step('s1', '온전', '아직 아무도 밟지 않음');
-  flow.appendChild(mk('i', 'rgArrow'));
-  /* 금 간 상태는 이제 '무기한'입니다 — 다시 밟기 전까지 버팁니다.
-   * 이 점이 규칙 변경의 핵심이라 단계 설명에 그대로 적습니다.      */
-  step('s2', '금', '1번 밟음 · 다시 밟기 전까지 버팀', true);
-  flow.appendChild(mk('i', 'rgArrow'));
-  step('s3', '붕괴',
-    (kBase.hits ? kBase.hits + '번째로 밟히면' : '다시 밟히면') +
-    (baseSpan ? ' ' + baseSpan + ' 뒤' : ''));
-  floorSec.appendChild(flow);
-  const floorNote = mk('div', 'rgDesc');
-  floorNote.style.marginTop = '7px';
-  floorNote.textContent = '금은 누가 밟았는지를 가리지 않습니다 — 남이 지나간 자리는 이미 한 번 깎여 있습니다.';
-  /* ★ 이 한 줄이 없으면 '왜 가만히 있는데 발밑이 꺼지지' 가 됩니다.
-   *   바닥이 두 번 밟아야 무너지게 되면서, 멈춰 서 있는 것을 막는
-   *   규칙이 별도로 생겼습니다(서버 STAND_ROT_MS).                 */
-  if (cfg.STAND_ROT_MS) {
-    floorNote.appendChild(mk('span', 'rgWarn',
-      '한자리에 ' + sec(cfg.STAND_ROT_MS) + ' 머무르면 그 자리가 무너집니다 — 멈출 수 없습니다'));
+  const parts = [];
+  if (used('normal')) parts.push('일반 타일은 한 번 밟으면 ' + span('normal') + ' 뒤에 무너집니다.');
+  if (used('fragile')) parts.push('취약 타일은 ' + span('fragile') + ' 만에 꺼집니다.');
+  if (used('reinforced')) {
+    /* 강화 타일이 바닥 전체가 되면 '강화'라는 이름으로 부르면 안 됩니다 —
+     * 특별한 타일이 따로 있는 것처럼 들립니다. 기본 타일일 때는 '바닥'. */
+    parts.push((baseKind === 'reinforced' ? '바닥은' : '강화 타일은') +
+      ' 한 번 밟으면 금이 갑니다. 누구든 ' + K.reinforced.hits + '번 밟거나, 처음 밟힌 뒤 ' +
+      sec(K.reinforced.autoMs) + '가 지나면 무너집니다.');
   }
-  floorSec.appendChild(floorNote);
-
-  /* 지금 쓰이지 않는 타일 종류는 적지 않습니다(TILE_MIX 로 거릅니다). */
-  if (used('normal') || used('fragile')) {
-    const other = section('그 밖의 바닥');
-    const ot = mk('div', 'rgTable');
-    if (used('normal')) row(ot, null, '일반', '한 번 밟으면 ' + span('normal') + ' 뒤에 무너집니다.');
-    if (used('fragile')) row(ot, null, '취약', span('fragile') + ' 만에 꺼집니다.');
-    other.appendChild(ot);
-  }
-
-  /* ── 2. 특수 타일 ── */
-  const spSec = section('특수 타일 — 층마다 하나씩');
-  const spTable = mk('div', 'rgTable');
-  let spCount = 0;
-
   const accelLayer = layers.find((L) => L.special === 'accel');
   if (accelLayer && cfg.DASH) {
-    row(spTable, accelLayer, '신속심사',
-      '밟으면 진행 방향으로 ' + cfg.DASH.tiles + '칸 튀어나갑니다.',
-      '앞이 비어 있으면 그대로 떨어집니다');
-    spCount++;
+    parts.push(accelLayer.name + ' 층의 특수 타일은 신속심사 타일입니다 — ' +
+      '밟으면 진행 방향으로 ' + cfg.DASH.tiles + '칸 튀어나갑니다. ' +
+      '앞이 비어 있으면 그대로 떨어집니다.');
   }
-  const rejectLayer = layers.find((L) => L.special === 'reject');
-  if (rejectLayer && cfg.REJECT_TILE) {
-    const R = cfg.REJECT_TILE;
-    row(spTable, rejectLayer, '거절이유',
-      '평소엔 일반 타일처럼 보이다가, 밟으면 ' + sec(R.delayMin) + '~' + sec(R.delayMax) +
-      ' 뒤에 자기 자신과 이웃 타일까지 함께 터집니다.',
-      '밟기 전에는 구별할 수 없습니다');
-    spCount++;
-  }
-  /* 보정 타일은 OFFICE_SPECIAL_MIX 에서 빠지면 맵에 아예 안 깔립니다.
-   * 층만 보고 적으면 없는 타일을 설명하게 됩니다.                  */
-  if (rejectLayer && cfg.OFFICE_SPECIAL_MIX && cfg.OFFICE_SPECIAL_MIX.amend > 0) {
-    row(spTable, rejectLayer, '보정', '밟으면 주변에서 무너진 타일 하나가 되살아납니다.');
-    spCount++;
-  }
-  const darkLayer = layers.find((L) => L.trait === 'dark');
-  if (darkLayer && cfg.SEARCH_TILE) {
-    const S = cfg.SEARCH_TILE;
-    row(spTable, darkLayer, '선행기술 검색',
-      '밟으면 ' + sec(S.durationMs) + ' 동안 시야가 ' + S.viewTiles + '칸까지 넓어집니다.');
-    spCount++;
-  }
-  const phaseLayer = layers.find((L) => L.special === 'phase');
-  if (phaseLayer && cfg.PHASE_TILE) {
-    row(spTable, phaseLayer, '위상',
-      sec(cfg.PHASE_TILE.onMs) + ' 실체 → ' + sec(cfg.PHASE_TILE.offMs) +
-      ' 비활성을 반복합니다. 밟아도 무너지지 않습니다.',
-      '비활성일 때 위에 있으면 떨어집니다');
-    spCount++;
-  }
-  const jumpLayer = layers.find((L) => L.special === 'jump');
-  if (jumpLayer && cfg.JUMP_TILE) {
-    row(spTable, jumpLayer, '점프',
-      cfg.JUMP_TILE.levels.join('층 · ') + '층 위로 쏘아 올립니다.',
-      '위에 발판이 없으면 그대로 떨어집니다');
-    spCount++;
-  }
-  if (spCount) spSec.appendChild(spTable);
-  else spSec.remove();
-
-  /* ── 3. 층 특성 — 특수 타일과 다른 축입니다(층 전체에 걸립니다) ── */
-  const trSec = section('층 특성 — 그 층 전체에 걸립니다');
-  const trTable = mk('div', 'rgTable');
-  let trCount = 0;
-
-  const rotLayer = layers.find((L) => L.trait === 'rotate');
-  if (rotLayer && cfg.ROTATE_EVENT) {
-    const R = cfg.ROTATE_EVENT;
-    row(trTable, rotLayer, '회전',
-      '층이 중심축을 기준으로 천천히 돕니다. 위에 서 있으면 함께 실려 돌고, ' +
-      sec(R.effectiveIntervalMs || R.intervalMs) + '마다 방향이 반대로 바뀝니다.');
-    trCount++;
-  }
-  /* 간격은 dev 에서 줄어든 실제 값(effectiveIntervalMs)을 씁니다. */
+  /* 층 특성(trait)은 특수 타일과 다른 축이라 따로 안내합니다.
+   * 간격은 dev 에서 줄어든 실제 값(effectiveIntervalMs)을 씁니다.    */
   const accelTraitLayer = layers.find((L) => L.trait === 'accel');
   if (accelTraitLayer && cfg.ACCEL_EVENT) {
     const A = cfg.ACCEL_EVENT;
-    row(trTable, accelTraitLayer, '심사 가속',
+    parts.push(accelTraitLayer.name + ' 층에는 심사 가속이 걸립니다 — ' +
       sec(A.effectiveIntervalMs || A.intervalMs) + '마다 ' + sec(A.durationMs) +
-      ' 동안 그 층 타일의 붕괴가 ' + A.speed + '배로 빨라집니다. 발동되면 화면이 붉게 깜빡입니다.');
-    trCount++;
+      ' 동안 그 층 타일의 붕괴가 ' + A.speed + '배로 빨라집니다. ' +
+      '발동되면 화면이 붉게 깜빡입니다.');
   }
+  const darkLayer = layers.find((L) => L.trait === 'dark');
   if (darkLayer && cfg.DARK_EVENT) {
     const D = cfg.DARK_EVENT;
-    row(trTable, darkLayer, '어둠',
+    parts.push(darkLayer.name + ' 층에는 어둠이 내립니다 — ' +
       sec(D.effectiveIntervalMs || D.intervalMs) + '마다 ' + sec(D.durationMs) +
-      ' 동안 내 주변 ' + D.clearTiles + '~' + D.viewTiles + '칸 밖이 보이지 않습니다.',
-      '타일은 평소처럼 무너집니다 — 보이지 않을 뿐입니다');
-    trCount++;
+      ' 동안 내 주변 ' + D.clearTiles + '~' + D.viewTiles +
+      '칸 밖이 보이지 않습니다. 타일은 평소처럼 무너지므로 보이지 않을 뿐입니다.');
   }
-  if (trCount) trSec.appendChild(trTable);
-  else trSec.remove();
-
-  /* ── 4. 승패 ── */
-  const endSec = section('끝나는 방식');
-  const end = mk('div', 'rgEnd');
-  const endRow = (kind, tag, text) => {
-    const d = mk('div');
-    const e = mk('em', kind, tag);
-    d.append(e, mk('span', null, text));
-    end.appendChild(d);
-  };
-  endRow('neutral', '시작', '정원이 차면 대기 발판이 사라지며 시작됩니다.');
+  if (darkLayer && cfg.SEARCH_TILE) {
+    const S = cfg.SEARCH_TILE;
+    parts.push('같은 층의 선행기술 검색 타일을 밟으면 ' + sec(S.durationMs) +
+      ' 동안 시야가 ' + S.viewTiles + '칸까지 넓어집니다.');
+  }
+  const rotLayer = layers.find((L) => L.trait === 'rotate');
+  if (rotLayer && cfg.ROTATE_EVENT) {
+    const R = cfg.ROTATE_EVENT;
+    parts.push(rotLayer.name + ' 층은 중심축을 기준으로 천천히 회전합니다 — ' +
+      '위에 서 있으면 함께 실려 돌고, ' + sec(R.effectiveIntervalMs || R.intervalMs) +
+      '마다 회전 방향이 반대로 바뀝니다.');
+  }
+  const rejectLayer = layers.find((L) => L.special === 'reject');
+  /* 보정 타일은 OFFICE_SPECIAL_MIX 에서 빠지면 맵에 아예 안 깔립니다.
+   * 층만 보고 설명하면 없는 타일을 안내하게 됩니다.                */
+  if (rejectLayer && cfg.OFFICE_SPECIAL_MIX && cfg.OFFICE_SPECIAL_MIX.amend > 0) {
+    parts.push('같은 층의 보정 타일을 밟으면 주변에서 무너진 타일 하나가 되살아납니다.');
+  }
+  if (rejectLayer && cfg.REJECT_TILE) {
+    const R = cfg.REJECT_TILE;
+    parts.push(rejectLayer.name + ' 층에는 거절이유 타일이 숨어 있습니다 — ' +
+      '평소엔 일반 타일처럼 보이다가 밟으면 ' + sec(R.delayMin) + '~' + sec(R.delayMax) +
+      ' 뒤에 자기 자신과 이웃 타일까지 함께 터집니다.');
+  }
+  const jumpLayer = layers.find((L) => L.special === 'jump');
+  if (jumpLayer && cfg.JUMP_TILE) {
+    parts.push(jumpLayer.name + ' 층의 특수 타일은 점프 타일입니다 — ' +
+      cfg.JUMP_TILE.levels.join('층 · ') + '층 위로 쏘아 올립니다. ' +
+      '위에 발판이 없으면 그대로 떨어집니다.');
+  }
+  const phaseLayer = layers.find((L) => L.special === 'phase');
+  if (phaseLayer && cfg.PHASE_TILE) {
+    parts.push(phaseLayer.name + ' 층의 특수 타일은 위상 타일입니다 — ' +
+      sec(cfg.PHASE_TILE.onMs) + ' 실체 → ' + sec(cfg.PHASE_TILE.offMs) +
+      ' 비활성을 반복하고, 밟아도 무너지지 않는 대신 비활성일 때 위에 있으면 떨어집니다.');
+  }
+  parts.push('그 밖의 특수 타일은 층마다 색이 다릅니다.');
+  parts.push('정원이 차면 대기 발판이 사라지며 시작됩니다.');
   if (layers.length) {
-    endRow('lose', '탈락', '맨 아래 ' + (layers[layers.length - 1].name || '') +
-      ' 층 밑으로 떨어지면 구름바다에 빠집니다.');
+    parts.push('맨 아래 ' + (layers[layers.length - 1].name || '') +
+      ' 층 밑으로 떨어지면 구름바다에 빠져 탈락합니다.');
   }
-  endRow('win', '등록결정', '마지막 한 명이 등록결정을 받습니다.');
-  /* 관전자 개입도 규격입니다 — 참가 방식에 '관전 + 개입'이 있는데,
-   * 그게 무엇을 할 수 있는 자리인지는 어디에도 적혀 있지 않았습니다. */
-  if (cfg.AMEND_LEVEL) {
-    endRow('neutral', '관전', '이번 회차에 뛰지 않는 관전자는 한 번, 주자 한 명을 ' +
-      cfg.AMEND_LEVEL + '층 위로 올려보낼 수 있습니다.');
-  }
-  endSec.appendChild(end);
+  parts.push('마지막 한 명이 등록결정을 받습니다.');
+  el.textContent = parts.join(' ');
 
   /* 화면 하단 한 줄 요약. 종전에는 "일반 타일 3회 · 함정 블록 1회" 였습니다.
    * 종류가 늘거나 수치가 바뀌면 여기도 자동으로 따라옵니다.            */
@@ -9291,9 +9080,6 @@ function buildRulesText() {
   }
   /* 각 항목이 '…붕괴'로 끝나므로 꼬리를 또 붙이면 겹칩니다
    * (종전 문구는 항목이 '강화 2회' 처럼 끝나서 꼬리가 필요했습니다). */
-  /* 머무름 규칙은 타일 종류가 아니라 '나'에 걸리는 규칙이라 맨 뒤에
-   * 따로 답니다 — 종류 설명 사이에 끼면 그 타일만의 성질로 읽힙니다. */
-  if (cfg.STAND_ROT_MS) bits.push('한자리에 ' + sec(cfg.STAND_ROT_MS) + ' 머무르면 발밑이 무너짐');
   hint.textContent = bits.join(' · ');
 }
 
@@ -9760,16 +9546,12 @@ function updateCountdown() {
     if (sec !== lastCountdownSec && sec > 0 && sec <= 5) Sound.sfx('tick');
     lastCountdownSec = sec;
     dom.cdNum.textContent = sec;
-    dom.cdLabel.textContent = G.solo ? '단독 심사 착수까지' : '심사 착수까지';
+    dom.cdLabel.textContent = '심사 착수까지';
     if (!cdVisible) { dom.countdown.classList.add('show'); cdVisible = true; }
   } else if (G.phase === 'waiting' && G.phaseEndsAt) {
     const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
     dom.cdNum.textContent = Math.ceil(left / 1000);
-    /* ★ 아무 말 없이 혼자 시작되면 "왜 나 혼자지" 가 됩니다.
-     *   기다리는 동안 미리 알려 두면 같은 일이 '고장'이 아니라
-     *   '예정된 전환'으로 읽힙니다.                                */
-    dom.cdLabel.textContent = '출원인 모집 중 · ' + (G.roster || 0) + '/' + G.seats +
-      (G.solo ? ' · 아무도 오지 않으면 연습 모드' : '');
+    dom.cdLabel.textContent = '출원인 모집 중 · ' + (G.roster || 0) + '/' + G.seats;
     if (!cdVisible) { dom.countdown.classList.add('show'); cdVisible = true; }
   } else if (cdVisible) {
     dom.countdown.classList.remove('show');
@@ -9784,54 +9566,13 @@ function updateCountdown() {
  * ★ 그리고 서버가 보내주는 durationMs 를 한 번도 쓰지 않았습니다.
  *   한 판이 30초~2분인 게임에서 '다시 해 볼까'를 만드는 건 내가
  *   얼마나 버텼고 어디까지 내려갔는지입니다.                        */
-/* 연습 모드 개인 최고 기록.
- *
- * 기준은 '더 깊이, 같은 깊이면 더 오래'입니다. 이 게임에서 아래로
- * 내려가는 것이 곧 권리가 깎이는 것이므로 깊이가 먼저입니다 —
- * 버틴 시간만 보면 맨 위층에서 얌전히 도는 쪽이 최고 기록이 됩니다.
- *
- * localStorage 는 없을 수도, 던질 수도 있습니다(사생활 보호 창·정책).
- * 기록은 부가 기능이므로 실패하면 조용히 비웁니다.                 */
-function updateSoloBest(me, layerName) {
-  const KEY = 'ipg.soloBest';
-  let prev = null;
-  try { prev = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
-  const mmss = (ms) => { const t = Math.max(0, Math.round(ms / 1000));
-    return Math.floor(t / 60) + '분 ' + String(t % 60).padStart(2, '0') + '초'; };
-
-  const now = { deepest: me.deepest, survivedMs: me.survivedMs };
-  const better = !prev || now.deepest < prev.deepest ||
-    (now.deepest === prev.deepest && now.survivedMs > prev.survivedMs);
-  if (better) { try { localStorage.setItem(KEY, JSON.stringify(now)); } catch (e) {} }
-
-  if (!prev) return '<span>첫 기록 <b>저장했습니다</b></span>';
-  if (better) {
-    return '<span>이전 최고 <b>' + escapeHtml(layerName(prev.deepest)) + ' · ' +
-           mmss(prev.survivedMs) + '</b> — 경신</span>';
-  }
-  return '<span>최고 기록 <b>' + escapeHtml(layerName(prev.deepest)) + ' · ' +
-         mmss(prev.survivedMs) + '</b></span>';
-}
-
 function showResult(data) {
   const me = (data.standings || []).find((s) => s.id === G.selfId);
   const survived = data.reason === 'survived';
-  const solo = !!data.solo;
-  const yielded = data.reason === 'yield';
   const won = data.winnerId === G.selfId || (survived && me && me.alive);
 
-  /* ★ 연습 모드에서는 '전원 탈락'이라고 말하면 안 됩니다 — 그 '전원'이
-   *   나 하나입니다. 실패가 아니라 기록이 남는 판이므로 말도 그렇게.
-   * ★ yield 는 승패가 아닙니다(사람이 와서 양보한 회차).            */
-  dom.resultEyebrow.textContent =
-    yielded ? '연습 종료 · PRACTICE'
-    : won ? '최종 처분 · REGISTERED'
-    : solo ? '연습 종료 · PRACTICE'
-    : '최종 처분 · REJECTED';
-  dom.resultTitle.innerHTML =
-    yielded ? '연습 종료'
-    : won ? '등록결정'
-    : solo ? '단독 심사 종료'
+  dom.resultEyebrow.textContent = won ? '최종 처분 · REGISTERED' : '최종 처분 · REJECTED';
+  dom.resultTitle.innerHTML = won ? '등록결정'
     : (data.winnerName ? '거절결정' : (survived ? '심사 기간 만료' : '전원 탈락'));
 
   const mmss = (ms) => { const t = Math.max(0, Math.round(ms / 1000));
@@ -9839,22 +9580,10 @@ function showResult(data) {
   const layerName = (idx) => { const Ls = (G.cfg && G.cfg.LAYERS) || [];
     const f = Ls.find((L) => L.index === idx); return f ? f.name : idx + '층'; };
 
-  const layerCount = ((G.cfg && G.cfg.LAYERS) || []).length;
-  if (yielded) {
-    dom.resultSub.textContent = '새 출원인이 도착해 연습을 마쳤습니다. 다음은 정식 심사입니다.';
-  } else if (won && solo) {
-    dom.resultSub.textContent = '혼자서 심사 기간을 끝까지 버텼습니다. 등록결정서가 발부되었습니다.';
-  } else if (won && survived) {
+  if (won && survived) {
     dom.resultSub.textContent = '심사 기간이 끝날 때까지 바닥을 지켜냈습니다. 패스트트랙 심사를 통과했습니다.';
   } else if (won) {
     dom.resultSub.textContent = '마지막까지 바닥을 지켜냈습니다. 패스트트랙 심사를 통과했습니다.';
-  } else if (solo && me) {
-    /* 몇 층까지 갔는가를 먼저 말합니다 — 연습에서 남는 것은 등수가
-     * 아니라 도달 지점입니다.                                      */
-    const gone = layerCount ? (layerCount - me.deepest + 1) : 0;
-    dom.resultSub.textContent = layerCount
-      ? (layerCount + '개 층 중 ' + gone + '개 층을 내려갔습니다. 다시 해 보세요.')
-      : '다시 해 보세요.';
   } else if (data.winnerName) {
     dom.resultSub.textContent = escapeHtml(data.winnerName) + ' 님이 등록결정을 받았습니다.';
   } else if (survived) {
@@ -9866,17 +9595,10 @@ function showResult(data) {
   /* 내 기록 한 줄. 살아남았으면 라운드 전체 시간이 곧 내 기록입니다. */
   if (dom.resultMine) {
     if (me) {
-      /* ★ 연습 모드에는 등수가 없습니다. 다시 할 이유를 만들려면
-       *   비교할 대상이 있어야 하고, 그 대상은 지난번의 나입니다.
-       *   서버에 남기지 않는 이유: 이 게임에 계정이 없고, 행사장에서
-       *   같은 PC 를 여러 사람이 씁니다 — 브라우저에만 둡니다.      */
-      let best = '';
-      if (solo && !yielded) best = updateSoloBest(me, layerName);
       dom.resultMine.innerHTML =
         '<span>버틴 시간 <b>' + mmss(me.survivedMs) + '</b></span>' +
         '<span>내려간 곳 <b>' + escapeHtml(layerName(me.deepest)) + '</b></span>' +
-        (solo ? best
-              : (data.durationMs ? '<span>이번 회차 <b>' + mmss(data.durationMs) + '</b></span>' : ''));
+        (data.durationMs ? '<span>이번 회차 <b>' + mmss(data.durationMs) + '</b></span>' : '');
       dom.resultMine.style.display = '';
     } else {
       dom.resultMine.style.display = 'none';      // 관전자
@@ -10540,9 +10262,6 @@ function applyMeta(meta) {
   if (meta.theme !== undefined) applyTheme(meta.theme);
   if (meta.seats) G.seats = meta.seats;
   G.roster = meta.total;
-  /* 대기 중에는 '지금 혼자인가', 회차가 시작된 뒤에는 '이 회차가
-   * 연습이었나'. 결과 화면 문구가 이 값을 봅니다.                 */
-  G.solo = !!meta.solo;
   dom.vAlive.textContent = meta.alive + '/' + meta.total;
   dom.vSpec.textContent = meta.spectators;
   dom.vRoom.textContent = meta.roomId || G.roomId;
@@ -11287,10 +11006,7 @@ document.querySelectorAll('.mode').forEach((b) => {
   });
 });
 
-/* ★ 심사를 '받는' 쪽이 플레이어입니다. 발밑을 무너뜨리는 것이 심사관이고
- *   그 위에서 버티는 것이 출원인이라, 기본 이름이 심사관이면 역할이
- *   거꾸로 읽힙니다. 명단·입력칸 라벨은 이미 '출원인'이었습니다.    */
-dom.nameInput.value = '출원인' + Math.floor(Math.random() * 900 + 100);
+dom.nameInput.value = '심사관' + Math.floor(Math.random() * 900 + 100);
 
 /* assets/character.glb 가 있으면 절차적 캐릭터를 대체합니다 */
 loadCharacterModel();
