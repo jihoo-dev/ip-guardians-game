@@ -549,39 +549,8 @@ const ACCEL_SPEED = Math.max(1, +ACCEL_EVENT.speed || 1);
  *   사람마다 다른데 20Hz 스냅샷을 사람마다 다르게 만들면 대역폭도,
  *   코드 복잡도도 감당이 안 됩니다. 게다가 어둠은 판정에 영향을 주지
  *   않으므로 클라이언트가 계산해도 공정성 문제가 없습니다.
- *
- * ★ 난이도 조정 (2026-09-17) — 간격 25초 → 10초 · 지속 6초 → 8초.
- *
- *   ⚠ intervalMs 는 '직전 종료'부터 셉니다(endTraitEvent). 그래서
- *     한 바퀴 = durationMs + intervalMs 입니다 —
- *         종전   6 + 25 = 31초 주기 · 어두운 시간 19%
- *         1차    6 + 12 = 18초 주기 · 어두운 시간 33%
- *         지금   8 + 10 = 18초 주기 · 어두운 시간 44%
- *
- *   ★ 2차에서 '한 번 걸렸을 때 더 오래'를 올리면서 간격을 같이 줄여
- *     <b>한 바퀴 18초는 그대로 두었습니다</b>. 지속만 올리면 한 바퀴가
- *     20초로 늘어 발동 빈도가 도로 낮아집니다 — 1차에서 올린 것을
- *     일부 무르는 셈이라, 두 값을 함께 움직였습니다.
- *   되살려 놓고 보니 한 층을 지나는 동안 두어 번밖에 안 걸려서
- *   이 층의 성격('보이지 않는 것과 싸운다')이 잘 드러나지 않았습니다.
- *   같은 회차에 바닥이 두 번 밟기로 바뀌며 층이 훨씬 오래 버티게
- *   됐으므로, 그만큼 난이도를 돌려받는 자리이기도 합니다.
- *
- * ⚠ 더 줄이려면 EVENT_SCHEDULE.gapMs(8초)가 하한입니다.
- *   이벤트가 끝나면 그만큼 쉬므로, intervalMs 를 8초보다 짧게 적어도
- *   발동은 8초에 걸려 밀립니다 — 화면·문서에 적은 숫자만 거짓이 됩니다.
- *   즉 가장 빠른 설정은 간격 8초 · 한 바퀴 14초 · 어두운 시간 43%.
- *   checkDarkSchedule() 이 시작할 때 이를 확인합니다.
- *
- * ★ 환경변수로 당일 조정할 수 있습니다 — 코드를 고치지 않아도 됩니다.
- *       DARK_INTERVAL_MS=12000 DARK_DURATION_MS=4000 npm start
  * ------------------------------------------------------------------ */
-const DARK_EVENT = {
-  intervalMs: parseInt(process.env.DARK_INTERVAL_MS, 10) || 10000,
-  durationMs: parseInt(process.env.DARK_DURATION_MS, 10) || 8000,
-  viewTiles: 3,
-  clearTiles: 2
-};
+const DARK_EVENT = { intervalMs: 25000, durationMs: 6000, viewTiles: 3, clearTiles: 2 };
 
 /* ── 선행기술 검색 타일 (SEARCH_TILE) ─────────────────────────────────
  * LAYER_DEFS 에서 special:'search' 인 층의 특수 타일입니다.
@@ -664,20 +633,6 @@ const LAYER_TRAITS = { accel: ACCEL_EVENT, dark: DARK_EVENT, rotate: ROTATE_EVEN
  *   이벤트만 크게 알리는' 방식으로 따로 해결합니다.
  * ------------------------------------------------------------------ */
 const EVENT_SCHEDULE = { warmupMs: 25000, gapMs: 8000, retryMs: 1000 };
-
-/* 설정한 주기가 실제로 지켜지는 값인지 확인합니다.
- * 이벤트가 끝나면 gapMs 만큼 쉬므로, 간격을 그보다 짧게 적어도 발동이
- * 밀리기만 합니다. 조용히 밀리면 화면·기획서에 적은 주기가 거짓이 되므로
- * 시작할 때 한 번 알려 줍니다.                                        */
-function checkDarkSchedule() {
-  if (DARK_EVENT.intervalMs >= EVENT_SCHEDULE.gapMs) return;
-  const sec = (ms) => (ms / 1000).toFixed(1);
-  console.warn('[경고] 암전 간격 ' + sec(DARK_EVENT.intervalMs) +
-    '초는 이벤트 쉬는 간격 ' + sec(EVENT_SCHEDULE.gapMs) + '초보다 짧습니다 — ' +
-    '실제로는 ' + sec(EVENT_SCHEDULE.gapMs) + '초마다 걸립니다(한 바퀴 ' +
-    sec(DARK_EVENT.durationMs + EVENT_SCHEDULE.gapMs) + '초). ' +
-    'EVENT_SCHEDULE.gapMs 를 함께 줄이세요.');
-}
 
 /* ── 거절이유 타일 (REJECT_TILE) ──────────────────────────────────────
  * 의견제출통지 층 특수 타일의 75% 입니다.
@@ -3808,8 +3763,6 @@ setInterval(() => {
 /* ------------------------------------------------------------- lifecycle */
 
 server.listen(PORT, HOST, () => {
-  /* 설정한 암전 주기가 스케줄러에서 실제로 지켜지는지 (DARK_EVENT 주석) */
-  checkDarkSchedule();
   console.log('==============================================');
   console.log(' IP Guardians: Fast-Track Survival');
   console.log(' listening on http://' + HOST + ':' + PORT);
@@ -3887,11 +3840,7 @@ server.listen(PORT, HOST, () => {
   const traitLabel = { accel: '심사 가속', dark: '어둠      ', rotate: '회전      ' };
   const traitDetail = {
     accel: () => '퓨즈 ×1/' + ACCEL_SPEED,
-    dark: () => '시야 ' + DARK_EVENT.clearTiles + '~' + DARK_EVENT.viewTiles + '칸 · 시각 효과만' +
-      /* 간격은 '직전 종료'부터라 한 바퀴는 지속 + 간격입니다. */
-      ' · 한 바퀴 ' + ((DARK_EVENT.durationMs + DARK_EVENT.intervalMs) / 1000).toFixed(0) +
-      '초 · 어두운 시간 ' + Math.round(DARK_EVENT.durationMs /
-        (DARK_EVENT.durationMs + DARK_EVENT.intervalMs) * 100) + '%',
+    dark: () => '시야 ' + DARK_EVENT.clearTiles + '~' + DARK_EVENT.viewTiles + '칸 · 시각 효과만',
     rotate: () => ROTATE_SPEED.toFixed(3) + ' rad/s (' +
       (ROTATE_SPEED * 180 / Math.PI).toFixed(1) + '°/s · 한 바퀴 ' +
       (2 * Math.PI / ROTATE_SPEED).toFixed(0) + '초 · 가장자리 ' +

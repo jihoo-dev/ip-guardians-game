@@ -991,7 +991,7 @@ const PEDESTAL_SCALE = 2.1;
 /* 로비 목록에 '어느 맵인가' 를 보여 주려고 이름만 들고 있습니다.
  * 실제 배경은 클라이언트 THEMES 가 그립니다 — 순서가 같아야 합니다.
  * (CLAUDE.md 의 'THEME_COUNT 와 THEMES 길이를 맞추라' 와 같은 규칙) */
-const THEME_NAMES = ['캔디 스카이', '네온 아레나', '새벽 구름'];
+const THEME_NAMES = ['천공의 크리스탈 · 한낮', '천공의 크리스탈 · 여명', '천공의 크리스탈 · 오로라'];
 
 const THEME_COUNT = 3;          // 배경 맵 개수 (THEME_NAMES 와 클라이언트 THEMES 길이가 같아야 합니다)
 
@@ -1113,7 +1113,7 @@ const LAYER_DEFS = [
    * ★ 최상층은 기믹을 하나만 둡니다 (층 특성 없음).
    *   전원이 여기서 시작하므로 이 층이 사실상 학습 구간입니다.      */
   { key: 'fasttrack', name: '우선심사 패스트트랙', short: 'FAST-TRACK',
-    color: '#00ffcc', special: 'accel',  trait: 'none',
+    color: '#7fdcf0', special: 'accel',  trait: 'none',
     tip: '밝게 빛나는 타일을 밟으면 진행 방향으로 두 칸 튀어나갑니다',
     marks: [{ i: '⚡', t: '밝게 빛나는 타일 = 앞으로 두 칸 사출' }] },
   /* ★ 실체심사가 의견제출통지보다 반드시 위층입니다 (순서를 바꾸지 마세요).
@@ -1145,14 +1145,14 @@ const LAYER_DEFS = [
    *   장치 → 장치 → 장치 → 휴식 → 장치 → 장치 가 되어 쉬는 구간이
    *   3F 하나만 남습니다. 너무 빡빡하면 여기를 먼저 되돌리세요.   */
   { key: 'exam',      name: '실체심사/선행기술조사', short: 'EXAMINATION',
-    color: '#7c5cff', special: 'search', trait: 'dark',
+    color: '#5fb8e8', special: 'search', trait: 'dark',
     tip: '주기적으로 암전됩니다 — 밝게 빛나는 타일을 밟으면 잠시 멀리까지 보입니다',
     marks: [
       { i: '◐', t: '주기적 암전 · 주변 2~3칸 밖이 안 보임' },
       { i: '◎', t: '선행기술 검색 타일 = 2초 동안 시야 8칸' }
     ] },
   { key: 'office',    name: '의견제출통지',       short: 'OFFICE ACTION',
-    color: '#0088ff', special: 'reject', trait: 'rotate',
+    color: '#7a9ce8', special: 'reject', trait: 'rotate',
     tip: '층 전체가 천천히 돕니다 · 노랗게 변한 타일은 곧 주변까지 터집니다',
     marks: [
       { i: '⟳', t: '층 전체가 회전 · 15초마다 방향 반전' },
@@ -1195,15 +1195,15 @@ const LAYER_DEFS = [
    *   대기 발판 높이 = 최상층 y + PEDESTAL_RISE 이고 최상층 y 는 층 수에
    *   비례해 올라갑니다. 지금은 90 + 45 = 135 이고 MAX_Y 는 180 입니다.  */
   { key: 'amend',     name: '보정',               short: 'AMENDMENT',
-    color: '#8ee04a', special: 'none',   trait: 'none',
+    color: '#9a84e4', special: 'none',   trait: 'none',
     tip: '이 층도 장치가 없습니다 — 숨을 고르고 다음 층을 고르세요',
     marks: [{ i: '—', t: '장치 없는 층 · 숨 고르고 다음 층을 고르세요' }] },
   { key: 'claim',     name: '청구항',             short: 'CLAIM',
-    color: '#ff8a3d', special: 'phase',  trait: 'none',
+    color: '#b86fdc', special: 'phase',  trait: 'none',
     tip: '깜빡이는 타일은 꺼져 있는 동안 밟을 수 없습니다',
     marks: [{ i: '◇', t: '깜빡이는 타일 = 꺼진 동안 밟을 수 없음' }] },
   { key: 'idea',      name: '아이디어',           short: 'IDEATION',
-    color: '#aa00ff', special: 'jump',   trait: 'none',
+    color: '#d068c2', special: 'jump',   trait: 'none',
     tip: '청록·자홍 발판을 밟으면 위층으로 다시 올라갑니다',
     marks: [{ i: '▲', t: '청록 = 한 층 위 · 자홍 = 두 층 위' }] }
 ];

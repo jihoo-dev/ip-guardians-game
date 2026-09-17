@@ -549,39 +549,8 @@ const ACCEL_SPEED = Math.max(1, +ACCEL_EVENT.speed || 1);
  *   사람마다 다른데 20Hz 스냅샷을 사람마다 다르게 만들면 대역폭도,
  *   코드 복잡도도 감당이 안 됩니다. 게다가 어둠은 판정에 영향을 주지
  *   않으므로 클라이언트가 계산해도 공정성 문제가 없습니다.
- *
- * ★ 난이도 조정 (2026-09-17) — 간격 25초 → 10초 · 지속 6초 → 8초.
- *
- *   ⚠ intervalMs 는 '직전 종료'부터 셉니다(endTraitEvent). 그래서
- *     한 바퀴 = durationMs + intervalMs 입니다 —
- *         종전   6 + 25 = 31초 주기 · 어두운 시간 19%
- *         1차    6 + 12 = 18초 주기 · 어두운 시간 33%
- *         지금   8 + 10 = 18초 주기 · 어두운 시간 44%
- *
- *   ★ 2차에서 '한 번 걸렸을 때 더 오래'를 올리면서 간격을 같이 줄여
- *     <b>한 바퀴 18초는 그대로 두었습니다</b>. 지속만 올리면 한 바퀴가
- *     20초로 늘어 발동 빈도가 도로 낮아집니다 — 1차에서 올린 것을
- *     일부 무르는 셈이라, 두 값을 함께 움직였습니다.
- *   되살려 놓고 보니 한 층을 지나는 동안 두어 번밖에 안 걸려서
- *   이 층의 성격('보이지 않는 것과 싸운다')이 잘 드러나지 않았습니다.
- *   같은 회차에 바닥이 두 번 밟기로 바뀌며 층이 훨씬 오래 버티게
- *   됐으므로, 그만큼 난이도를 돌려받는 자리이기도 합니다.
- *
- * ⚠ 더 줄이려면 EVENT_SCHEDULE.gapMs(8초)가 하한입니다.
- *   이벤트가 끝나면 그만큼 쉬므로, intervalMs 를 8초보다 짧게 적어도
- *   발동은 8초에 걸려 밀립니다 — 화면·문서에 적은 숫자만 거짓이 됩니다.
- *   즉 가장 빠른 설정은 간격 8초 · 한 바퀴 14초 · 어두운 시간 43%.
- *   checkDarkSchedule() 이 시작할 때 이를 확인합니다.
- *
- * ★ 환경변수로 당일 조정할 수 있습니다 — 코드를 고치지 않아도 됩니다.
- *       DARK_INTERVAL_MS=12000 DARK_DURATION_MS=4000 npm start
  * ------------------------------------------------------------------ */
-const DARK_EVENT = {
-  intervalMs: parseInt(process.env.DARK_INTERVAL_MS, 10) || 10000,
-  durationMs: parseInt(process.env.DARK_DURATION_MS, 10) || 8000,
-  viewTiles: 3,
-  clearTiles: 2
-};
+const DARK_EVENT = { intervalMs: 25000, durationMs: 6000, viewTiles: 3, clearTiles: 2 };
 
 /* ── 선행기술 검색 타일 (SEARCH_TILE) ─────────────────────────────────
  * LAYER_DEFS 에서 special:'search' 인 층의 특수 타일입니다.
@@ -664,20 +633,6 @@ const LAYER_TRAITS = { accel: ACCEL_EVENT, dark: DARK_EVENT, rotate: ROTATE_EVEN
  *   이벤트만 크게 알리는' 방식으로 따로 해결합니다.
  * ------------------------------------------------------------------ */
 const EVENT_SCHEDULE = { warmupMs: 25000, gapMs: 8000, retryMs: 1000 };
-
-/* 설정한 주기가 실제로 지켜지는 값인지 확인합니다.
- * 이벤트가 끝나면 gapMs 만큼 쉬므로, 간격을 그보다 짧게 적어도 발동이
- * 밀리기만 합니다. 조용히 밀리면 화면·기획서에 적은 주기가 거짓이 되므로
- * 시작할 때 한 번 알려 줍니다.                                        */
-function checkDarkSchedule() {
-  if (DARK_EVENT.intervalMs >= EVENT_SCHEDULE.gapMs) return;
-  const sec = (ms) => (ms / 1000).toFixed(1);
-  console.warn('[경고] 암전 간격 ' + sec(DARK_EVENT.intervalMs) +
-    '초는 이벤트 쉬는 간격 ' + sec(EVENT_SCHEDULE.gapMs) + '초보다 짧습니다 — ' +
-    '실제로는 ' + sec(EVENT_SCHEDULE.gapMs) + '초마다 걸립니다(한 바퀴 ' +
-    sec(DARK_EVENT.durationMs + EVENT_SCHEDULE.gapMs) + '초). ' +
-    'EVENT_SCHEDULE.gapMs 를 함께 줄이세요.');
-}
 
 /* ── 거절이유 타일 (REJECT_TILE) ──────────────────────────────────────
  * 의견제출통지 층 특수 타일의 75% 입니다.
@@ -1128,29 +1083,10 @@ const LAYER_DEFS = [
    *   중간에 순수하게 달리기만 하는 구간이 있어야 난이도 곡선에 숨이
    *   생깁니다. special 이 'none' 이면 그 층의 특수 타일 몫(20%)은
    *   buildMap 에서 기본 바닥 타일로 강등됩니다.                    */
-  /* ── 어둠 + 선행기술 검색 (2026-09-17 재연결) ──────────────────────
-   *   2026-09-14 에 '기믹이 너무 많다'는 의견으로 끊어 뒀던 두 태그를
-   *   다시 겁니다. 구현(DARK_EVENT · SEARCH_TILE · trySearch ·
-   *   search_pulse)은 그대로 살아 있었고 태그만 'none' 이었습니다.
-   *
-   * ★ 이 층에서만 말이 되는 조합입니다.
-   *   선행기술은 '있는지 없는지 모르는 것'이고, 조사해야 비로소
-   *   보입니다. 어둠이 그 무지를, 검색 타일이 조사를 맡습니다 —
-   *   다른 층에 붙이면 그냥 시야를 가리는 장치일 뿐입니다.
-   *
-   * ★ 되돌리려면 special·trait 를 'none' 으로 되돌리면 됩니다.
-   *   그때도 구현은 남습니다.
-   *
-   * ⚠ 이 층은 5F 와 3F 두 '숨 고르는 층' 중 하나였습니다. 장치를 붙이면
-   *   장치 → 장치 → 장치 → 휴식 → 장치 → 장치 가 되어 쉬는 구간이
-   *   3F 하나만 남습니다. 너무 빡빡하면 여기를 먼저 되돌리세요.   */
   { key: 'exam',      name: '실체심사/선행기술조사', short: 'EXAMINATION',
-    color: '#7c5cff', special: 'search', trait: 'dark',
-    tip: '주기적으로 암전됩니다 — 밝게 빛나는 타일을 밟으면 잠시 멀리까지 보입니다',
-    marks: [
-      { i: '◐', t: '주기적 암전 · 주변 2~3칸 밖이 안 보임' },
-      { i: '◎', t: '선행기술 검색 타일 = 2초 동안 시야 8칸' }
-    ] },
+    color: '#7c5cff', special: 'none',   trait: 'none',
+    tip: '특별한 장치가 없는 층입니다 — 금 간 타일만 피해 달리세요',
+    marks: [{ i: '—', t: '장치 없는 층 · 금 간 타일만 피하면 됩니다' }] },
   { key: 'office',    name: '의견제출통지',       short: 'OFFICE ACTION',
     color: '#0088ff', special: 'reject', trait: 'rotate',
     tip: '층 전체가 천천히 돕니다 · 노랗게 변한 타일은 곧 주변까지 터집니다',
@@ -2713,8 +2649,8 @@ function tickTiles(room, now) {
  * 방향은 p.ry 를 씁니다. 클라이언트가 입력이 있을 때만 ry 를 갱신하므로
  * (index.html 의 local.ry = atan2(wish.x, wish.z)), 멈춰 있어도 마지막으로
  * 움직인 방향이 그대로 남아 있습니다. 다만 ry 는 기본값 0 이라 그것만으로는
- * '한 번도 안 움직인 사람'과 '정북으로 움직였던 사람'을 구분할 수 없습니다.
- * 그 경우에는 ry 를 믿지 않고 아레나 안쪽으로 보냅니다 (아래 참고).
+ * '한 번도 안 움직인 사람'과 '정북으로 움직였던 사람'을 구분할 수 없어서,
+ * lastMoveAt 으로 실제 이동 이력을 함께 봅니다.
  *
  * @returns 발동했으면 impulse 페이로드, 아니면 null
  */
@@ -2726,29 +2662,16 @@ function tryDash(room, p, tile) {
   // 착지 한 번에 두 번 발동하는 것을 막는 최소 간격
   if (p.lastDashAt && now - p.lastDashAt < 150) return null;
 
-  /* ★ 한 번도 움직인 적이 없어도 발동합니다 (2026-09-17).
-   *
-   *   종전에는 여기서 그냥 돌아갔습니다 — 방향 기록이 없는데 ry 기본값
-   *   0 으로 튀어나가면 안 된다는 이유였습니다. 그런데 그러면 라운드
-   *   시작 직후 발판에서 떨어져 그대로 신속심사 타일을 밟은 사람에게는
-   *   사출이 일어나지 않고 타일만 사라집니다. 특수 타일은 hits 1 이라
-   *   한 번에 무너지므로, 그 사람에게는 '한 번 밟았는데 그냥 깨졌다'
-   *   로만 보입니다 — 실제로 그 오해가 의견으로 들어왔습니다.
-   *
-   *   방향을 모를 때는 ry 를 믿는 대신 <b>아레나 안쪽</b>으로 보냅니다.
-   *   ry 기본값을 그대로 쓰면 아직 안 움직인 사람 전원이 같은 절대
-   *   방향(정북)으로 튀어, 스폰 위치에 따라 누구는 곧바로 난간 쪽을
-   *   향하게 됩니다. 안쪽은 어느 자리에서 밟든 말이 됩니다.        */
-  let dx, dz;
-  if (p.lastMoveAt) {
-    const ry = +p.ry;
-    if (!Number.isFinite(ry)) return null;
-    // 클라이언트 규약: 방향 = (sin(ry), cos(ry))  — local.ry = atan2(wish.x, wish.z)
-    dx = Math.sin(ry); dz = Math.cos(ry);
-  } else {
-    dx = -p.pos.x; dz = -p.pos.z;                     // 중심(0,0) 쪽
-    if (Math.hypot(dx, dz) < 1e-6) { dx = 0; dz = 1; }  // 이미 정중앙이면 아무 쪽
-  }
+  /* ★ 한 번도 움직인 적이 없으면 발동하지 않습니다.
+   * 라운드 시작 직후 발판에서 떨어져 그대로 밟은 경우가 여기 걸립니다 —
+   * 방향 기록이 없는데 ry 기본값 0 으로 튀어나가면 안 됩니다.        */
+  if (!p.lastMoveAt) return null;
+
+  const ry = +p.ry;
+  if (!Number.isFinite(ry)) return null;
+
+  // 클라이언트 규약: 방향 = (sin(ry), cos(ry))  — local.ry = atan2(wish.x, wish.z)
+  const dx = Math.sin(ry), dz = Math.cos(ry);
   const len = Math.hypot(dx, dz);
   if (len < 1e-6) return null;
 
@@ -3808,8 +3731,6 @@ setInterval(() => {
 /* ------------------------------------------------------------- lifecycle */
 
 server.listen(PORT, HOST, () => {
-  /* 설정한 암전 주기가 스케줄러에서 실제로 지켜지는지 (DARK_EVENT 주석) */
-  checkDarkSchedule();
   console.log('==============================================');
   console.log(' IP Guardians: Fast-Track Survival');
   console.log(' listening on http://' + HOST + ':' + PORT);
@@ -3887,11 +3808,7 @@ server.listen(PORT, HOST, () => {
   const traitLabel = { accel: '심사 가속', dark: '어둠      ', rotate: '회전      ' };
   const traitDetail = {
     accel: () => '퓨즈 ×1/' + ACCEL_SPEED,
-    dark: () => '시야 ' + DARK_EVENT.clearTiles + '~' + DARK_EVENT.viewTiles + '칸 · 시각 효과만' +
-      /* 간격은 '직전 종료'부터라 한 바퀴는 지속 + 간격입니다. */
-      ' · 한 바퀴 ' + ((DARK_EVENT.durationMs + DARK_EVENT.intervalMs) / 1000).toFixed(0) +
-      '초 · 어두운 시간 ' + Math.round(DARK_EVENT.durationMs /
-        (DARK_EVENT.durationMs + DARK_EVENT.intervalMs) * 100) + '%',
+    dark: () => '시야 ' + DARK_EVENT.clearTiles + '~' + DARK_EVENT.viewTiles + '칸 · 시각 효과만',
     rotate: () => ROTATE_SPEED.toFixed(3) + ' rad/s (' +
       (ROTATE_SPEED * 180 / Math.PI).toFixed(1) + '°/s · 한 바퀴 ' +
       (2 * Math.PI / ROTATE_SPEED).toFixed(0) + '초 · 가장자리 ' +

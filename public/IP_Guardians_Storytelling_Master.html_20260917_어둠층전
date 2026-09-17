@@ -283,27 +283,20 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
         심사관이 전 세계의 특허 문헌과 논문을 뒤지기 시작합니다. 문제는
         <b>무엇이 나올지 아무도 모른다</b>는 것입니다. 30년 전 일본 공개공보 하나가
         당신의 발명을 무너뜨릴 수 있습니다. 출원인이 할 수 있는 일은 기다리는 것뿐입니다.
-        그래서 이 층은 <b>주기적으로 캄캄해집니다.</b> 주변 두어 칸 밖은 완전한
-        검정이 되고, 어디가 안전한지는 <b>조사해야</b> 비로소 보입니다.
+        그래서 이 층에는 <b>아무 장치도 없습니다.</b> 오직 발밑의 금만 보고 달립니다.
       </div>
 
       <div class="box">
-        <div class="blabel">층 특성 · 어둠</div>
-        주기적으로 <b>암전 페이즈</b>가 발생해 주변 <b>2~3칸 밖</b>이 완전한 검정으로
-        가려집니다. 화면에는 <b>"선행기술이 있는지 알 수 없다. 조사하고 판단해야
-        한다."</b> 가 뜹니다.
-        <span class="tiny">— <b>18초에 한 바퀴, 그중 8초가 어둠</b>(어두운 시간 44%).
-        가리는 일은 각 클라이언트가 <b>자기 위치</b> 기준으로 하고, 서버는 언제부터
-        언제까지인지만 알려 줍니다.
-        실측: 0~1칸 밝기 0.81 그대로 · 2칸 0.29 감쇠 · <b>3칸 이상 0.00 완전한 검정</b>.</span>
-      </div>
-
-      <div class="box">
-        <div class="blabel">특수 타일 · 선행기술 검색 (20%)</div>
-        밟는 즉시 <b>레이더 스캔 연출</b>과 함께 <b>2초 동안</b> 시야가 3칸에서
-        <b>8칸</b>으로 넓어집니다. 숨은 위험을 피해 안전한 발판을 찾는 수단입니다.
-        <span class="tiny">— 시야가 넓어지는 것은 밟은 사람 한 명뿐이지만, <b>스캔
-        연출은 모두가 봅니다</b>. 어둠 속에서 누군가 조사 중이라는 것이 읽혀야 합니다.</span>
+        <div class="blabel">특수 타일 · 없음 · 층 특성 · 없음 (숨 고르는 층)</div>
+        <b>6개 층 중 장치가 하나도 없는 두 층 가운데 하나</b>입니다(다른 하나는 3F 보정).
+        층마다 새 규칙이 쏟아지면 배울 틈이 없으므로, 중간에 순수하게 달리기만 하는
+        구간을 두어 난이도 곡선에 숨을 틔웠습니다. 라운드를 길게 만드는 것도
+        이 층의 역할입니다.
+        <span class="tiny">— 종전에는 <b>어둠</b>(주변 2~3칸 밖 암전)과 그 해법인
+        <b>선행기술 검색 타일</b>(2초간 시야 8칸)이 한 세트로 있었습니다. 둘을 함께 뺀
+        이유는 어둠이 <b>"못 보는 것"이 난이도인 유일한 기믹</b>이었기 때문입니다.
+        죽은 이유가 화면에 없으면 다음 판에 배울 수가 없습니다. 어둠이 빠지면
+        검색 타일은 존재 이유가 사라지므로 세트로 정리했습니다.</span>
       </div>
 
       <div class="legal">
@@ -389,9 +382,7 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
 
       <div class="box">
         <div class="blabel">특수 타일 · 없음 · 층 특성 · 없음 (숨 고르는 층)</div>
-        <b>6개 층에서 장치가 없는 유일한 층</b>입니다
-        <span class="tiny">(2026-09-17 에 5F 실체심사가 어둠·검색 타일을 되찾으면서,
-        숨 고르는 층이 둘에서 하나로 줄었습니다).</span>
+        5F 실체심사와 함께 장치가 없는 두 층 중 하나입니다.
         위층(4F)이 거절이유 폭발과 회전이 겹치는 이 게임의 클라이맥스라,
         바로 아래에 숨 돌릴 구간을 두었습니다.
         <span class="tiny">— 이 층은 <b>라운드를 길게 만드는 것</b> 자체가 역할입니다.
@@ -604,11 +595,11 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
     서사도 맞습니다: <b>머무르면 깎입니다.</b>
   </div>
 
-  <h3>층별 장치 한눈에 — 특수 타일 5종 · 층 특성 2종</h3>
+  <h3>층별 장치 한눈에 — 특수 타일 4종 · 층 특성 1종</h3>
   <table>
     <tr><th>층</th><th>특수 타일</th><th>비율</th><th>층 특성</th><th>효과</th></tr>
     <tr><td style="color:var(--l6)"><b>6F</b></td><td>신속심사</td><td>20%</td><td>—</td><td>전방 2칸 대시</td></tr>
-    <tr><td style="color:var(--l5)"><b>5F</b></td><td>선행기술 검색</td><td>20%</td><td><b>어둠</b></td><td>2초간 시야 3→8칸 · 18초마다 8초 암전</td></tr>
+    <tr><td style="color:var(--l5)"><b>5F</b></td><td>—</td><td>—</td><td>—</td><td class="tiny">장치 없음 · 숨 고르는 층</td></tr>
     <tr><td style="color:var(--l4)"><b>4F</b></td><td>거절이유</td><td>15%</td><td><b>회전</b></td><td>변색 후 인접 6칸 폭발 · 층 전체 회전</td></tr>
     <tr><td style="color:var(--l3)"><b>3F</b></td><td>—</td><td>—</td><td>—</td><td class="tiny">장치 없음 · 숨 고르는 층</td></tr>
     <tr><td style="color:var(--l2)"><b>2F</b></td><td>위상</td><td>20%</td><td>—</td><td>2초 ON ↔ 1초 OFF</td></tr>
@@ -629,40 +620,6 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
     보정 타일(5%라 존재를 아무도 모름).<br><br>
     <b>코드는 지우지 않았습니다.</b> 제거한 장치의 상수와 구현은 그대로 남아 있고
     <code>LAYER_DEFS</code>의 태그 연결만 끊었습니다. 태그를 되돌리면 그대로 되살아납니다.
-  </div>
-
-  <div class="changed">
-    <span class="ckind">2026-09-17 — 어둠과 선행기술 검색을 되살렸습니다</span>
-    위에서 뺐던 둘을 <b>5F 실체심사·선행기술조사</b>에 다시 걸었습니다.
-    <code>LAYER_DEFS</code> 의 태그를 <code>none</code> → <code>dark</code>·
-    <code>search</code> 로 되돌린 것이 전부이고, 구현은 그대로 살아 있었습니다.
-    <ul>
-      <li><b>"못 보는 것이 난이도"라는 우려는 그대로 유효합니다.</b> 다만 이 층에는
-          <b>해법이 같이 있습니다</b> — 검색 타일이 전체의 20% 라 한 층에 50장 남짓
-          깔립니다. 어둠만 있으면 배울 수 없지만, 어둠과 조사 수단이 한 세트면
-          '보이지 않으면 조사한다'가 규칙이 됩니다.</li>
-      <li><b>이 층에서만 말이 되는 조합입니다.</b> 선행기술은 있는지 없는지 모르는
-          것이고, 조사해야 비로소 보입니다. 다른 층에 붙이면 그냥 시야를 가리는
-          장치일 뿐입니다.</li>
-      <li>⚠ <b>숨 고르는 층이 둘에서 하나(3F)로 줄었습니다.</b> 장치 → 장치 → 장치 →
-          휴식 → 장치 → 장치 가 됩니다. 너무 빡빡하면 여기를 먼저 되돌리세요 —
-          태그 두 개입니다.</li>
-      <li><b>같은 날 난이도를 두 번 올렸습니다</b> — 되살려 놓고 보니 한 층을 지나는
-          동안 두어 번밖에 안 걸려 이 층의 성격이 드러나지 않았습니다.
-          <table style="margin-top:8px">
-            <tr><th></th><th>지속</th><th>간격</th><th>한 바퀴</th><th>어두운 시간</th></tr>
-            <tr><td>종전</td><td>6초</td><td>25초</td><td>31초</td><td>19%</td></tr>
-            <tr><td>1차 — 더 자주</td><td>6초</td><td>12초</td><td><b>18초</b></td><td>33%</td></tr>
-            <tr><td><b>지금</b> — 더 길게</td><td><b>8초</b></td><td>10초</td><td><b>18초</b></td><td><b>44%</b></td></tr>
-          </table>
-          <span class="tiny"><b>지속을 올리면서 간격을 같이 줄여 한 바퀴 18초는 그대로</b>
-          두었습니다 — 지속만 올리면 한 바퀴가 20초로 늘어 발동 빈도가 도로 낮아지고,
-          1차에서 올린 것을 일부 무르는 셈이 됩니다.<br>
-          간격은 <b>직전 종료부터</b> 셉니다. 하한은 이벤트 쉬는 간격 8초라 가장 빠르게
-          잡아도 한 바퀴 16초(지속 8 + 간격 8 · 50%)입니다.
-          당일 조정은 <code>DARK_INTERVAL_MS</code>·<code>DARK_DURATION_MS</code>
-          환경변수로 합니다. 실측 18.0초 · 지속 8.0초 · 44%.</span></li>
-    </ul>
   </div>
 </section>
 
@@ -865,58 +822,22 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
 
   <table>
     <tr><th>효과음</th><th>언제</th><th>지금</th></tr>
-    <tr><td><code>sfx_tile1.mp3</code><br><code>sfx_tile2.mp3</code></td>
-        <td><b>바닥을 처음 밟을 때 / 두 번째로 밟을 때</b> — 소리가 다릅니다</td><td>있음</td></tr>
-    <tr><td><code>sfx_bomb.mp3</code></td>
-        <td><b>거절이유 타일 폭발</b> — 자기 자신 + 이웃 6칸</td><td>있음</td></tr>
-    <tr><td><code>sfx_boost.mp3</code></td>
-        <td><b>신속심사 타일 사출</b> — 내 것만 (남의 사출은 조용)</td><td>있음</td></tr>
-    <tr><td><code>sfx_power_down.mp3</code><br><code>sfx_power_up.mp3</code></td>
-        <td><b>암전 시작 / 끝</b> — 내가 그 층에 있을 때만</td><td>있음</td></tr>
-    <tr><td><code>sfx_opportunity.mp3</code></td>
-        <td><b>관전자의 보정 기회</b>가 발동할 때 — 올라가는 사람 자리에서</td><td>있음</td></tr>
-    <tr><td><code>sfx_2_1_go.mp3</code></td>
-        <td><b>카운트다운 2초 지점</b> — 한 파일에 2·1·GO</td><td>있음</td></tr>
-    <tr><td><code>sfx_stair_jump_1.mp3</code><br><code>sfx_stair_jump_2.mp3</code></td>
-        <td><b>점프 타일</b> — 1층 위로 / 2층 위로</td><td>있음</td></tr>
     <tr><td><code>sfx_click.mp3</code></td>
         <td>대기 화면의 버튼 · 게임 화면의 <b>층 안내(좌)·출원인 명단(우)</b> 클릭</td><td>있음</td></tr>
+    <tr><td><code>sfx_stair_jump_1.mp3</code><br><code>sfx_stair_jump_2.mp3</code></td>
+        <td><b>점프 타일</b> — 1층 위로 / 2층 위로. 관전자의 보정 기회도 1층 소리를 씁니다</td><td>있음</td></tr>
     <tr><td><code>sfx_jump.mp3</code> · <code>sfx_land.mp3</code></td><td>점프 · 착지</td><td>있음</td></tr>
     <tr><td><code>sfx_death.mp3</code> · <code>sfx_win.mp3</code></td><td>구름바다 추락 · 등록결정</td><td>있음</td></tr>
-    <tr><td class="tiny">start · tick · crack · eliminate · booster · lose</td>
-        <td class="tiny">시작 · 카운트다운 5·4·3 · 금 · 탈락 · 검색 스캔 · 거절결정</td>
+    <tr><td class="tiny">start · tick · step · crack · eliminate · booster · lose</td>
+        <td class="tiny">시작 · 카운트다운 · 밟기 · 금 · 탈락 · 보정 기회 · 거절결정</td>
         <td class="tiny">없음</td></tr>
   </table>
 
   <div class="note">
-    <b>모든 소리는 "화면을 안 봐도 알 수 있게"가 기준입니다.</b>
-    이 게임은 발밑이 계속 바뀌는데, 달리는 동안 시선이 가장 덜 가는 곳이
-    바로 발밑입니다.
-    <ul>
-      <li><b>바닥을 처음 밟을 때와 두 번째로 밟을 때의 소리가 다릅니다.</b>
-          바닥은 두 번 밟아야 무너지는데 소리가 같으면 지금 밟은 것이 몇
-          번째인지 화면을 봐야만 알 수 있습니다.</li>
-      <li><b>암전은 시작과 끝을 모두 알립니다.</b> 시야가 좁아지는 순간에는
-          오히려 화면을 덜 보게 되므로, 소리로 못 박아 두면 언제 끝나는지를
-          기다릴 수 있습니다.</li>
-      <li><b>내 층·내 행동만 냅니다.</b> 암전은 내가 그 층에 있을 때만,
-          신속심사 사출은 내 것만 — 남의 것까지 내면 4인 게임에서 무슨
-          소리인지 알 수 없는 소음이 됩니다.</li>
-      <li><b><code>sfx_2_1_go.mp3</code> 는 한 파일에 2·1·GO 셋이 들어 있습니다.</b>
-          그래서 2초 지점에서 한 번만 틀고 그 뒤로는 tick 을 내지 않습니다 —
-          겹쳐 내면 두 소리가 어긋나 박자가 깨집니다.</li>
-      <li><b>전부 없으면 종전 소리로 내려앉습니다.</b> 파일을 지우면 예전
-          동작으로 그대로 돌아갑니다.</li>
-    </ul>
-  </div>
-
-  <div class="note">
     <b>점프 타일 소리를 층수마다 나눈 이유.</b>
     1층과 2층이 같은 소리면 <b>몇 층 올라갔는지를 화면으로만</b> 알 수 있는데,
-    솟는 동안 시선은 이미 착지 지점에 가 있습니다. 관전자의 <b>보정 기회</b>는
-    <b>자기 소리</b>(<code>sfx_opportunity.mp3</code>)가 따로 있고, 실제로
-    올라가는 순간에는 1층 점프 소리가 함께 납니다 — 앞은 '기회가 쓰였다',
-    뒤는 '올라간다' 로 역할이 다릅니다.<br><br>
+    솟는 동안 시선은 이미 착지 지점에 가 있습니다. 관전자의 <b>보정 기회</b>도
+    같은 '한 층 올라가는 사건'이라 1층 소리를 씁니다.<br><br>
     <b>클릭 소리는 패널이 클릭을 받지 않은 채로 납니다.</b>
     층 안내와 명단은 폭 208·212px 에 세로로 긴 패널이라, 클릭을 받게 하면
     <b>그 위에서 시작한 시점 드래그가 막힙니다.</b> 그래서 좌표가 패널 안인지만
@@ -1063,7 +984,7 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
     <tr><td>시작</td><td>발판 소멸, 6F로 낙하</td><td class="tiny">출원 접수 완료 — 심사 착수</td></tr>
     <tr><td>6F 진행</td><td>대시 타일 사출</td><td class="tiny">우선심사 결정 — 심사 대기열 건너뛰기</td></tr>
     <tr><td>6F→5F</td><td>층 낙하</td><td class="tiny">선행기술 발견 — 청구범위 재검토 필요</td></tr>
-    <tr><td>5F 진행</td><td>암전 · 검색 타일</td><td class="tiny">선행기술이 있는지 알 수 없다 — 조사해야 보인다</td></tr>
+    <tr><td>5F 진행</td><td>장치 없음</td><td class="tiny">실체심사 진행 중 — 기다리는 것 외에 할 일이 없다</td></tr>
     <tr><td>5F→4F</td><td>층 낙하</td><td class="tiny">거절이유통지서 발송 — 의견제출기간 개시</td></tr>
     <tr><td>4F 진행</td><td>타일 변색·폭발</td><td class="tiny">거절이유 발견 — 제29조 제2항</td></tr>
     <tr><td>4F 회전</td><td>판 반전</td><td class="tiny">⚠️ 거절이유 발생 — 심사관 검토 방향 변경</td></tr>

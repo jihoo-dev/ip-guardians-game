@@ -939,7 +939,7 @@ body.touch-run #touch{display:block}
 <div id="darkAlert">
   <div class="vig"></div>
   <div class="tag">
-    <b>선행기술이 있는지 알 수 없다. 조사하고 판단해야 한다.</b>
+    <b>무엇이 있는지 알 수 없다. 조사하고 판단해야 한다.</b>
     <i id="darkSub">PRIOR ART SEARCH</i>
   </div>
 </div>
@@ -1138,7 +1138,7 @@ if (typeof THREE === 'undefined') {
  *
  * ★ assets/ 안의 파일을 갈아끼웠다면 이 숫자를 올리세요. 안 올리면
  *   이미 받은 사람은 1년 동안 옛 파일을 씁니다.                        */
-const ASSET_VER = '7';   // 2026-09-17 보정 기회 효과음 추가   // 2026-09-17 배경음 128kbps 재인코딩
+const ASSET_VER = '3';
 const assetUrl = (p) => p + (p.indexOf('?') >= 0 ? '&' : '?') + 'v=' + ASSET_VER;
 
 /* ============================ 0. constants ============================== */
@@ -4166,32 +4166,7 @@ const SFX = {
   obstacle:  { src: 'assets/audio/sfx_obstacle.mp3',  volume: 0.7 },
   impact:    { src: 'assets/audio/sfx_impact.mp3',    volume: 0.8 },
   win:       { src: 'assets/audio/sfx_win.mp3',       volume: 1.0 },
-  lose:      { src: 'assets/audio/sfx_lose.mp3',      volume: 0.9 },
-  /* 점프 타일 — 올라가는 층수마다 다릅니다(JUMP_TILE.levels). 파일이
-   * 없으면 버퍼가 안 생기므로 applyJumpImpulse 가 기본 점프 소리로
-   * 받쳐 줍니다.                                                    */
-  stairJump1: { src: 'assets/audio/sfx_stair_jump_1.mp3', volume: 0.95 },
-  stairJump2: { src: 'assets/audio/sfx_stair_jump_2.mp3', volume: 0.95 },
-  /* UI 클릭. 화면 조작이라 게임 소리보다 작게 둡니다 — 같은 크기면
-   * 대기 화면에서 버튼을 누를 때마다 배경음을 뚫고 튀어나옵니다.    */
-  click:      { src: 'assets/audio/sfx_click.mp3',        volume: 0.5 },
-
-  /* ── 2026-09-17 추가 ────────────────────────────────────────────
-   * 바닥을 밟는 소리를 <b>첫 번째와 두 번째로 나눴습니다.</b>
-   * 바닥은 두 번 밟아야 무너지는데, 소리가 같으면 지금 밟은 것이
-   * 몇 번째인지 <b>화면을 봐야만</b> 알 수 있습니다. 발밑은 달리는
-   * 동안 시선이 가장 덜 가는 곳이라, 두 번째를 소리로 알려 줍니다.
-   * ------------------------------------------------------------ */
-  tile1:      { src: 'assets/audio/sfx_tile1.mp3',        volume: 0.55 },  // 첫 밟기 — 금이 감
-  tile2:      { src: 'assets/audio/sfx_tile2.mp3',        volume: 0.75 },  // 두 번째 — 곧 무너짐
-  bomb:       { src: 'assets/audio/sfx_bomb.mp3',         volume: 1.0 },   // 거절이유 타일 폭발
-  boost:      { src: 'assets/audio/sfx_boost.mp3',        volume: 0.9 },   // 신속심사 사출
-  powerDown:  { src: 'assets/audio/sfx_power_down.mp3',   volume: 0.85 },  // 암전 시작
-  powerUp:    { src: 'assets/audio/sfx_power_up.mp3',     volume: 0.8 },   // 암전 끝
-  countGo:    { src: 'assets/audio/sfx_2_1_go.mp3',       volume: 1.0 },   // 2 · 1 · GO
-  /* 관전자가 보정 기회를 쓴 순간. 종전에는 이 사건에 소리가 아예
-   * 없었습니다 — 화면에 토스트만 떴습니다.                          */
-  opportunity: { src: 'assets/audio/sfx_opportunity.mp3', volume: 0.95 }
+  lose:      { src: 'assets/audio/sfx_lose.mp3',      volume: 0.9 }
 };
 
 const Sound = {
@@ -6156,12 +6131,7 @@ function separateFromRunners(dt) {
  *   38 유닛/초로 2칸(약 7.4유닛)이면 약 194ms — 서버 면제 창 400ms 의
  *   절반이라 대시 전체가 면제 안에서 끝납니다.
  * ------------------------------------------------------------------ */
-/* ★ 사출 소리는 여기 하나에만 답니다.
- *   내 것이면 이 함수를 지나고, 남의 것이면 지나지 않습니다
- *   (player_impulse 수신부에서 갈립니다). 남의 사출까지 소리를 내면
- *   4인 게임에서 신속심사 층이 시끄러워집니다.                     */
 function applyDashImpulse(d) {
-  Sound.sfx('boost');
   if (!d || !Array.isArray(d.vel) || !Array.isArray(d.to)) return;
   const vx = +d.vel[0] || 0, vz = +d.vel[2] || 0;
   const speed = Math.hypot(vx, vz);
@@ -6211,17 +6181,7 @@ function applyJumpImpulse(d) {
   contactTile = null;
   local.dash = null;              // 대시 중이었다면 여기서 끝냅니다
 
-  /* ★ 올라가는 층수마다 다른 소리를 씁니다.
-   *   1층·2층이 같은 소리면 '몇 층 올라갔는지'를 화면으로만 알 수
-   *   있는데, 솟는 동안에는 시선이 착지 지점에 가 있습니다.
-   *   파일이 없으면 buffers 에 안 들어오므로 기본 점프 소리로
-   *   받칩니다 — 소리가 사라지는 것보다 낫습니다.
-   *   관전자의 보정 기회도 level 1 로 여기를 지납니다. 같은 '한 층
-   *   올라가는 사건'이라 같은 소리가 맞습니다.                     */
-  const lv = (d.level | 0) >= 2 ? 2 : 1;
-  const stair = lv >= 2 ? 'stairJump2' : 'stairJump1';
-  if (Sound.buffers[stair]) Sound.sfx(stair);
-  else Sound.sfx('jump', { rate: lv >= 2 ? 0.8 : 1.0, volume: 0.9 });
+  Sound.sfx('jump', { rate: d.level >= 2 ? 0.8 : 1.0, volume: 0.9 });
   spawnJumpFx(local.pos.x, local.pos.y, local.pos.z, d.level || 1);
 }
 
@@ -9632,21 +9592,12 @@ function applyLayerEvent(d) {
         ? names.join(' · ') + ' 층 시야 ' + (st.clearTiles || 2) + '~' + (st.viewTiles || 3) + '칸'
         : 'PRIOR ART SEARCH';
     }
-    /* ★ 켜질 때와 꺼질 때 모두 소리를 냅니다.
-     *   어둠은 <b>화면이 어두워지는 것</b>으로만 알리는데, 시야가
-     *   좁아지는 순간에는 오히려 화면을 덜 보게 됩니다. 시작과 끝을
-     *   소리로 못 박아 두면 "언제 끝나는지"를 기다릴 수 있습니다.
-     * ★ 내가 그 층에 있을 때만입니다 — 다른 층에서 남의 층 사정까지
-     *   들리면 무슨 일인지 알 수 없는 소리가 됩니다.               */
     if (st.active && !wasActive) {
       netStats.darks++;
       if (onTraitLayer('dark')) {
         toast('어둠 — 주변 ' + (st.viewTiles || 3) + '칸 밖은 보이지 않습니다. 검색 타일을 찾으세요', 'obstacle');
-        if (Sound.buffers.powerDown) Sound.sfx('powerDown');
-        else Sound.sfx('obstacle', { rate: 0.55, volume: 0.7 });
+        Sound.sfx('obstacle', { rate: 0.55, volume: 0.7 });
       }
-    } else if (!st.active && wasActive) {
-      if (onTraitLayer('dark')) Sound.sfx('powerUp');
     }
   } else if (trait === 'rotate') {
     for (const el of (dom.docs || [])) {
@@ -9817,22 +9768,14 @@ function updateLayerStack(layer) {
 
 function updateRoster() {
   const rows = [];
-  const isAlive = (r) => (r.id === G.selfId ? local.alive : r.alive);
-  const entries = [...G.players.values()].sort((a, b) => (isAlive(b) - isAlive(a)));
+  const entries = [...G.players.values()].sort((a, b) => (b.alive - a.alive));
   for (const r of entries) {
     const isSelf = r.id === G.selfId;
-    /* ★ 내 층의 진실 원천은 local 입니다.
-     *   state 스냅샷에서 내 것은 건너뜁니다(로컬 예측을 덮으면 안 되므로).
-     *   그래서 G.players 의 내 항목은 참가 시점의 층(최상층)에 멈춰 있고,
-     *   명단에 내 층만 L6 으로 굳어 있었습니다. 이동이 클라이언트 권위이므로
-     *   남의 층은 스냅샷에서, 내 층은 local 에서 읽는 것이 맞습니다.   */
-    const alive = isSelf ? local.alive : r.alive;
-    const layer = isSelf ? local.layer : r.layer;
     rows.push(
-      '<div class="rrow' + (alive ? '' : ' dead') + '" style="border-left-color:' + (r.color || '#888') + '">' +
+      '<div class="rrow' + (r.alive ? '' : ' dead') + '" style="border-left-color:' + (r.color || '#888') + '">' +
       '<span>' + escapeHtml(safeName(r.name)) + '</span>' +
       (isSelf ? '<span class="you">YOU</span>' : '') +
-      '<span class="lay">' + (alive ? 'L' + (layer || '?') : 'OUT') + '</span>' +
+      '<span class="lay">' + (r.alive ? 'L' + (r.layer || 3) : 'OUT') + '</span>' +
       '</div>'
     );
   }
@@ -9926,17 +9869,7 @@ function updateCountdown() {
   if (G.phase === 'countdown' && G.phaseEndsAt) {
     const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
     const sec = Math.ceil(left / 1000);
-    if (sec !== lastCountdownSec && sec > 0 && sec <= 5) {
-      /* ★ '2 · 1 · GO' 는 <b>한 파일에 셋이 들어 있는</b> 소리라
-       *   2초 지점에서 한 번만 틀고, 그 뒤로는 tick 을 내지 않습니다.
-       *   매초 tick 을 겹쳐 내면 두 소리가 어긋나 박자가 깨집니다.
-       *   파일이 없으면 종전대로 매초 tick 입니다.                   */
-      if (Sound.buffers.countGo && sec <= 2) {
-        if (sec === 2) Sound.sfx('countGo');
-      } else {
-        Sound.sfx('tick');
-      }
-    }
+    if (sec !== lastCountdownSec && sec > 0 && sec <= 5) Sound.sfx('tick');
     lastCountdownSec = sec;
     dom.cdNum.textContent = sec;
     dom.cdLabel.textContent = G.solo ? '단독 심사 착수까지' : '심사 착수까지';
@@ -10498,14 +10431,9 @@ function connect(name, mode, opts) {
     rec.maxHits = d.maxHits;
     if (d.kind) rec.kind = d.kind;
     applyTileWear(rec);
-    /* ★ tile_hit 은 <b>아직 버티는</b> 밟기입니다(hits < maxHits).
-     *   바닥은 두 번 밟아야 무너지므로 여기 오는 것은 첫 밟기 —
-     *   '금이 갔다' 소리입니다. 두 번째 밟기는 붕괴가 예약되므로
-     *   tile_warn 으로 갑니다(아래).
-     *   파일이 없으면 buffers 에 안 들어오니 종전 'step' 으로 받칩니다. */
-    const hitKey = Sound.buffers.tile1 ? 'tile1' : 'step';
-    Sound.sfx(hitKey, {
-      pos: rec, rate: hitKey === 'step' ? 0.9 + d.hits * 0.08 : 1,
+    // 밟을수록 음이 높아져 "몇 번 남았는지"가 소리로도 읽힙니다
+    Sound.sfx('step', {
+      pos: rec, rate: 0.9 + d.hits * 0.08,
       volume: d.by === G.selfId ? 1 : 0.55
     });
   });
@@ -10517,13 +10445,9 @@ function connect(name, mode, opts) {
     if (d.hits !== undefined) rec.hits = d.hits;
     if (d.maxHits !== undefined) rec.maxHits = d.maxHits;
     startWarn(rec, d.fuse);
-    /* ★ tile_warn 은 <b>붕괴가 예약된</b> 밟기입니다 — 바닥에서는
-     *   두 번째 밟기입니다. 첫 밟기(tile_hit)와 소리를 달리해
-     *   "이번엔 꺼진다"를 발밑을 보지 않고도 알 수 있게 합니다.
-     *   내가 밟은 타일만 또렷하게, 남이 밟은 건 거리에 따라 작게.   */
-    const warnKey = Sound.buffers.tile2 ? 'tile2' : 'step';
-    Sound.sfx(warnKey, {
-      pos: rec, rate: warnKey === 'step' ? 0.94 + Math.random() * 0.12 : 1,
+    // 내가 밟은 타일만 또렷하게, 남이 밟은 건 거리에 따라 작게
+    Sound.sfx('step', {
+      pos: rec, rate: 0.94 + Math.random() * 0.12,
       volume: d.by === G.selfId ? 1 : 0.55
     });
   });
@@ -10555,14 +10479,8 @@ function connect(name, mode, opts) {
       breakTile(rec, id === d.tileId ? 2.4 : 1.6);
     }
     if (center) {
-      /* 폭탄 소리가 있으면 그것 하나로 갑니다 — 없을 때만 종전처럼
-       * 두 소리를 겹쳐 대신합니다.                                  */
-      if (Sound.buffers.bomb) {
-        Sound.sfx('bomb', { pos: center });
-      } else {
-        Sound.sfx('crack', { pos: center, rate: 0.72 });
-        Sound.sfx('death', { pos: center, volume: 0.5 });
-      }
+      Sound.sfx('crack', { pos: center, rate: 0.72 });
+      Sound.sfx('death', { pos: center, volume: 0.5 });
     }
   });
 
@@ -10597,14 +10515,6 @@ function connect(name, mode, opts) {
    * (점프 타일과 같은 경로), 여기서는 내 기회 소진만 기록합니다.   */
   socket.on('amend_granted', (e) => {
     if (e.byId === G.selfId) { G.amendUsed = true; updateActionCooldowns(); }
-    /* ★ 올라가는 사람의 자리에서 냅니다 — 방 전체가 듣되, 누가
-     *   도움을 받았는지가 소리의 방향으로도 읽힙니다.
-     *   실제 상승 소리(stairJump1)는 player_impulse 가 따로 냅니다.
-     *   이건 '기회가 쓰였다'는 신호라 겹쳐도 역할이 다릅니다.       */
-    let at = null;
-    if (e.targetId === G.selfId) at = local.pos;
-    else { const r = G.players.get(e.targetId); if (r && r.render) at = r.render; }
-    Sound.sfx('opportunity', at ? { pos: at } : undefined);
   });
 
   socket.on('booster_spawn', (e) => {
@@ -11701,53 +11611,6 @@ dom.btnJoin.addEventListener('click', () => {
 });
 
 dom.nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') dom.btnJoin.click(); });
-
-/* ══════════════════════════════════════════════════════════════════════
- * 클릭 소리
- * ────────────────────────────────────────────────────────────────────
- * ★ 대기 화면은 위임 한 줄로 끝납니다 — 버튼이 여럿이고(참가 방식·
- *   규격 접기·소리·심사실 목록·참가) 앞으로도 늘어날 자리라,
- *   각각에 리스너를 다는 대신 화면 하나에 걸어 둡니다.
- *
- * ★ 게임 화면의 층 안내(좌)·출원인 명단(우)에는 pointer-events 를
- *   주지 않습니다. 두 패널은 폭 208·212px 에 세로로 길어서, 클릭을
- *   받게 하면 그 위에서 시작한 드래그가 캔버스로 내려가지 않아
- *   시점 회전이 막힙니다. 그래서 '좌표가 패널 안인가'만 보고 소리를
- *   냅니다 — 패널은 그대로 투명하고 시점 회전도 그대로입니다.
- *
- * ★ 드래그와 구분합니다. 누른 자리에서 6px 이상 움직였으면 시점을
- *   돌린 것이지 누른 것이 아닙니다.
- * ------------------------------------------------------------------ */
-const CLICK_SLOP_PX = 6;
-
-if (dom.joinScreen) {
-  dom.joinScreen.addEventListener('click', (e) => {
-    const hit = e.target.closest && e.target.closest('button, .lbRow, .mode');
-    if (hit) Sound.sfx('click');
-  });
-}
-
-let clickDownAt = null;
-window.addEventListener('pointerdown', (e) => {
-  clickDownAt = { x: e.clientX, y: e.clientY };
-});
-window.addEventListener('pointerup', (e) => {
-  const d0 = clickDownAt;
-  clickDownAt = null;
-  if (!d0) return;
-  if (Math.hypot(e.clientX - d0.x, e.clientY - d0.y) > CLICK_SLOP_PX) return;   // 드래그
-  if (dom.joinScreen && dom.joinScreen.classList.contains('show')) return;      // 위에서 처리
-  const inside = (el) => {
-    if (!el || !el.offsetParent) return false;
-    const b = el.getBoundingClientRect();
-    return e.clientX >= b.left && e.clientX <= b.right &&
-           e.clientY >= b.top && e.clientY <= b.bottom;
-  };
-  if (inside(document.getElementById('layerStack')) ||
-      inside(document.getElementById('roster'))) {
-    Sound.sfx('click');
-  }
-});
 
 frame();
 </script>

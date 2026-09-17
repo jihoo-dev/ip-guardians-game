@@ -550,18 +550,13 @@ const ACCEL_SPEED = Math.max(1, +ACCEL_EVENT.speed || 1);
  *   코드 복잡도도 감당이 안 됩니다. 게다가 어둠은 판정에 영향을 주지
  *   않으므로 클라이언트가 계산해도 공정성 문제가 없습니다.
  *
- * ★ 난이도 조정 (2026-09-17) — 간격 25초 → 10초 · 지속 6초 → 8초.
+ * ★ 25초 → 12초 (2026-09-17).
  *
  *   ⚠ intervalMs 는 '직전 종료'부터 셉니다(endTraitEvent). 그래서
  *     한 바퀴 = durationMs + intervalMs 입니다 —
- *         종전   6 + 25 = 31초 주기 · 어두운 시간 19%
- *         1차    6 + 12 = 18초 주기 · 어두운 시간 33%
- *         지금   8 + 10 = 18초 주기 · 어두운 시간 44%
- *
- *   ★ 2차에서 '한 번 걸렸을 때 더 오래'를 올리면서 간격을 같이 줄여
- *     <b>한 바퀴 18초는 그대로 두었습니다</b>. 지속만 올리면 한 바퀴가
- *     20초로 늘어 발동 빈도가 도로 낮아집니다 — 1차에서 올린 것을
- *     일부 무르는 셈이라, 두 값을 함께 움직였습니다.
+ *         종전 6 + 25 = 31초 주기 · 어두운 시간 19%
+ *         지금 6 + 12 = 18초 주기 · 어두운 시간 33%
+ *     발동 빈도로는 1.7배입니다. 실측으로 확인했습니다(아래).
  *   되살려 놓고 보니 한 층을 지나는 동안 두어 번밖에 안 걸려서
  *   이 층의 성격('보이지 않는 것과 싸운다')이 잘 드러나지 않았습니다.
  *   같은 회차에 바닥이 두 번 밟기로 바뀌며 층이 훨씬 오래 버티게
@@ -577,8 +572,8 @@ const ACCEL_SPEED = Math.max(1, +ACCEL_EVENT.speed || 1);
  *       DARK_INTERVAL_MS=12000 DARK_DURATION_MS=4000 npm start
  * ------------------------------------------------------------------ */
 const DARK_EVENT = {
-  intervalMs: parseInt(process.env.DARK_INTERVAL_MS, 10) || 10000,
-  durationMs: parseInt(process.env.DARK_DURATION_MS, 10) || 8000,
+  intervalMs: parseInt(process.env.DARK_INTERVAL_MS, 10) || 12000,
+  durationMs: parseInt(process.env.DARK_DURATION_MS, 10) || 6000,
   viewTiles: 3,
   clearTiles: 2
 };

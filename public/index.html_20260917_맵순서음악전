@@ -939,7 +939,7 @@ body.touch-run #touch{display:block}
 <div id="darkAlert">
   <div class="vig"></div>
   <div class="tag">
-    <b>선행기술이 있는지 알 수 없다. 조사하고 판단해야 한다.</b>
+    <b>무엇이 있는지 알 수 없다. 조사하고 판단해야 한다.</b>
     <i id="darkSub">PRIOR ART SEARCH</i>
   </div>
 </div>
@@ -1138,7 +1138,7 @@ if (typeof THREE === 'undefined') {
  *
  * ★ assets/ 안의 파일을 갈아끼웠다면 이 숫자를 올리세요. 안 올리면
  *   이미 받은 사람은 1년 동안 옛 파일을 씁니다.                        */
-const ASSET_VER = '7';   // 2026-09-17 보정 기회 효과음 추가   // 2026-09-17 배경음 128kbps 재인코딩
+const ASSET_VER = '3';
 const assetUrl = (p) => p + (p.indexOf('?') >= 0 ? '&' : '?') + 'v=' + ASSET_VER;
 
 /* ============================ 0. constants ============================== */
@@ -2056,14 +2056,9 @@ function disposeGroup(g) {
   scene.remove(g);
 }
 
-/* ★ 배경이 바뀌면 곡도 바뀌어야 합니다. applyTheme 은 init·map_reset·phase
- *   어디서 와도 거치는 길목이라 여기 한 곳만 붙이면 됩니다.
- *   playBgm 은 지금 곡과 같으면 아무것도 하지 않으므로, 맵이 그대로인
- *   호출에서는 비용이 없습니다.                                     */
 function applyTheme(index) {
   const i = ((index | 0) % THEMES.length + THEMES.length) % THEMES.length;
   if (currentTheme === i && skyMesh) return;
-  const themeChanged = (currentTheme !== i);
   currentTheme = i;
   const t = THEMES[i];
 
@@ -2111,13 +2106,6 @@ function applyTheme(index) {
 
   console.log('[IPG] 배경 적용: ' + t.name +
     ' · 구름 ' + t.cloudCount + '덩어리 · 소품 ' + t.prop.count + '개 (이미지 파일 불필요)');
-
-  /* 맵이 바뀌었으면 라운드 곡도 그 맵의 것으로. 대기·결과 곡은 맵과
-   * 무관하므로 지금 페이즈가 play 일 때만 바꿉니다 — 대기 화면에서
-   * 맵이 바뀔 때마다 로비 음악이 끊기면 안 됩니다.                  */
-  if (themeChanged && Sound.unlocked && Sound.phaseKey === 'play') {
-    Sound.playBgm('play');
-  }
 }
 
 /* 하늘의 별 반짝임과 구름/소품의 느린 흐름 */
@@ -4104,53 +4092,11 @@ function applyLayerTransparency(currentLayer) {
  *   실행되는 자리에 두어야 합니다.                                    */
 let lobbyAudioArmed = false;
 
-/* ══════════════════════════════════════════════════════════════════════
- * 배경음 파일 이름 규칙
- * ────────────────────────────────────────────────────────────────────
- * 전부 public/assets/audio/ 에 둡니다. **모두 선택 사항**입니다 —
- * 없으면 공통 곡(bgm_main.mp3)으로 자동으로 내려앉고, 그것도 없으면
- * 조용히 무음으로 갑니다. 게임은 어느 경우에도 그대로 돌아갑니다.
- *
- *   bgm_main.mp3     공통 폴백. 아래 파일이 하나도 없어도 이것만 있으면
- *                    종전과 똑같이 동작합니다.
- *   bgm_lobby.mp3    대기 화면 · 카운트다운
- *   bgm_result.mp3   결과 화면
- *   bgm_map1.mp3     1번 맵 — 캔디 스카이
- *   bgm_map2.mp3     2번 맵 — 네온 아레나
- *   bgm_map3.mp3     3번 맵 — 새벽 구름
- *
- * ★ 왜 맵 이름이 아니라 번호인가
- *   THEMES 의 이름(캔디 스카이…)은 언제든 바뀔 수 있는 표시용 문구이고,
- *   파일 이름이 거기 묶이면 이름을 고치는 순간 음악이 조용히 사라집니다.
- *   번호는 THEMES 배열의 순서 그 자체라 흔들리지 않습니다.
- *   맵을 4개로 늘리면 bgm_map4.mp3 가 자동으로 후보가 됩니다.
- *
- * ★ 왜 라운드 중(play)만 맵별인가
- *   대기 화면은 아직 어느 맵을 달릴지 모르는 시간이고, 결과 화면은
- *   8초입니다. 맵마다 세 곡씩 아홉 곡을 만들 일이 아닙니다 —
- *   '이 맵의 노래'는 실제로 그 맵을 달리는 동안에만 의미가 있습니다.
- *
- * ★ 형식: mp3 권장(모든 브라우저 공통). 반복 재생되므로 앞뒤가 자연스럽게
- *   이어지는 루프가 좋습니다. 파일은 압축하지 않고 그대로 나갑니다
- *   (server.js PRECOMPRESSED) — 용량을 직접 줄여 두세요.
- * ------------------------------------------------------------------ */
-const BGM_DIR = 'assets/audio/';
-const BGM_FALLBACK = BGM_DIR + 'bgm_main.mp3';
-
-/* 페이즈별 후보. 앞에서부터 '없는 파일'을 건너뛰며 고릅니다.
- * themeIndex 는 0부터입니다 — 파일 이름은 사람이 세는 1부터입니다.   */
-function bgmCandidates(phaseKey, themeIndex) {
-  const list = [];
-  if (phaseKey === 'play' && themeIndex >= 0) {
-    list.push(BGM_DIR + 'bgm_map' + (themeIndex + 1) + '.mp3');
-  } else if (phaseKey === 'lobby') {
-    list.push(BGM_DIR + 'bgm_lobby.mp3');
-  } else if (phaseKey === 'result') {
-    list.push(BGM_DIR + 'bgm_result.mp3');
-  }
-  list.push(BGM_FALLBACK);
-  return list;
-}
+const BGM = {
+  lobby:  'assets/audio/bgm_main.mp3',   // 대기 / 카운트다운
+  play:   'assets/audio/bgm_main.mp3',   // 라운드 진행 중
+  result: 'assets/audio/bgm_main.mp3'    // 결과 화면
+};
 
 /* 효과음. { 경로, 볼륨 } — 파일이 없으면 그냥 무시됩니다. */
 const SFX = {
@@ -4166,45 +4112,16 @@ const SFX = {
   obstacle:  { src: 'assets/audio/sfx_obstacle.mp3',  volume: 0.7 },
   impact:    { src: 'assets/audio/sfx_impact.mp3',    volume: 0.8 },
   win:       { src: 'assets/audio/sfx_win.mp3',       volume: 1.0 },
-  lose:      { src: 'assets/audio/sfx_lose.mp3',      volume: 0.9 },
-  /* 점프 타일 — 올라가는 층수마다 다릅니다(JUMP_TILE.levels). 파일이
-   * 없으면 버퍼가 안 생기므로 applyJumpImpulse 가 기본 점프 소리로
-   * 받쳐 줍니다.                                                    */
-  stairJump1: { src: 'assets/audio/sfx_stair_jump_1.mp3', volume: 0.95 },
-  stairJump2: { src: 'assets/audio/sfx_stair_jump_2.mp3', volume: 0.95 },
-  /* UI 클릭. 화면 조작이라 게임 소리보다 작게 둡니다 — 같은 크기면
-   * 대기 화면에서 버튼을 누를 때마다 배경음을 뚫고 튀어나옵니다.    */
-  click:      { src: 'assets/audio/sfx_click.mp3',        volume: 0.5 },
-
-  /* ── 2026-09-17 추가 ────────────────────────────────────────────
-   * 바닥을 밟는 소리를 <b>첫 번째와 두 번째로 나눴습니다.</b>
-   * 바닥은 두 번 밟아야 무너지는데, 소리가 같으면 지금 밟은 것이
-   * 몇 번째인지 <b>화면을 봐야만</b> 알 수 있습니다. 발밑은 달리는
-   * 동안 시선이 가장 덜 가는 곳이라, 두 번째를 소리로 알려 줍니다.
-   * ------------------------------------------------------------ */
-  tile1:      { src: 'assets/audio/sfx_tile1.mp3',        volume: 0.55 },  // 첫 밟기 — 금이 감
-  tile2:      { src: 'assets/audio/sfx_tile2.mp3',        volume: 0.75 },  // 두 번째 — 곧 무너짐
-  bomb:       { src: 'assets/audio/sfx_bomb.mp3',         volume: 1.0 },   // 거절이유 타일 폭발
-  boost:      { src: 'assets/audio/sfx_boost.mp3',        volume: 0.9 },   // 신속심사 사출
-  powerDown:  { src: 'assets/audio/sfx_power_down.mp3',   volume: 0.85 },  // 암전 시작
-  powerUp:    { src: 'assets/audio/sfx_power_up.mp3',     volume: 0.8 },   // 암전 끝
-  countGo:    { src: 'assets/audio/sfx_2_1_go.mp3',       volume: 1.0 },   // 2 · 1 · GO
-  /* 관전자가 보정 기회를 쓴 순간. 종전에는 이 사건에 소리가 아예
-   * 없었습니다 — 화면에 토스트만 떴습니다.                          */
-  opportunity: { src: 'assets/audio/sfx_opportunity.mp3', volume: 0.95 }
+  lose:      { src: 'assets/audio/sfx_lose.mp3',      volume: 0.9 }
 };
 
 const Sound = {
   ctx: null,
   master: null, bgmGain: null, sfxGain: null,
   el: null, elSrc: null,          // 현재 재생 중인 배경음
-  /* 지금 걸려 있는 페이즈. 맵이 바뀌었을 때 '라운드 중인가' 를 보고
-   * 곡을 갈아 끼울지 정합니다(applyTheme 끝부분).                    */
-  phaseKey: null,
   elNext: null, nextSrc: null,    // 크로스페이드 대상
   buffers: {},                    // 디코딩된 효과음
   missing: {},                    // 없는 파일 (재시도 방지)
-  have: {},                       // 배경음 파일 존재 여부 (probe 결과 캐시)
   unlocked: false,
   muted: false,
   vol: { master: 0.8, bgm: 0.45, sfx: 0.85 },
@@ -4273,54 +4190,11 @@ const Sound = {
   },
 
   /* ---------------- 배경음 ---------------- */
-  /* 이 파일이 있는가. 결과는 have 에 캐시해 한 번만 물어봅니다.
-   *
-   * ★ 왜 <audio> 의 error 이벤트를 안 쓰는가
-   *   없는 파일(404)에 대해 크롬은 error 를 쏘지 않습니다. stalled 만
-   *   한 번 남기고 networkState 를 LOADING 에 둔 채 멈춰 있습니다
-   *   (실측: loadstart 직후 → 3.3초 뒤 stalled · error 없음 · readyState 0).
-   *   그 상태로 두면 '없으면 공통 곡으로'가 아예 동작하지 않고 배경음이
-   *   조용히 안 나옵니다 — 맵별 곡을 아직 안 만든 지금이 바로 그 상태입니다.
-   *   그래서 재생 전에 HEAD 로 한 번 물어봅니다. 같은 주소(?v= 포함)라
-   *   실제 재생 요청은 캐시를 씁니다.                                */
-  probe(src) {
-    if (this.have[src] !== undefined) return Promise.resolve(this.have[src]);
-    const done = (ok) => {
-      this.have[src] = ok;
-      if (!ok) {
-        this.missing[src] = true;
-        /* 맵별 곡은 '아직 안 만든 것'이 정상입니다 — 오류가 아니라 안내. */
-        console.log('[IPG] 배경음 없음 → 다음 후보로: ' + src);
-      }
-      return ok;
-    };
-    return fetch(assetUrl(src), { method: 'HEAD' })
-      .then((r) => done(r.ok))
-      .catch(() => done(false));
-  },
-
   playBgm(phaseKey) {
     if (!this.unlocked) return;
-    this.phaseKey = phaseKey;
-    /* ★ 반드시 '순서대로' 걸어야 합니다.
-     *   종전에는 '있다고 확인된 아무 후보'를 먼저 찾았는데, 공통 곡이
-     *   대기 화면에서 한 번 확인되고 나면 맵별 곡은 물어보지도 않고
-     *   공통 곡으로 가 버립니다 — 맵별 음악이 영영 안 걸립니다.     */
-    for (const c of bgmCandidates(phaseKey, currentTheme)) {
-      if (this.have[c] === false) continue;          // 없는 것으로 확인됨
-      if (this.have[c] === true) { this.startBgm(c); return; }
-      /* 아직 모름 — 물어보고 다시 들어옵니다. 그 사이 페이즈가 바뀌었으면
-       * 그때 것이 우선이므로 버립니다.                              */
-      this.probe(c).then(() => {
-        if (this.phaseKey === phaseKey) this.playBgm(phaseKey);
-      });
-      return;
-    }
-  },
-
-  startBgm(src) {
+    const src = BGM[phaseKey] || BGM.play;
+    if (!src || this.missing[src]) return;
     if (this.elSrc === src && this.el && !this.el.paused) return;   // 같은 곡이면 유지
-    if (this.nextSrc === src) return;                // 이미 이 곡으로 넘어가는 중
 
     const next = new Audio(assetUrl(src));
     next.loop = true;
@@ -4332,22 +4206,11 @@ const Sound = {
      *   그걸 '파일이 없다'로 받아 missing 에 적어 버리면, 세 페이즈가 모두
      *   같은 파일을 쓰는 지금 구성에서는 첫 전환 한 번에 배경음이 영영
      *   꺼집니다. 실제로 그렇게 되고 있었습니다.                        */
-    /* ★ probe 를 통과했는데도 재생이 안 되는 경우의 안전망입니다
-     *   (파일은 있는데 깨졌거나 브라우저가 못 읽는 형식일 때).
-     *   '없는 파일'은 여기가 아니라 probe 가 걸러냅니다.           */
     next._onErr = () => {
       if (this.el !== next && this.elNext !== next) return;   // 이미 은퇴한 요소
       this.missing[src] = true;
-      this.have[src] = false;
-      console.warn('[IPG] 배경음을 재생할 수 없습니다(형식 확인): ' + src);
-      if (this.fadeTimer) { clearInterval(this.fadeTimer); this.fadeTimer = null; }
+      console.warn('[IPG] 배경음 파일이 없습니다: ' + src);
       if (this.elNext === next) { this.elNext = null; this.nextSrc = null; }
-      /* ★ error 가 크로스페이드(0.9초)보다 늦게 올 수 있습니다. 그러면
-       *   죽은 요소가 이미 this.el 로 승격된 뒤라, elNext 만 보고
-       *   되돌리면 다음 페이즈 전환까지 무음이 됩니다 — 종전에 배경음이
-       *   영영 꺼지던 것과 같은 모양의 버그입니다. 양쪽 다 봅니다. */
-      if (this.el === next) { this.retire(next); this.el = null; this.elSrc = null; }
-      this.playBgm(this.phaseKey);
     };
     next.addEventListener('error', next._onErr);
 
@@ -6156,12 +6019,7 @@ function separateFromRunners(dt) {
  *   38 유닛/초로 2칸(약 7.4유닛)이면 약 194ms — 서버 면제 창 400ms 의
  *   절반이라 대시 전체가 면제 안에서 끝납니다.
  * ------------------------------------------------------------------ */
-/* ★ 사출 소리는 여기 하나에만 답니다.
- *   내 것이면 이 함수를 지나고, 남의 것이면 지나지 않습니다
- *   (player_impulse 수신부에서 갈립니다). 남의 사출까지 소리를 내면
- *   4인 게임에서 신속심사 층이 시끄러워집니다.                     */
 function applyDashImpulse(d) {
-  Sound.sfx('boost');
   if (!d || !Array.isArray(d.vel) || !Array.isArray(d.to)) return;
   const vx = +d.vel[0] || 0, vz = +d.vel[2] || 0;
   const speed = Math.hypot(vx, vz);
@@ -6211,17 +6069,7 @@ function applyJumpImpulse(d) {
   contactTile = null;
   local.dash = null;              // 대시 중이었다면 여기서 끝냅니다
 
-  /* ★ 올라가는 층수마다 다른 소리를 씁니다.
-   *   1층·2층이 같은 소리면 '몇 층 올라갔는지'를 화면으로만 알 수
-   *   있는데, 솟는 동안에는 시선이 착지 지점에 가 있습니다.
-   *   파일이 없으면 buffers 에 안 들어오므로 기본 점프 소리로
-   *   받칩니다 — 소리가 사라지는 것보다 낫습니다.
-   *   관전자의 보정 기회도 level 1 로 여기를 지납니다. 같은 '한 층
-   *   올라가는 사건'이라 같은 소리가 맞습니다.                     */
-  const lv = (d.level | 0) >= 2 ? 2 : 1;
-  const stair = lv >= 2 ? 'stairJump2' : 'stairJump1';
-  if (Sound.buffers[stair]) Sound.sfx(stair);
-  else Sound.sfx('jump', { rate: lv >= 2 ? 0.8 : 1.0, volume: 0.9 });
+  Sound.sfx('jump', { rate: d.level >= 2 ? 0.8 : 1.0, volume: 0.9 });
   spawnJumpFx(local.pos.x, local.pos.y, local.pos.z, d.level || 1);
 }
 
@@ -9632,21 +9480,12 @@ function applyLayerEvent(d) {
         ? names.join(' · ') + ' 층 시야 ' + (st.clearTiles || 2) + '~' + (st.viewTiles || 3) + '칸'
         : 'PRIOR ART SEARCH';
     }
-    /* ★ 켜질 때와 꺼질 때 모두 소리를 냅니다.
-     *   어둠은 <b>화면이 어두워지는 것</b>으로만 알리는데, 시야가
-     *   좁아지는 순간에는 오히려 화면을 덜 보게 됩니다. 시작과 끝을
-     *   소리로 못 박아 두면 "언제 끝나는지"를 기다릴 수 있습니다.
-     * ★ 내가 그 층에 있을 때만입니다 — 다른 층에서 남의 층 사정까지
-     *   들리면 무슨 일인지 알 수 없는 소리가 됩니다.               */
     if (st.active && !wasActive) {
       netStats.darks++;
       if (onTraitLayer('dark')) {
         toast('어둠 — 주변 ' + (st.viewTiles || 3) + '칸 밖은 보이지 않습니다. 검색 타일을 찾으세요', 'obstacle');
-        if (Sound.buffers.powerDown) Sound.sfx('powerDown');
-        else Sound.sfx('obstacle', { rate: 0.55, volume: 0.7 });
+        Sound.sfx('obstacle', { rate: 0.55, volume: 0.7 });
       }
-    } else if (!st.active && wasActive) {
-      if (onTraitLayer('dark')) Sound.sfx('powerUp');
     }
   } else if (trait === 'rotate') {
     for (const el of (dom.docs || [])) {
@@ -9817,22 +9656,14 @@ function updateLayerStack(layer) {
 
 function updateRoster() {
   const rows = [];
-  const isAlive = (r) => (r.id === G.selfId ? local.alive : r.alive);
-  const entries = [...G.players.values()].sort((a, b) => (isAlive(b) - isAlive(a)));
+  const entries = [...G.players.values()].sort((a, b) => (b.alive - a.alive));
   for (const r of entries) {
     const isSelf = r.id === G.selfId;
-    /* ★ 내 층의 진실 원천은 local 입니다.
-     *   state 스냅샷에서 내 것은 건너뜁니다(로컬 예측을 덮으면 안 되므로).
-     *   그래서 G.players 의 내 항목은 참가 시점의 층(최상층)에 멈춰 있고,
-     *   명단에 내 층만 L6 으로 굳어 있었습니다. 이동이 클라이언트 권위이므로
-     *   남의 층은 스냅샷에서, 내 층은 local 에서 읽는 것이 맞습니다.   */
-    const alive = isSelf ? local.alive : r.alive;
-    const layer = isSelf ? local.layer : r.layer;
     rows.push(
-      '<div class="rrow' + (alive ? '' : ' dead') + '" style="border-left-color:' + (r.color || '#888') + '">' +
+      '<div class="rrow' + (r.alive ? '' : ' dead') + '" style="border-left-color:' + (r.color || '#888') + '">' +
       '<span>' + escapeHtml(safeName(r.name)) + '</span>' +
       (isSelf ? '<span class="you">YOU</span>' : '') +
-      '<span class="lay">' + (alive ? 'L' + (layer || '?') : 'OUT') + '</span>' +
+      '<span class="lay">' + (r.alive ? 'L' + (r.layer || 3) : 'OUT') + '</span>' +
       '</div>'
     );
   }
@@ -9926,17 +9757,7 @@ function updateCountdown() {
   if (G.phase === 'countdown' && G.phaseEndsAt) {
     const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
     const sec = Math.ceil(left / 1000);
-    if (sec !== lastCountdownSec && sec > 0 && sec <= 5) {
-      /* ★ '2 · 1 · GO' 는 <b>한 파일에 셋이 들어 있는</b> 소리라
-       *   2초 지점에서 한 번만 틀고, 그 뒤로는 tick 을 내지 않습니다.
-       *   매초 tick 을 겹쳐 내면 두 소리가 어긋나 박자가 깨집니다.
-       *   파일이 없으면 종전대로 매초 tick 입니다.                   */
-      if (Sound.buffers.countGo && sec <= 2) {
-        if (sec === 2) Sound.sfx('countGo');
-      } else {
-        Sound.sfx('tick');
-      }
-    }
+    if (sec !== lastCountdownSec && sec > 0 && sec <= 5) Sound.sfx('tick');
     lastCountdownSec = sec;
     dom.cdNum.textContent = sec;
     dom.cdLabel.textContent = G.solo ? '단독 심사 착수까지' : '심사 착수까지';
@@ -10498,14 +10319,9 @@ function connect(name, mode, opts) {
     rec.maxHits = d.maxHits;
     if (d.kind) rec.kind = d.kind;
     applyTileWear(rec);
-    /* ★ tile_hit 은 <b>아직 버티는</b> 밟기입니다(hits < maxHits).
-     *   바닥은 두 번 밟아야 무너지므로 여기 오는 것은 첫 밟기 —
-     *   '금이 갔다' 소리입니다. 두 번째 밟기는 붕괴가 예약되므로
-     *   tile_warn 으로 갑니다(아래).
-     *   파일이 없으면 buffers 에 안 들어오니 종전 'step' 으로 받칩니다. */
-    const hitKey = Sound.buffers.tile1 ? 'tile1' : 'step';
-    Sound.sfx(hitKey, {
-      pos: rec, rate: hitKey === 'step' ? 0.9 + d.hits * 0.08 : 1,
+    // 밟을수록 음이 높아져 "몇 번 남았는지"가 소리로도 읽힙니다
+    Sound.sfx('step', {
+      pos: rec, rate: 0.9 + d.hits * 0.08,
       volume: d.by === G.selfId ? 1 : 0.55
     });
   });
@@ -10517,13 +10333,9 @@ function connect(name, mode, opts) {
     if (d.hits !== undefined) rec.hits = d.hits;
     if (d.maxHits !== undefined) rec.maxHits = d.maxHits;
     startWarn(rec, d.fuse);
-    /* ★ tile_warn 은 <b>붕괴가 예약된</b> 밟기입니다 — 바닥에서는
-     *   두 번째 밟기입니다. 첫 밟기(tile_hit)와 소리를 달리해
-     *   "이번엔 꺼진다"를 발밑을 보지 않고도 알 수 있게 합니다.
-     *   내가 밟은 타일만 또렷하게, 남이 밟은 건 거리에 따라 작게.   */
-    const warnKey = Sound.buffers.tile2 ? 'tile2' : 'step';
-    Sound.sfx(warnKey, {
-      pos: rec, rate: warnKey === 'step' ? 0.94 + Math.random() * 0.12 : 1,
+    // 내가 밟은 타일만 또렷하게, 남이 밟은 건 거리에 따라 작게
+    Sound.sfx('step', {
+      pos: rec, rate: 0.94 + Math.random() * 0.12,
       volume: d.by === G.selfId ? 1 : 0.55
     });
   });
@@ -10555,14 +10367,8 @@ function connect(name, mode, opts) {
       breakTile(rec, id === d.tileId ? 2.4 : 1.6);
     }
     if (center) {
-      /* 폭탄 소리가 있으면 그것 하나로 갑니다 — 없을 때만 종전처럼
-       * 두 소리를 겹쳐 대신합니다.                                  */
-      if (Sound.buffers.bomb) {
-        Sound.sfx('bomb', { pos: center });
-      } else {
-        Sound.sfx('crack', { pos: center, rate: 0.72 });
-        Sound.sfx('death', { pos: center, volume: 0.5 });
-      }
+      Sound.sfx('crack', { pos: center, rate: 0.72 });
+      Sound.sfx('death', { pos: center, volume: 0.5 });
     }
   });
 
@@ -10597,14 +10403,6 @@ function connect(name, mode, opts) {
    * (점프 타일과 같은 경로), 여기서는 내 기회 소진만 기록합니다.   */
   socket.on('amend_granted', (e) => {
     if (e.byId === G.selfId) { G.amendUsed = true; updateActionCooldowns(); }
-    /* ★ 올라가는 사람의 자리에서 냅니다 — 방 전체가 듣되, 누가
-     *   도움을 받았는지가 소리의 방향으로도 읽힙니다.
-     *   실제 상승 소리(stairJump1)는 player_impulse 가 따로 냅니다.
-     *   이건 '기회가 쓰였다'는 신호라 겹쳐도 역할이 다릅니다.       */
-    let at = null;
-    if (e.targetId === G.selfId) at = local.pos;
-    else { const r = G.players.get(e.targetId); if (r && r.render) at = r.render; }
-    Sound.sfx('opportunity', at ? { pos: at } : undefined);
   });
 
   socket.on('booster_spawn', (e) => {
@@ -11701,53 +11499,6 @@ dom.btnJoin.addEventListener('click', () => {
 });
 
 dom.nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') dom.btnJoin.click(); });
-
-/* ══════════════════════════════════════════════════════════════════════
- * 클릭 소리
- * ────────────────────────────────────────────────────────────────────
- * ★ 대기 화면은 위임 한 줄로 끝납니다 — 버튼이 여럿이고(참가 방식·
- *   규격 접기·소리·심사실 목록·참가) 앞으로도 늘어날 자리라,
- *   각각에 리스너를 다는 대신 화면 하나에 걸어 둡니다.
- *
- * ★ 게임 화면의 층 안내(좌)·출원인 명단(우)에는 pointer-events 를
- *   주지 않습니다. 두 패널은 폭 208·212px 에 세로로 길어서, 클릭을
- *   받게 하면 그 위에서 시작한 드래그가 캔버스로 내려가지 않아
- *   시점 회전이 막힙니다. 그래서 '좌표가 패널 안인가'만 보고 소리를
- *   냅니다 — 패널은 그대로 투명하고 시점 회전도 그대로입니다.
- *
- * ★ 드래그와 구분합니다. 누른 자리에서 6px 이상 움직였으면 시점을
- *   돌린 것이지 누른 것이 아닙니다.
- * ------------------------------------------------------------------ */
-const CLICK_SLOP_PX = 6;
-
-if (dom.joinScreen) {
-  dom.joinScreen.addEventListener('click', (e) => {
-    const hit = e.target.closest && e.target.closest('button, .lbRow, .mode');
-    if (hit) Sound.sfx('click');
-  });
-}
-
-let clickDownAt = null;
-window.addEventListener('pointerdown', (e) => {
-  clickDownAt = { x: e.clientX, y: e.clientY };
-});
-window.addEventListener('pointerup', (e) => {
-  const d0 = clickDownAt;
-  clickDownAt = null;
-  if (!d0) return;
-  if (Math.hypot(e.clientX - d0.x, e.clientY - d0.y) > CLICK_SLOP_PX) return;   // 드래그
-  if (dom.joinScreen && dom.joinScreen.classList.contains('show')) return;      // 위에서 처리
-  const inside = (el) => {
-    if (!el || !el.offsetParent) return false;
-    const b = el.getBoundingClientRect();
-    return e.clientX >= b.left && e.clientX <= b.right &&
-           e.clientY >= b.top && e.clientY <= b.bottom;
-  };
-  if (inside(document.getElementById('layerStack')) ||
-      inside(document.getElementById('roster'))) {
-    Sound.sfx('click');
-  }
-});
 
 frame();
 </script>

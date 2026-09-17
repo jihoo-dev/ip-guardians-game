@@ -1138,7 +1138,7 @@ if (typeof THREE === 'undefined') {
  *
  * ★ assets/ 안의 파일을 갈아끼웠다면 이 숫자를 올리세요. 안 올리면
  *   이미 받은 사람은 1년 동안 옛 파일을 씁니다.                        */
-const ASSET_VER = '7';   // 2026-09-17 보정 기회 효과음 추가   // 2026-09-17 배경음 128kbps 재인코딩
+const ASSET_VER = '5';   // 2026-09-17 배경음 128kbps 재인코딩
 const assetUrl = (p) => p + (p.indexOf('?') >= 0 ? '&' : '?') + 'v=' + ASSET_VER;
 
 /* ============================ 0. constants ============================== */
@@ -1796,51 +1796,106 @@ loadOptionalTexture('assets/road_texture.png', 'road', 1);
  * ---------------------------------------------------------------------- */
 const SKY_RADIUS = 620;
 
+/* ══════════════════════════════════════════════════════════════════════
+ * 배경 테마 — 천공의 크리스탈 (Sky Crystal Arena)
+ * ────────────────────────────────────────────────────────────────────
+ * 2026-09-17: 캔디 스카이 / 네온 아레나 / 새벽 구름 세 세계를 걷어내고
+ * <b>하나의 세계에 세 시간대</b>로 다시 만들었습니다.
+ *
+ * ★ 왜 세 세계를 하나로 모았나
+ *   회차마다 세계관이 통째로 바뀌면 "이 게임은 어떤 곳인가"가 남지
+ *   않습니다. 맵이 순서대로 도는 지금 구조에서는 <b>같은 하늘의 다른
+ *   시간</b>이 훨씬 잘 읽힙니다 — 여명 → 한낮 → 오로라.
+ *   맵 순서 배정(nextThemeForNewRoom)과 맵별 배경음 구조는 그대로입니다.
+ *
+ * ★ 팔레트는 흰색 + 하늘색을 바탕으로, 시안 · 연분홍 · 연보라를 포인트로만
+ *   씁니다. 색을 더 늘리면 경기장이 장난감처럼 보입니다.
+ *
+ * ★ 이미지 파일은 여전히 0개입니다. 하늘은 셰이더 스카이돔, 구름·섬·링·
+ *   기둥·첨탑은 전부 절차적 생성 + 인스턴싱입니다.
+ *
+ * ⚠ 서버 THEME_NAMES 와 순서·길이가 같아야 합니다(로비 목록이 그 이름을
+ *   씁니다). 맵별 배경음 파일도 순서를 따릅니다 — bgm_map1 = 배열 0번.
+ * ══════════════════════════════════════════════════════════════════════ */
 const THEMES = [
   {
-    key: 'candy',
-    name: '캔디 스카이',
-    zenith:  0x1f7fd4, mid: 0x4aa8e8, horizon: 0xa8dcf5, ground: 0x7fc4e6,
-    sunColor: 0xfff3c4, sunDir: [0.35, 0.42, -0.84], sunSharp: 220, sunInt: 0.55,
+    /* ── 1번 맵 · 한낮 ────────────────────────────────────────────────
+     * 레퍼런스에 가장 가까운 얼굴입니다. 처음 들어온 사람이 보는 하늘이라
+     * 가장 밝고 맑게 둡니다 — 흰 구름, 높은 채도 없이 파랗기만 한 하늘. */
+    key: 'noon',
+    name: '천공의 크리스탈 · 한낮',
+    zenith:  0x18539c, mid: 0x3376be, horizon: 0x3d7ec0, ground: 0x5c96cf,
+    sunColor: 0xfffdf4, sunDir: [0.30, 0.48, -0.82], sunSharp: 260, sunInt: 0.50,
     stars: 0.0,
-    cloudBase: 0xdfeffb, cloudTop: 0xffffff, cloudCount: 26, cloudEmissive: 0.55,
-    seaBase: 0xdcefff, seaTop: 0xffffff, seaEmissive: 0.5, seaHaze: 0xa8dcf5, flash: 0xdff2ff,
-    prop: { kind: 'cube', colors: [0xff9ec4, 0xffe08a, 0x9ce8ff, 0xc4f5a8], count: 46 },
-    fog: 0xa8dcf5, fogDensity: 0.0030,
-    hemiSky: 0xcfeaff, hemiGround: 0x7fa8c8, hemiInt: 1.0,
-    keyColor: 0xffffff, keyInt: 1.05, rimColor: 0x8fe8ff, rimInt: 0.35
+    cloudBase: 0xeaf6ff, cloudTop: 0xffffff, cloudCount: 30, cloudEmissive: 0.62,
+    seaBase: 0xe6f4ff, seaTop: 0xffffff, seaEmissive: 0.55, seaHaze: 0xcfe8fb, flash: 0xeaf7ff,
+    props: [
+      /* 가까이 — 떠 있는 섬 */
+      { kind: 'island', colors: [0xeaf4ff, 0xd6e8fa], count: 14,
+        rMin: 78, rMax: 150, yMin: -10, yMax: 78, sMin: 7, sMax: 16 },
+      /* 중간 — 마법 링 · 크리스탈 기둥 */
+      { kind: 'ring', colors: [0x9be8f5, 0xf3bde0], count: 10,
+        rMin: 95, rMax: 200, yMin: 20, yMax: 115, sMin: 5, sMax: 12 },
+      { kind: 'pillar', colors: [0xa9ddf7, 0xd9c2f5], count: 12,
+        rMin: 88, rMax: 175, yMin: -6, yMax: 60, sMin: 4, sMax: 9, tall: 1.6 },
+      /* 멀리 — 천공의 성(첨탑 실루엣) */
+      { kind: 'spire', colors: [0xcfe4fa, 0xe3d4f7], count: 9,
+        rMin: 260, rMax: 380, yMin: 10, yMax: 90, sMin: 16, sMax: 34, tall: 2.1 }
+    ],
+    fog: 0x5f9acf, fogDensity: 0.0024,
+    hemiSky: 0xdcf0ff, hemiGround: 0x93b4d6, hemiInt: 1.10,
+    keyColor: 0xffffff, keyInt: 1.05, rimColor: 0x9be8f5, rimInt: 0.34
   },
   {
-    key: 'neon',
-    name: '네온 아레나',
-    zenith:  0x1668c8, mid: 0x3f9ce0, horizon: 0xbde9f0, ground: 0x8fd0dc,
-    sunColor: 0xd8fff6, sunDir: [-0.42, 0.36, -0.83], sunSharp: 160, sunInt: 0.6,
-    stars: 0.0,
-    cloudBase: 0xe4f4fa, cloudTop: 0xffffff, cloudCount: 20, cloudEmissive: 0.6,
-    seaBase: 0xd6f2f6, seaTop: 0xeafffd, seaEmissive: 0.55, seaHaze: 0x9fdce6, flash: 0xc9fff4,
-    prop: { kind: 'ring', colors: [0x00ffcc, 0x54ffb0, 0xff7fc4, 0x7fd8ff], count: 38 },
-    fog: 0xbde9f0, fogDensity: 0.0034,
-    hemiSky: 0xc4f0ff, hemiGround: 0x39708c, hemiInt: 0.92,
-    keyColor: 0xf2fbff, keyInt: 1.12, rimColor: 0x00ffcc, rimInt: 0.55
-  },
-  {
+    /* ── 2번 맵 · 여명 ────────────────────────────────────────────────
+     * 같은 하늘의 아침입니다. 지평선만 분홍으로 바꾸고 천정은 남보라로
+     * 내려, 한낮과 같은 장소라는 것이 남게 합니다. */
     key: 'dawn',
-    name: '새벽 구름',
-    /* ★ 지평선 0xf4c2a8 → 0xd08f6e (2026-09-14).
-     *   종전 색이 청구항 층 타일(0xffd2b5)과 ΔE 6.0 이었습니다 — 색 차이
-     *   10 미만이면 나란히 놓아도 같은 색으로 보이는 수준이라, 그 층에서
-     *   지평선 쪽을 보면 타일이 배경에 그대로 녹았습니다. 새벽의 따뜻한
-     *   색조는 그대로 두고 명도만 내려 ΔE 25.3 으로 벌렸습니다.
-     *   ground·fog 도 같이 내리지 않으면 지평선만 떠 보여 함께 옮깁니다. */
-    zenith:  0x4a4a9e, mid: 0x9a86d4, horizon: 0xd08f6e, ground: 0xb98fa4,
-    sunColor: 0xffd9a0, sunDir: [0.72, 0.16, -0.68], sunSharp: 90, sunInt: 0.9,
-    stars: 0.85,
-    cloudBase: 0xe7c8dc, cloudTop: 0xffe4c0, cloudCount: 24, cloudEmissive: 0.5,
-    seaBase: 0xecc9d8, seaTop: 0xffd9b0, seaEmissive: 0.5, seaHaze: 0xd9aec4, flash: 0xffdcc4,
-    prop: { kind: 'island', colors: [0xb9a2dd, 0xf0b8c8, 0xc9b0e8], count: 22 },
-    fog: 0xc49aa2, fogDensity: 0.0028,
-    hemiSky: 0xf5d2e4, hemiGround: 0x6a5a94, hemiInt: 0.95,
-    keyColor: 0xffdcb0, keyInt: 1.0, rimColor: 0xb98cff, rimInt: 0.5
+    name: '천공의 크리스탈 · 여명',
+    zenith:  0x33326f, mid: 0x5b4f96, horizon: 0xa8709c, ground: 0x8467a8,
+    sunColor: 0xfff0f4, sunDir: [-0.42, 0.26, -0.87], sunSharp: 180, sunInt: 0.68,
+    stars: 0.10,
+    cloudBase: 0xf6e4f2, cloudTop: 0xfffaff, cloudCount: 28, cloudEmissive: 0.58,
+    seaBase: 0xf3e2f0, seaTop: 0xfff6fb, seaEmissive: 0.5, seaHaze: 0xe7c9e6, flash: 0xfde9f4,
+    props: [
+      { kind: 'island', colors: [0xf1e2f3, 0xdccdee], count: 14,
+        rMin: 78, rMax: 150, yMin: -10, yMax: 78, sMin: 7, sMax: 16 },
+      { kind: 'ring', colors: [0xf7c2dd, 0xc4b0f2], count: 10,
+        rMin: 95, rMax: 200, yMin: 20, yMax: 115, sMin: 5, sMax: 12 },
+      { kind: 'pillar', colors: [0xf2bcd8, 0xc0aef0], count: 12,
+        rMin: 88, rMax: 175, yMin: -6, yMax: 60, sMin: 4, sMax: 9, tall: 1.6 },
+      { kind: 'spire', colors: [0xe6d2f2, 0xf7d4e6], count: 9,
+        rMin: 260, rMax: 380, yMin: 10, yMax: 90, sMin: 16, sMax: 34, tall: 2.1 }
+    ],
+    fog: 0x9b7196, fogDensity: 0.0028,
+    hemiSky: 0xf7dced, hemiGround: 0x8f7fb8, hemiInt: 1.05,
+    keyColor: 0xfff2f6, keyInt: 1.00, rimColor: 0xf7c2dd, rimInt: 0.40
+  },
+  {
+    /* ── 3번 맵 · 오로라 ──────────────────────────────────────────────
+     * 밤은 아닙니다 — 별을 조금 띄우되 지평선은 오로라 시안으로 밝게
+     * 남깁니다. 어둡게 가면 타일 대비가 무너지고(금 간 타일 5.33 실측)
+     * "몽환적이면서 밝은" 이라는 방향과도 어긋납니다. */
+    key: 'aurora',
+    name: '천공의 크리스탈 · 오로라',
+    zenith:  0x16255c, mid: 0x2f4a8c, horizon: 0x3f948e, ground: 0x486a96,
+    sunColor: 0xd8fff4, sunDir: [0.18, 0.55, -0.81], sunSharp: 150, sunInt: 0.46,
+    stars: 0.34,
+    cloudBase: 0xdaeef8, cloudTop: 0xf4ffff, cloudCount: 26, cloudEmissive: 0.66,
+    seaBase: 0xd4f0ee, seaTop: 0xf2ffff, seaEmissive: 0.62, seaHaze: 0xa8dfe8, flash: 0xdcfff8,
+    props: [
+      { kind: 'island', colors: [0xdceefb, 0xc6dcf2], count: 14,
+        rMin: 78, rMax: 150, yMin: -10, yMax: 78, sMin: 7, sMax: 16 },
+      { kind: 'ring', colors: [0x7ef0e2, 0xb9a6f0], count: 12,
+        rMin: 95, rMax: 200, yMin: 20, yMax: 115, sMin: 5, sMax: 13 },
+      { kind: 'pillar', colors: [0x86e8f0, 0xb6a2f2], count: 12,
+        rMin: 88, rMax: 175, yMin: -6, yMax: 60, sMin: 4, sMax: 9, tall: 1.6 },
+      { kind: 'spire', colors: [0xbfe4f7, 0xcdbaf5], count: 9,
+        rMin: 260, rMax: 380, yMin: 10, yMax: 90, sMin: 16, sMax: 34, tall: 2.1 }
+    ],
+    fog: 0x4a8294, fogDensity: 0.0029,
+    hemiSky: 0xcdf2ff, hemiGround: 0x5d6fa8, hemiInt: 1.05,
+    keyColor: 0xf2ffff, keyInt: 1.00, rimColor: 0x7ef0e2, rimInt: 0.46
   }
 ];
 
@@ -2003,42 +2058,94 @@ function buildClouds(t) {
 /* ── 떠다니는 소품 ─────────────────────────────────────────────────────
  * 맵마다 다른 오브젝트를 멀리 띄웁니다. 카메라를 돌릴 때 이것들이
  * 시차를 만들어 "배경이 진짜 3D 공간"처럼 느껴지게 합니다.             */
+/* ── 배경 소품 ────────────────────────────────────────────────────────
+ *
+ * ★ 한 테마가 여러 종류를 동시에 씁니다(props 배열). 종전에는 테마마다
+ *   한 종류(cube / ring / island)뿐이라 하늘이 늘 한 가지 물건으로만
+ *   채워졌습니다. 천공의 크리스탈은 <b>가까이 섬 · 중간에 링과 기둥 ·
+ *   멀리 첨탑</b> 이 겹쳐야 공간이 깊어 보입니다.
+ *
+ * ★ 전부 InstancedMesh 입니다. 종류 하나 + 색 하나가 드로우콜 1개이므로,
+ *   종류를 늘릴 때는 색 수를 줄여 총합을 봐야 합니다(현재 테마당 11콜).
+ *
+ * ★ 충돌체가 없습니다. 이 게임의 물리는 타일(G.tiles)하고만 판정하므로,
+ *   씬에 올린 장식 메시는 그 자체로 통과됩니다 — 낙하 경로를 막지
+ *   않습니다.
+ *
+ *   kind   : island 떠 있는 섬 · ring 마법 링 · pillar 크리스탈 기둥
+ *            shard 작은 결정 · spire 멀리 보이는 첨탑(성)
+ *   rMin~rMax : 중심에서의 거리. 경기장 반지름이 약 29 이므로 그보다
+ *               충분히 밖에 두어야 시야를 가리지 않습니다.
+ *   yMin~yMax : 높이. 최상층 y=90, 구름바다 y=-16 입니다.
+ * ------------------------------------------------------------------ */
+const PROP_GEO = {
+  ring:   () => new THREE.TorusGeometry(1, 0.20, 10, 30),
+  island: () => new THREE.CylinderGeometry(1, 0.52, 0.38, 7),
+  pillar: () => new THREE.CylinderGeometry(0.30, 0.72, 3.0, 6),
+  shard:  () => new THREE.OctahedronGeometry(1, 0),
+  spire:  () => new THREE.ConeGeometry(0.62, 3.4, 6)
+};
+
+/* 종류마다 재질 성격이 다릅니다 — 링은 발광체, 섬은 거의 무광. */
+const PROP_MAT = {
+  ring:   { emis: 0.95, rough: 0.20, metal: 0.30 },
+  island: { emis: 0.22, rough: 0.80, metal: 0.00 },
+  pillar: { emis: 0.70, rough: 0.18, metal: 0.25 },
+  shard:  { emis: 0.85, rough: 0.15, metal: 0.30 },
+  spire:  { emis: 0.55, rough: 0.25, metal: 0.20 }
+};
+
 function buildProps(t) {
   const group = new THREE.Group();
-  const cfg = t.prop;
+  const list = t.props || (t.prop ? [t.prop] : []);
 
-  let geo;
-  if (cfg.kind === 'ring')        geo = new THREE.TorusGeometry(1, 0.30, 10, 28);
-  else if (cfg.kind === 'island') geo = new THREE.CylinderGeometry(1, 0.62, 0.42, 7);
-  else                            geo = new THREE.BoxGeometry(1.4, 1.4, 1.4);
+  for (const cfg of list) {
+    const kind = cfg.kind || 'shard';
+    const geoFn = PROP_GEO[kind] || PROP_GEO.shard;
+    const look = PROP_MAT[kind] || PROP_MAT.shard;
+    const geo = geoFn();
 
-  for (const hex of cfg.colors) {
-    const col = new THREE.Color(hex);
-    const mat = new THREE.MeshStandardMaterial({
-      color: col,
-      emissive: col.clone().multiplyScalar(cfg.kind === 'ring' ? 0.85 : 0.30),
-      emissiveIntensity: 1.0,
-      roughness: cfg.kind === 'ring' ? 0.25 : 0.65,
-      metalness: cfg.kind === 'ring' ? 0.35 : 0.05
-    });
-    const n = Math.round(cfg.count / cfg.colors.length);
-    const inst = new THREE.InstancedMesh(geo, mat, n);
-    inst.frustumCulled = false;
+    for (const hex of cfg.colors) {
+      const col = new THREE.Color(hex);
+      const mat = new THREE.MeshStandardMaterial({
+        color: col,
+        emissive: col.clone().multiplyScalar(look.emis),
+        emissiveIntensity: 1.0,
+        roughness: look.rough,
+        metalness: look.metal
+      });
+      const n = Math.max(1, Math.round(cfg.count / cfg.colors.length));
+      const inst = new THREE.InstancedMesh(geo, mat, n);
+      inst.frustumCulled = false;
+      inst.castShadow = false;
+      inst.receiveShadow = false;
 
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion();
-    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
-    for (let i = 0; i < n; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const dist = 100 + Math.random() * 240;
-      const s = (cfg.kind === 'island' ? 9 : 3) * (0.6 + Math.random() * 1.5);
-      pos.set(Math.cos(ang) * dist, -30 + Math.random() * 120, Math.sin(ang) * dist);
-      scl.set(s, s, s);
-      q.setFromEuler(new THREE.Euler(Math.random() * 3, Math.random() * 3, Math.random() * 3));
-      m.compose(pos, q, scl);
-      inst.setMatrixAt(i, m);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion();
+      const pos = new THREE.Vector3(), scl = new THREE.Vector3();
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      for (let i = 0; i < n; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const dist = rnd(cfg.rMin, cfg.rMax);
+        const sc = rnd(cfg.sMin, cfg.sMax);
+        pos.set(Math.cos(ang) * dist, rnd(cfg.yMin, cfg.yMax), Math.sin(ang) * dist);
+        /* ★ 방향을 종류마다 다르게 둡니다. 전부 무작위로 돌리면 섬이
+         *   뒤집히고 기둥이 누워 "떠 있는 하늘"로 안 읽힙니다.       */
+        if (kind === 'ring') {
+          // 링은 세워서, 보는 각도만 살짝 흔듭니다
+          q.setFromEuler(new THREE.Euler(rnd(-0.5, 0.5), ang + rnd(-0.6, 0.6), rnd(-0.3, 0.3)));
+        } else if (kind === 'island' || kind === 'pillar' || kind === 'spire') {
+          // 수평/수직을 지킵니다
+          q.setFromEuler(new THREE.Euler(rnd(-0.06, 0.06), Math.random() * 6.28, rnd(-0.06, 0.06)));
+        } else {
+          q.setFromEuler(new THREE.Euler(Math.random() * 3, Math.random() * 3, Math.random() * 3));
+        }
+        scl.set(sc, sc * (cfg.tall || 1), sc);
+        m.compose(pos, q, scl);
+        inst.setMatrixAt(i, m);
+      }
+      inst.instanceMatrix.needsUpdate = true;
+      group.add(inst);
     }
-    inst.instanceMatrix.needsUpdate = true;
-    group.add(inst);
   }
   scene.add(group);
   return group;
@@ -2414,7 +2521,7 @@ function updateSplash(dt) {
  *                   두껍게 해도 착지 높이는 변하지 않습니다(윗면만 살짝 도톰).
  * ------------------------------------------------------------------ */
 const TILE_STYLE = {
-  normal:     { mix: 0.62,                                    emissive: 0.14, rough: 0.62, metal: 0.18, thick: 1.00 },
+  normal:     { mix: 0.16,                                    emissive: 0.14, rough: 0.28, metal: 0.30, thick: 1.00 },
   fragile:    { color: 0x6b0d12, emissiveColor: 0x330000,     emissive: 0.50, rough: 0.85, metal: 0.10, thick: 1.15 },
   /* ★ 강화 타일이 '바닥 그 자체'가 되면서 겉모습을 일반 타일과 같게
    *   맞췄습니다 (종전: 황동 고정색 0xc9a227 + 두께 1.28).
@@ -2429,8 +2536,8 @@ const TILE_STYLE = {
    *   상태가 바뀐 것만 눈에 띄면 되고, 밟기 전부터 튈 이유는 없습니다.
    *
    *   TILE_MIX 를 4종으로 되돌린다면 이 줄도 같이 되돌리세요.       */
-  reinforced: { mix: 0.62,                                    emissive: 0.14, rough: 0.62, metal: 0.18, thick: 1.00 },
-  special:    { mix: 0.00,                                    emissive: 0.85, rough: 0.30, metal: 0.45, thick: 1.08 }
+  reinforced: { mix: 0.16,                                    emissive: 0.14, rough: 0.28, metal: 0.30, thick: 1.00 },
+  special:    { mix: 0.00,                                    emissive: 0.85, rough: 0.18, metal: 0.50, thick: 1.08 }
 };
 /* ── 특수 타일 세부 종류별 색 덮어쓰기 ───────────────────────────────
  * TILE_STYLE 은 '종류(kind)' 단위라 special 안에서 갈리는 것들은 여기서
@@ -2633,7 +2740,13 @@ const TileInst = {
         sh.fragmentShader = 'varying float vIAlpha;\nvarying vec3 vIEmissive;\n' +
           sh.fragmentShader
             .replace('#include <emissivemap_fragment>',
-                     '#include <emissivemap_fragment>\n  totalEmissiveRadiance = vIEmissive;')
+                     '#include <emissivemap_fragment>\n' +
+                     '  totalEmissiveRadiance = vIEmissive;\n' +
+                     /* 스치는 각도일수록 밝아집니다. normal 은 여기서 이미
+                      * 뷰 공간이고(normal_fragment_begin 이 위에 있습니다),
+                      * vViewPosition 은 카메라에서 이 점으로 가는 벡터입니다. */
+                     '  float rimF = 1.0 - abs(dot(normalize(normal), normalize(vViewPosition)));\n' +
+                     '  totalEmissiveRadiance += vColor.rgb * pow(rimF, 2.2) * 0.42;')
             .replace('#include <dithering_fragment>',
                      '#include <dithering_fragment>\n  gl_FragColor.a *= vIAlpha;');
       };
@@ -4174,24 +4287,7 @@ const SFX = {
   stairJump2: { src: 'assets/audio/sfx_stair_jump_2.mp3', volume: 0.95 },
   /* UI 클릭. 화면 조작이라 게임 소리보다 작게 둡니다 — 같은 크기면
    * 대기 화면에서 버튼을 누를 때마다 배경음을 뚫고 튀어나옵니다.    */
-  click:      { src: 'assets/audio/sfx_click.mp3',        volume: 0.5 },
-
-  /* ── 2026-09-17 추가 ────────────────────────────────────────────
-   * 바닥을 밟는 소리를 <b>첫 번째와 두 번째로 나눴습니다.</b>
-   * 바닥은 두 번 밟아야 무너지는데, 소리가 같으면 지금 밟은 것이
-   * 몇 번째인지 <b>화면을 봐야만</b> 알 수 있습니다. 발밑은 달리는
-   * 동안 시선이 가장 덜 가는 곳이라, 두 번째를 소리로 알려 줍니다.
-   * ------------------------------------------------------------ */
-  tile1:      { src: 'assets/audio/sfx_tile1.mp3',        volume: 0.55 },  // 첫 밟기 — 금이 감
-  tile2:      { src: 'assets/audio/sfx_tile2.mp3',        volume: 0.75 },  // 두 번째 — 곧 무너짐
-  bomb:       { src: 'assets/audio/sfx_bomb.mp3',         volume: 1.0 },   // 거절이유 타일 폭발
-  boost:      { src: 'assets/audio/sfx_boost.mp3',        volume: 0.9 },   // 신속심사 사출
-  powerDown:  { src: 'assets/audio/sfx_power_down.mp3',   volume: 0.85 },  // 암전 시작
-  powerUp:    { src: 'assets/audio/sfx_power_up.mp3',     volume: 0.8 },   // 암전 끝
-  countGo:    { src: 'assets/audio/sfx_2_1_go.mp3',       volume: 1.0 },   // 2 · 1 · GO
-  /* 관전자가 보정 기회를 쓴 순간. 종전에는 이 사건에 소리가 아예
-   * 없었습니다 — 화면에 토스트만 떴습니다.                          */
-  opportunity: { src: 'assets/audio/sfx_opportunity.mp3', volume: 0.95 }
+  click:      { src: 'assets/audio/sfx_click.mp3',        volume: 0.5 }
 };
 
 const Sound = {
@@ -6156,12 +6252,7 @@ function separateFromRunners(dt) {
  *   38 유닛/초로 2칸(약 7.4유닛)이면 약 194ms — 서버 면제 창 400ms 의
  *   절반이라 대시 전체가 면제 안에서 끝납니다.
  * ------------------------------------------------------------------ */
-/* ★ 사출 소리는 여기 하나에만 답니다.
- *   내 것이면 이 함수를 지나고, 남의 것이면 지나지 않습니다
- *   (player_impulse 수신부에서 갈립니다). 남의 사출까지 소리를 내면
- *   4인 게임에서 신속심사 층이 시끄러워집니다.                     */
 function applyDashImpulse(d) {
-  Sound.sfx('boost');
   if (!d || !Array.isArray(d.vel) || !Array.isArray(d.to)) return;
   const vx = +d.vel[0] || 0, vz = +d.vel[2] || 0;
   const speed = Math.hypot(vx, vz);
@@ -9632,21 +9723,12 @@ function applyLayerEvent(d) {
         ? names.join(' · ') + ' 층 시야 ' + (st.clearTiles || 2) + '~' + (st.viewTiles || 3) + '칸'
         : 'PRIOR ART SEARCH';
     }
-    /* ★ 켜질 때와 꺼질 때 모두 소리를 냅니다.
-     *   어둠은 <b>화면이 어두워지는 것</b>으로만 알리는데, 시야가
-     *   좁아지는 순간에는 오히려 화면을 덜 보게 됩니다. 시작과 끝을
-     *   소리로 못 박아 두면 "언제 끝나는지"를 기다릴 수 있습니다.
-     * ★ 내가 그 층에 있을 때만입니다 — 다른 층에서 남의 층 사정까지
-     *   들리면 무슨 일인지 알 수 없는 소리가 됩니다.               */
     if (st.active && !wasActive) {
       netStats.darks++;
       if (onTraitLayer('dark')) {
         toast('어둠 — 주변 ' + (st.viewTiles || 3) + '칸 밖은 보이지 않습니다. 검색 타일을 찾으세요', 'obstacle');
-        if (Sound.buffers.powerDown) Sound.sfx('powerDown');
-        else Sound.sfx('obstacle', { rate: 0.55, volume: 0.7 });
+        Sound.sfx('obstacle', { rate: 0.55, volume: 0.7 });
       }
-    } else if (!st.active && wasActive) {
-      if (onTraitLayer('dark')) Sound.sfx('powerUp');
     }
   } else if (trait === 'rotate') {
     for (const el of (dom.docs || [])) {
@@ -9926,17 +10008,7 @@ function updateCountdown() {
   if (G.phase === 'countdown' && G.phaseEndsAt) {
     const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
     const sec = Math.ceil(left / 1000);
-    if (sec !== lastCountdownSec && sec > 0 && sec <= 5) {
-      /* ★ '2 · 1 · GO' 는 <b>한 파일에 셋이 들어 있는</b> 소리라
-       *   2초 지점에서 한 번만 틀고, 그 뒤로는 tick 을 내지 않습니다.
-       *   매초 tick 을 겹쳐 내면 두 소리가 어긋나 박자가 깨집니다.
-       *   파일이 없으면 종전대로 매초 tick 입니다.                   */
-      if (Sound.buffers.countGo && sec <= 2) {
-        if (sec === 2) Sound.sfx('countGo');
-      } else {
-        Sound.sfx('tick');
-      }
-    }
+    if (sec !== lastCountdownSec && sec > 0 && sec <= 5) Sound.sfx('tick');
     lastCountdownSec = sec;
     dom.cdNum.textContent = sec;
     dom.cdLabel.textContent = G.solo ? '단독 심사 착수까지' : '심사 착수까지';
@@ -10498,14 +10570,9 @@ function connect(name, mode, opts) {
     rec.maxHits = d.maxHits;
     if (d.kind) rec.kind = d.kind;
     applyTileWear(rec);
-    /* ★ tile_hit 은 <b>아직 버티는</b> 밟기입니다(hits < maxHits).
-     *   바닥은 두 번 밟아야 무너지므로 여기 오는 것은 첫 밟기 —
-     *   '금이 갔다' 소리입니다. 두 번째 밟기는 붕괴가 예약되므로
-     *   tile_warn 으로 갑니다(아래).
-     *   파일이 없으면 buffers 에 안 들어오니 종전 'step' 으로 받칩니다. */
-    const hitKey = Sound.buffers.tile1 ? 'tile1' : 'step';
-    Sound.sfx(hitKey, {
-      pos: rec, rate: hitKey === 'step' ? 0.9 + d.hits * 0.08 : 1,
+    // 밟을수록 음이 높아져 "몇 번 남았는지"가 소리로도 읽힙니다
+    Sound.sfx('step', {
+      pos: rec, rate: 0.9 + d.hits * 0.08,
       volume: d.by === G.selfId ? 1 : 0.55
     });
   });
@@ -10517,13 +10584,9 @@ function connect(name, mode, opts) {
     if (d.hits !== undefined) rec.hits = d.hits;
     if (d.maxHits !== undefined) rec.maxHits = d.maxHits;
     startWarn(rec, d.fuse);
-    /* ★ tile_warn 은 <b>붕괴가 예약된</b> 밟기입니다 — 바닥에서는
-     *   두 번째 밟기입니다. 첫 밟기(tile_hit)와 소리를 달리해
-     *   "이번엔 꺼진다"를 발밑을 보지 않고도 알 수 있게 합니다.
-     *   내가 밟은 타일만 또렷하게, 남이 밟은 건 거리에 따라 작게.   */
-    const warnKey = Sound.buffers.tile2 ? 'tile2' : 'step';
-    Sound.sfx(warnKey, {
-      pos: rec, rate: warnKey === 'step' ? 0.94 + Math.random() * 0.12 : 1,
+    // 내가 밟은 타일만 또렷하게, 남이 밟은 건 거리에 따라 작게
+    Sound.sfx('step', {
+      pos: rec, rate: 0.94 + Math.random() * 0.12,
       volume: d.by === G.selfId ? 1 : 0.55
     });
   });
@@ -10555,14 +10618,8 @@ function connect(name, mode, opts) {
       breakTile(rec, id === d.tileId ? 2.4 : 1.6);
     }
     if (center) {
-      /* 폭탄 소리가 있으면 그것 하나로 갑니다 — 없을 때만 종전처럼
-       * 두 소리를 겹쳐 대신합니다.                                  */
-      if (Sound.buffers.bomb) {
-        Sound.sfx('bomb', { pos: center });
-      } else {
-        Sound.sfx('crack', { pos: center, rate: 0.72 });
-        Sound.sfx('death', { pos: center, volume: 0.5 });
-      }
+      Sound.sfx('crack', { pos: center, rate: 0.72 });
+      Sound.sfx('death', { pos: center, volume: 0.5 });
     }
   });
 
@@ -10597,14 +10654,6 @@ function connect(name, mode, opts) {
    * (점프 타일과 같은 경로), 여기서는 내 기회 소진만 기록합니다.   */
   socket.on('amend_granted', (e) => {
     if (e.byId === G.selfId) { G.amendUsed = true; updateActionCooldowns(); }
-    /* ★ 올라가는 사람의 자리에서 냅니다 — 방 전체가 듣되, 누가
-     *   도움을 받았는지가 소리의 방향으로도 읽힙니다.
-     *   실제 상승 소리(stairJump1)는 player_impulse 가 따로 냅니다.
-     *   이건 '기회가 쓰였다'는 신호라 겹쳐도 역할이 다릅니다.       */
-    let at = null;
-    if (e.targetId === G.selfId) at = local.pos;
-    else { const r = G.players.get(e.targetId); if (r && r.render) at = r.render; }
-    Sound.sfx('opportunity', at ? { pos: at } : undefined);
   });
 
   socket.on('booster_spawn', (e) => {

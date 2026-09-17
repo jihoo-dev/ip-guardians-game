@@ -1138,7 +1138,7 @@ if (typeof THREE === 'undefined') {
  *
  * ★ assets/ 안의 파일을 갈아끼웠다면 이 숫자를 올리세요. 안 올리면
  *   이미 받은 사람은 1년 동안 옛 파일을 씁니다.                        */
-const ASSET_VER = '7';   // 2026-09-17 보정 기회 효과음 추가   // 2026-09-17 배경음 128kbps 재인코딩
+const ASSET_VER = '6';   // 2026-09-17 효과음 7종 추가   // 2026-09-17 배경음 128kbps 재인코딩
 const assetUrl = (p) => p + (p.indexOf('?') >= 0 ? '&' : '?') + 'v=' + ASSET_VER;
 
 /* ============================ 0. constants ============================== */
@@ -4188,10 +4188,7 @@ const SFX = {
   boost:      { src: 'assets/audio/sfx_boost.mp3',        volume: 0.9 },   // 신속심사 사출
   powerDown:  { src: 'assets/audio/sfx_power_down.mp3',   volume: 0.85 },  // 암전 시작
   powerUp:    { src: 'assets/audio/sfx_power_up.mp3',     volume: 0.8 },   // 암전 끝
-  countGo:    { src: 'assets/audio/sfx_2_1_go.mp3',       volume: 1.0 },   // 2 · 1 · GO
-  /* 관전자가 보정 기회를 쓴 순간. 종전에는 이 사건에 소리가 아예
-   * 없었습니다 — 화면에 토스트만 떴습니다.                          */
-  opportunity: { src: 'assets/audio/sfx_opportunity.mp3', volume: 0.95 }
+  countGo:    { src: 'assets/audio/sfx_2_1_go.mp3',       volume: 1.0 }    // 2 · 1 · GO
 };
 
 const Sound = {
@@ -10597,14 +10594,6 @@ function connect(name, mode, opts) {
    * (점프 타일과 같은 경로), 여기서는 내 기회 소진만 기록합니다.   */
   socket.on('amend_granted', (e) => {
     if (e.byId === G.selfId) { G.amendUsed = true; updateActionCooldowns(); }
-    /* ★ 올라가는 사람의 자리에서 냅니다 — 방 전체가 듣되, 누가
-     *   도움을 받았는지가 소리의 방향으로도 읽힙니다.
-     *   실제 상승 소리(stairJump1)는 player_impulse 가 따로 냅니다.
-     *   이건 '기회가 쓰였다'는 신호라 겹쳐도 역할이 다릅니다.       */
-    let at = null;
-    if (e.targetId === G.selfId) at = local.pos;
-    else { const r = G.players.get(e.targetId); if (r && r.render) at = r.render; }
-    Sound.sfx('opportunity', at ? { pos: at } : undefined);
   });
 
   socket.on('booster_spawn', (e) => {
