@@ -1,0 +1,1330 @@
+<title>심사 타워 전개도</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- ★ 글꼴을 렌더 차단으로 두지 않습니다.
+     이 문서가 아래에서 경고하는 바로 그 증상 — 사내망에서
+     fonts.googleapis.com 이 "거절"이 아니라 "무응답"으로 막히면,
+     <link rel=stylesheet> 는 렌더 차단 자원이라 그동안 화면이 통째로
+     비어 있습니다. 게임 본체는 글꼴을 자체 서빙해 이 문제를 끊었는데
+     이 문서는 그대로였습니다.
+
+     media="print" 로 받으면 브라우저가 화면용이 아니라고 보고 기다리지
+     않습니다. 다 받아진 뒤 onload 에서 all 로 바꿔 적용합니다 —
+     못 받으면 그냥 안 걸리고, 폴백 스택(--sans/--disp/--mono)의
+     맑은 고딕·system-ui 로 읽힙니다. 모양만 수수해지고 멈추지 않습니다.
+
+     스크립트가 꺼져 있으면 onload 가 안 도므로 noscript 로 종전과 같은
+     링크를 하나 둡니다 — 그 경우는 차단을 감수합니다. -->
+<link rel="stylesheet" media="print" onload="this.media=&quot;all&quot;"
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<noscript><link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap"></noscript>
+
+<style>
+  /* ── 토큰: 밝은 테마가 기본, 어두운 테마가 덮어씀 ───────────────── */
+  :root {
+    --bg:      #f4f6f9;
+    --panel:   #ffffff;
+    --panel-2: #eef1f6;
+    --rule:    #dce1ea;
+    --rule-2:  #c6cddb;
+    --ink:     #141922;
+    --ink-2:   #3d4657;
+    --muted:   #6b7488;
+    --accent:  #00a383;
+
+    --l6: #00a383;
+    --l5: #5b3ce0;
+    --l4: #0069c7;
+    --l3: #4f8c12;
+    --l2: #c05a0a;
+    --l1: #8400c7;
+    --sea: #6b7488;
+    --gone: #94a0b4;
+
+    --shadow: 0 1px 2px rgba(20,25,34,.06), 0 8px 24px -12px rgba(20,25,34,.18);
+
+    --sans: "IBM Plex Sans KR", system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    --disp: "Chakra Petch", "IBM Plex Sans KR", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:      #090c12;
+      --panel:   #10141d;
+      --panel-2: #161b26;
+      --rule:    #1f2635;
+      --rule-2:  #2c3547;
+      --ink:     #e2e8f2;
+      --ink-2:   #b0bacb;
+      --muted:   #79839a;
+      --accent:  #00ffcc;
+
+      --l6: #00ffcc;
+      --l5: #9b82ff;
+      --l4: #4aa8ff;
+      --l3: #a8e85c;
+      --l2: #ff8a3d;
+      --l1: #c463ff;
+      --sea: #7d8799;
+      --gone: #6b7689;
+
+      --shadow: 0 1px 0 rgba(255,255,255,.03), 0 12px 32px -18px rgba(0,0,0,.9);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg:      #090c12;
+    --panel:   #10141d;
+    --panel-2: #161b26;
+    --rule:    #1f2635;
+    --rule-2:  #2c3547;
+    --ink:     #e2e8f2;
+    --ink-2:   #b0bacb;
+    --muted:   #79839a;
+    --accent:  #00ffcc;
+
+    --l6: #00ffcc;
+    --l5: #9b82ff;
+    --l4: #4aa8ff;
+    --l3: #a8e85c;
+    --l2: #ff8a3d;
+    --l1: #c463ff;
+    --sea: #7d8799;
+    --gone: #6b7689;
+
+    --shadow: 0 1px 0 rgba(255,255,255,.03), 0 12px 32px -18px rgba(0,0,0,.9);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ── 머리말 ───────────────────────────────────────────────────── */
+  header.top {
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px; font-weight: 500;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--disp); font-weight: 700;
+    font-size: clamp(34px, 5.2vw, 56px);
+    line-height: 1.05; letter-spacing: -.01em;
+    margin: 0 0 20px; text-wrap: balance;
+  }
+  h1 .dim { color: var(--muted); font-weight: 500; }
+  .lede { max-width: 62ch; color: var(--ink-2); font-size: 16px; margin: 0; }
+  .lede + .lede { margin-top: 12px; }
+
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 28px;
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .meta b { color: var(--ink-2); font-weight: 500; }
+
+  /* ── 타워 ─────────────────────────────────────────────────────── */
+  .tower { position: relative; padding-top: 48px; }
+  .rail { position: absolute; left: 0; top: 64px; bottom: 0; width: 62px; display: none; }
+  @media (min-width: 900px) {
+    .rail { display: block; }
+    .tower { padding-left: 94px; }
+  }
+  .rail::before {
+    content: ""; position: absolute;
+    left: 55px; top: 6px; bottom: 96px; width: 1px;
+    background: linear-gradient(180deg, var(--rule-2), var(--rule) 70%, transparent);
+  }
+
+  .layer { position: relative; padding: 34px 0 38px; border-top: 1px solid var(--rule); }
+  .layer:first-of-type { border-top: 0; }
+
+  .lhead {
+    display: grid; grid-template-columns: auto 1fr auto;
+    align-items: baseline; gap: 0 18px; margin-bottom: 22px;
+  }
+  .lidx {
+    font-family: var(--disp); font-weight: 600; font-size: 46px;
+    line-height: .9; letter-spacing: -.02em; color: var(--lc);
+    font-variant-numeric: tabular-nums;
+  }
+  .lnames { min-width: 0; }
+  .lname {
+    font-family: var(--disp); font-weight: 600;
+    font-size: clamp(22px, 3vw, 30px); line-height: 1.15;
+    margin: 0; letter-spacing: -.005em;
+  }
+  .lshort {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    letter-spacing: .2em; text-transform: uppercase;
+    color: var(--muted); margin: 6px 0 0;
+  }
+  .lheight {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+
+  .tick {
+    position: absolute; left: -94px; width: 62px; text-align: right;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    font-variant-numeric: tabular-nums; display: none;
+  }
+  @media (min-width: 900px) { .tick { display: block; } }
+  .tick::after {
+    content: ""; position: absolute; right: -13px; top: 9px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--bg); border: 2px solid var(--lc);
+  }
+
+  .cards { display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 760px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+    .cards.one { grid-template-columns: 1fr; max-width: 680px; }
+  }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--rule);
+    border-radius: 3px; border-left: 3px solid var(--lc);
+    padding: 20px 22px 22px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .card.flat { border-left-color: var(--rule-2); }
+  .card.empty { border-left-style: dashed; background: transparent; box-shadow: none; }
+
+  .ckind {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: .2em; text-transform: uppercase; color: var(--muted);
+  }
+  .ctitle {
+    font-family: var(--disp); font-weight: 600; font-size: 19px;
+    line-height: 1.25; margin: -6px 0 0;
+  }
+  .ctitle .pct {
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    color: var(--lc); margin-left: 8px; letter-spacing: .02em;
+  }
+  .card p { margin: 0; color: var(--ink-2); }
+  .card p + p { margin-top: -2px; }
+  .card strong { color: var(--ink); font-weight: 600; }
+
+  dl.spec {
+    margin: 4px 0 0; display: grid; grid-template-columns: auto 1fr;
+    gap: 5px 16px; font-family: var(--mono); font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    border-top: 1px solid var(--rule); padding-top: 12px;
+  }
+  dl.spec dt { color: var(--muted); white-space: nowrap; }
+  dl.spec dd { margin: 0; color: var(--ink-2); }
+  dl.spec dd b { color: var(--ink); font-weight: 600; }
+
+  .note {
+    font-size: 13.5px; color: var(--muted);
+    border-left: 2px solid var(--rule-2); padding-left: 12px; margin: 2px 0 0;
+  }
+  .note b { color: var(--ink-2); font-weight: 600; }
+
+  .sea {
+    position: relative; margin-top: 8px; padding: 26px 24px;
+    border: 1px dashed var(--rule-2); border-radius: 3px;
+    background: var(--panel-2); --lc: var(--sea);
+  }
+  .sea h3 { font-family: var(--disp); font-weight: 600; font-size: 20px; margin: 0 0 6px; }
+  .sea p { margin: 0; color: var(--ink-2); max-width: 60ch; }
+  .sea .lheight { display: block; margin-top: 10px; }
+
+  /* ── 공통 섹션 ────────────────────────────────────────────────── */
+  section.block { padding-top: 72px; }
+  h2 {
+    font-family: var(--disp); font-weight: 600;
+    font-size: clamp(24px, 3.4vw, 32px); margin: 0 0 8px; letter-spacing: -.01em;
+  }
+  .sub { color: var(--muted); max-width: 64ch; margin: 0 0 26px; font-size: 15px; }
+
+  .tablewrap {
+    overflow-x: auto; border: 1px solid var(--rule);
+    border-radius: 3px; background: var(--panel); box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
+  th, td { text-align: left; padding: 13px 18px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: var(--muted); background: var(--panel-2); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, th.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.name { font-weight: 600; white-space: nowrap; }
+  td .en {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    font-weight: 400; display: block; letter-spacing: .06em;
+  }
+  td.desc { color: var(--ink-2); }
+  td.none { color: var(--muted); font-family: var(--mono); }
+
+  .chip {
+    display: inline-block; width: 9px; height: 9px;
+    border-radius: 2px; margin-right: 9px; vertical-align: 1px;
+  }
+
+  .grid2 { display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 760px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+
+  .changed {
+    margin-top: 20px; padding: 18px 22px;
+    border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+    border-radius: 3px; background: var(--panel);
+    font-size: 14px; color: var(--ink-2);
+  }
+  .changed .ckind { color: var(--accent); margin-bottom: 8px; display: block; }
+  .changed ul { margin: 8px 0 0; padding-left: 18px; }
+  .changed li { margin-bottom: 5px; }
+  .changed b { color: var(--ink); font-weight: 600; }
+  code {
+    font-family: var(--mono); font-size: .92em;
+    background: var(--panel-2); border: 1px solid var(--rule);
+    border-radius: 2px; padding: 1px 5px;
+  }
+
+  footer.end {
+    margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--rule);
+    font-family: var(--mono); font-size: 11.5px; color: var(--muted); letter-spacing: .04em;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card { transition: border-color .18s ease; }
+    .card:hover { border-color: var(--rule-2); }
+  }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">IP Guardians · Fast-Track Survival</p>
+  <h1>심사 타워 전개도<br><span class="dim">6개 층 · 특수 타일 · 층 특성</span></h1>
+  <p class="lede">출원은 맨 위 우선심사 층에서 시작해 아래로 떨어집니다. 한 층 내려갈 때마다 권리가 깎이고, 맨 밑 구름바다에 닿으면 거절결정입니다. <strong>한 층 떨어지는 것은 탈락이 아닙니다</strong> — 층이 곧 목숨이라, 구름바다까지 다섯 번을 더 떨어져야 끝납니다.</p>
+  <p class="lede">아래 수치는 전부 <code>server.js</code> 의 현재 값입니다. 층 번호가 아니라 층 태그(<code>special</code> / <code>trait</code>)로 판정하므로, 층 순서를 바꿔도 기믹은 그대로 따라갑니다.</p>
+  <div class="meta">
+    <span><b>6</b> 개 층 · 층 간격 <b>18</b></span>
+    <span>층당 <b>271</b> 타일 · 총 <b>1,626</b></span>
+    <span>타일 한 변 <b>3.017</b> (넓이 ×2)</span>
+    <span>라운드 상한 <b>6</b> 분 · 정원 <b>4</b> 인</span>
+    <span>동시 심사실 <b>40</b> 개까지 실측</span>
+  </div>
+</header>
+
+<div class="tower">
+  <div class="rail" aria-hidden="true"></div>
+
+  <!-- ───────────────────────── L6 ───────────────────────── -->
+  <article class="layer" style="--lc: var(--l6)">
+    <span class="tick">y 90</span>
+    <div class="lhead">
+      <span class="lidx">6</span>
+      <div class="lnames">
+        <h2 class="lname">우선심사 패스트트랙</h2>
+        <p class="lshort">Fast-Track</p>
+      </div>
+      <span class="lheight">출발 층</span>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <span class="ckind">특수 타일</span>
+        <h3 class="ctitle">신속심사 타일<span class="pct">전체의 20%</span></h3>
+        <p>밟으면 <strong>진행 방향으로 2칸 사출</strong>됩니다. <b>아직 한 번도 움직이지 않았다면 아레나 안쪽</b>으로 보냅니다 — 라운드가 막 시작되어 발판에서 떨어진 참이면 어디를 보고 있는지 알 수 없기 때문입니다.</p>
+        <p class="note">서버는 도착 지점만 정하고 실제 이동은 클라이언트가 합니다. 순간이동이 아니라 <b>정말로 달려가는</b> 방식이라, 다른 사람 화면에서도 끊기지 않습니다.</p>
+        <p class="note"><b>이 타일은 한 번만 밟아도 무너집니다</b>(0.7~1초 뒤). 바닥은 두 번인데 여기만 한 번인 이유는, 밟는 순간 2칸 밖으로 튀어나가 <b>어차피 그 자리에 남지 않기</b> 때문입니다.</p>
+        <dl class="spec">
+          <dt>거리</dt><dd>2칸 = <b>10.45</b> 유닛</dd>
+          <dt>속도</dt><dd>38 → 소요 <b>275ms</b></dd>
+          <dt>검증 면제</dt><dd><b>495ms</b></dd>
+          <dt>밟기</dt><dd><b>1</b>회 <span class="en">(바닥은 2회)</span></dd>
+        </dl>
+      </div>
+
+      <div class="card empty">
+        <span class="ckind">층 특성</span>
+        <h3 class="ctitle" style="color:var(--muted)">없음 — 출발 층</h3>
+        <p><strong>전원이 여기서 시작합니다.</strong> 사실상 학습 구간이라, 첫 층부터 대응 수단 없는 압박을 얹지 않으려고 비워 두었습니다.</p>
+        <p class="note">종전에는 <b>심사 가속</b>(퓨즈 ×1/2)이 걸려 있었습니다. 뺀 이유는 <b>퓨즈가 빨라진 것을 화면으로 알 방법이 없다</b>는 것이었습니다.</p>
+      </div>
+    </div>
+
+    <p class="note" style="margin-top:16px">
+      <b>스폰 보호.</b> 최상층 바깥 두 줄은 특수 타일 없이 <b>전부 기본 바닥</b>입니다 — 발판에서 떨어지자마자 함정을 밟는 사고를 막습니다.
+    </p>
+  </article>
+
+  <!-- ───────────────────────── L5 ───────────────────────── -->
+  <article class="layer" style="--lc: var(--l5)">
+    <span class="tick">y 72</span>
+    <div class="lhead">
+      <span class="lidx">5</span>
+      <div class="lnames">
+        <h2 class="lname">실체심사 / 선행기술조사</h2>
+        <p class="lshort">Examination</p>
+      </div>
+      <span class="lheight">−18</span>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <span class="ckind">층 특성</span>
+        <h3 class="ctitle">어둠<span class="pct">18초마다 8초</span></h3>
+        <p>주기적으로 <strong>암전 페이즈</strong>가 발생해 주변 <strong>2~3칸 밖</strong>이 완전한 검정으로 가려집니다. 화면에 <b>"선행기술이 있는지 알 수 없다. 조사하고 판단해야 한다."</b> 가 뜹니다.</p>
+        <p class="note">서버는 <b>언제부터 언제까지</b>만 알려주고, 실제로 가리는 일은 각 클라이언트가 <b>자기 위치</b> 기준으로 합니다. 카메라를 기준으로 삼으면 시점을 돌리는 것만으로 시야가 달라집니다.</p>
+        <dl class="spec">
+          <dt>한 바퀴</dt><dd><b>18</b>초 <span class="en">(지속 8 + 간격 10)</span></dd>
+          <dt>어두운 시간</dt><dd><b>44</b>%</dd>
+          <dt>그대로 보임</dt><dd><b>2</b>칸 <span class="en">(밝기 0.81)</span></dd>
+          <dt>감쇠</dt><dd>2~3칸 <span class="en">(0.29)</span></dd>
+          <dt>완전한 검정</dt><dd><b>3</b>칸부터 <span class="en">(0.00)</span></dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <span class="ckind">특수 타일</span>
+        <h3 class="ctitle">선행기술 검색 타일<span class="pct">전체의 20%</span></h3>
+        <p>밟는 즉시 <strong>레이더 스캔 연출</strong>과 함께 <strong>2초 동안</strong> 시야가 3칸에서 <strong>8칸</strong>으로 넓어집니다. 숨은 위험을 피해 안전한 발판을 찾는 수단입니다.</p>
+        <p class="note">시야가 넓어지는 것은 밟은 사람 한 명뿐이지만, <b>스캔 연출은 모두가 봅니다</b> — 어둠 속에서 누군가 조사 중이라는 것이 읽혀야 합니다.</p>
+        <dl class="spec">
+          <dt>시야</dt><dd>3칸 → <b>8</b>칸</dd>
+          <dt>지속</dt><dd><b>2</b>초</dd>
+          <dt>한 층에</dt><dd>약 <b>50</b>장</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="changed">
+      <span class="ckind">2026-09-17 — 뺐던 둘을 되살리고, 난이도를 두 번 올렸습니다</span>
+      2026-09-14 에 <b>"보이는 난이도만 남긴다"</b>는 기준으로 어둠과 검색 타일을 함께 뺐습니다. 어둠이 <b>"못 보는 것"이 난이도인 유일한 기믹</b>이었기 때문입니다.
+      <ul>
+        <li><b>그 우려는 그대로 유효합니다.</b> 다만 이 층에는 <b>해법이 같이 있습니다</b> — 검색 타일이 전체의 20% 라 한 층에 50장 남짓 깔립니다. 어둠만 있으면 배울 수 없지만, 어둠과 조사 수단이 한 세트면 <b>"보이지 않으면 조사한다"</b>가 규칙이 됩니다.</li>
+        <li><b>이 층에서만 말이 되는 조합입니다.</b> 선행기술은 있는지 없는지 모르는 것이고, 조사해야 비로소 보입니다. 다른 층에 붙이면 그냥 시야를 가리는 장치일 뿐입니다.</li>
+        <li><b>난이도를 두 번 올렸습니다 — 더 자주, 그다음 더 길게.</b> 되살려 놓고 보니 한 층을 지나는 동안 두어 번밖에 안 걸려 이 층의 성격이 드러나지 않았습니다.<br><span style="color:var(--muted)">종전 지속 6 · 간격 25 → 한 바퀴 31초 · 19%<br>1차 지속 6 · 간격 12 → 한 바퀴 <b>18초</b> · 33%<br>지금 지속 <b>8</b> · 간격 10 → 한 바퀴 <b>18초</b> · <b>44%</b><br><b>지속을 올리면서 간격을 같이 줄여 한 바퀴 18초는 그대로 두었습니다</b> — 지속만 올리면 한 바퀴가 20초로 늘어 1차에서 올린 빈도를 일부 무르게 됩니다. 간격은 <b>직전 종료부터</b> 셉니다. 하한은 이벤트 쉬는 간격 8초라 가장 빠르게 잡아도 한 바퀴 16초(50%). 실측 18.0초 · 지속 8.0초 · 44%.</span></li>
+        <li>⚠ <b>숨 고르는 층이 둘에서 하나(L3)로 줄었습니다.</b> 너무 빡빡하면 여기를 먼저 되돌리세요 — <code>LAYER_DEFS</code> 태그 두 개입니다. 구현은 끊어도 그대로 남습니다.</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- ───────────────────────── L4 ───────────────────────── -->
+  <article class="layer" style="--lc: var(--l4)">
+    <span class="tick">y 54</span>
+    <div class="lhead">
+      <span class="lidx">4</span>
+      <div class="lnames">
+        <h2 class="lname">의견제출통지</h2>
+        <p class="lshort">Office Action</p>
+      </div>
+      <span class="lheight">−36 · 클라이맥스</span>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <span class="ckind">특수 타일</span>
+        <h3 class="ctitle">거절이유 타일<span class="pct">전체의 15%</span></h3>
+        <p>평소엔 바닥과 똑같이 보입니다. 밟으면 잠시 뒤 폭발하면서 <strong>자기 자신과 이웃 6칸, 총 7칸을 한꺼번에</strong> 없앱니다.</p>
+        <p class="note"><b>연쇄 폭발은 없습니다.</b> 폭발 범위 안에 다른 거절이유 타일이 있어도 같이 제거만 하고 그쪽 폭발 예약은 취소합니다 — 허용하면 한 번 밟는 것으로 층 절반이 날아갑니다.</p>
+        <dl class="spec">
+          <dt>지연</dt><dd><b>1.5 ~ 2.0</b>초</dd>
+          <dt>범위</dt><dd>반경 1 = <b>7칸</b></dd>
+        </dl>
+      </div>
+
+      <div class="card">
+        <span class="ckind">층 특성</span>
+        <h3 class="ctitle">회전</h3>
+        <p>이 층은 <strong>항상 돌고 있습니다.</strong> 켜졌다 꺼지는 게 아니라, 일정 간격마다 <strong>방향만 반대로 뒤집힙니다.</strong> 위에 서 있는 주자도 층과 함께 실려 돕니다.</p>
+        <p class="note"><b>발이 닿아 있을 때만</b> 실려 돕니다 — 공중에서도 돌리면 점프 한 번에 목적지가 통째로 밀려나기 때문입니다.</p>
+        <dl class="spec">
+          <dt>각속도</dt><dd><b>0.12</b> rad/s = 6.9°/s · 한 바퀴 <b>52</b>초</dd>
+          <dt>반전 간격</dt><dd><b>15</b>초</dd>
+          <dt>가장자리</dt><dd><b>4.9</b> m/s (이동 속도 15의 약 1/3)</dd>
+        </dl>
+      </div>
+    </div>
+
+    <p class="note" style="margin-top:16px">
+      <b>6개 층 중 장치가 둘인 유일한 층입니다.</b> 절차상 가장 극적인 국면이라 의도적으로 클라이맥스로 두었습니다.
+      종전에 함께 있던 <b>보정 타일</b>(5%)은 빠졌습니다 — 한 라운드에 한 번 밟힐까 말까 했고 효과를 밟은 본인조차 알아채기 어려웠습니다. 대신 <b>보정을 층 하나로 승격</b>했습니다.
+    </p>
+  </article>
+
+  <!-- ───────────────────────── L3 ───────────────────────── -->
+  <article class="layer" style="--lc: var(--l3)">
+    <span class="tick">y 36</span>
+    <div class="lhead">
+      <span class="lidx">3</span>
+      <div class="lnames">
+        <h2 class="lname">보정</h2>
+        <p class="lshort">Amendment · 신설</p>
+      </div>
+      <span class="lheight">−54</span>
+    </div>
+
+    <div class="cards one">
+      <div class="card empty">
+        <span class="ckind">특수 타일 · 층 특성</span>
+        <h3 class="ctitle" style="color:var(--muted)">둘 다 없음 — 유일한 숨 고르는 층</h3>
+        <p>거절이유를 받은 출원인이 할 수 있는 일은 하나뿐입니다 — <strong>청구항을 스스로 좁히는 것.</strong> 심사관이 깎는 것이 아니라 출원인이 깎습니다. 지켜낸 권리는 반드시 처음보다 좁아져 있습니다.</p>
+        <p class="note">바로 위층(L4)이 폭발과 회전이 겹치는 클라이맥스라, 그 아래에 숨 돌릴 구간을 두었습니다.</p>
+        <p class="note"><b>이 층은 라운드를 길게 만드는 것 자체가 역할입니다.</b> 라운드가 너무 빨리 끝난다는 의견에 대한 답으로 신설됐습니다 — 층은 곧 목숨이라, 층을 하나 더 두면 구름바다까지 가는 길이 그만큼 길어집니다.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ───────────────────────── L2 ───────────────────────── -->
+  <article class="layer" style="--lc: var(--l2)">
+    <span class="tick">y 18</span>
+    <div class="lhead">
+      <span class="lidx">2</span>
+      <div class="lnames">
+        <h2 class="lname">청구항</h2>
+        <p class="lshort">Claim</p>
+      </div>
+      <span class="lheight">−72</span>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <span class="ckind">특수 타일</span>
+        <h3 class="ctitle">위상 타일<span class="pct">전체의 20%</span></h3>
+        <p><strong>2초 켜지고 1초 꺼지는</strong> 것을 반복합니다. 꺼져 있는 동안에는 아예 <strong>없는 것으로 처리</strong>되어, 그 위에 서 있으면 그대로 통과해 떨어집니다.</p>
+        <p class="note">방 전체가 <b>기준 시각 하나</b>로 리듬을 맞춥니다. 각자 세면 화면마다 깜빡이는 타이밍이 달라져, 누구는 밟히고 누구는 빠지는 일이 생깁니다.</p>
+        <dl class="spec">
+          <dt>켜짐</dt><dd><b>2,000ms</b></dd>
+          <dt>꺼짐</dt><dd><b>1,000ms</b></dd>
+          <dt>주기</dt><dd>3,000ms</dd>
+        </dl>
+      </div>
+
+      <div class="card empty">
+        <span class="ckind">층 특성</span>
+        <h3 class="ctitle" style="color:var(--muted)">없음</h3>
+        <p>위상 타일의 3초 리듬 자체가 이 층의 압박입니다. 여기에 이벤트를 더 얹으면 리듬을 읽을 여유가 사라집니다.</p>
+      </div>
+    </div>
+  </article>
+
+  <!-- ───────────────────────── L1 ───────────────────────── -->
+  <article class="layer" style="--lc: var(--l1)">
+    <span class="tick">y 0</span>
+    <div class="lhead">
+      <span class="lidx">1</span>
+      <div class="lnames">
+        <h2 class="lname">아이디어</h2>
+        <p class="lshort">Ideation</p>
+      </div>
+      <span class="lheight">−90 · 최하층</span>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <span class="ckind">특수 타일</span>
+        <h3 class="ctitle">점프 타일<span class="pct">전체의 20%</span></h3>
+        <p>최하층의 <strong>유일한 탈출구</strong>입니다. 밟으면 같은 좌표 그대로 위층으로 쏘아 올려집니다. 두 종류가 반반씩 섞여 있습니다.</p>
+        <p class="note">목표 층이 없으면 발동하지 않습니다 — 층 개수를 바꿔도 안전하도록 매번 찾아봅니다.</p>
+        <dl class="spec">
+          <dt>1단 (10%)</dt><dd>한 층 위 · v <b>48.5</b> · 상승 <b>0.78</b>초</dd>
+          <dt>2단 (10%)</dt><dd>두 층 위 · v <b>67.9</b> · 상승 <b>1.09</b>초</dd>
+          <dt>검증 면제</dt><dd><b>1,500ms</b></dd>
+        </dl>
+      </div>
+
+      <div class="card empty">
+        <span class="ckind">층 특성</span>
+        <h3 class="ctitle" style="color:var(--muted)">없음</h3>
+        <p>여기까지 떨어진 사람은 이미 벼랑 끝입니다. 점프 타일을 찾아 올라가는 것 말고 다른 부담을 더하지 않습니다.</p>
+      </div>
+    </div>
+  </article>
+
+  <div class="sea">
+    <h3>구름바다</h3>
+    <p>포기와 취하의 영역입니다. 닿는 순간 <strong>거절결정이 확정</strong>되고 탈락합니다. <strong>여기에 닿기 전까지는 살아 있습니다.</strong></p>
+    <span class="lheight">y −16 · 최하층보다 16 아래</span>
+  </div>
+</div>
+
+<!-- ───────────────────────── 공통: 타일 2종 ───────────────────────── -->
+<section class="block">
+  <h2>모든 층에 깔리는 타일 2종</h2>
+  <p class="sub">비율은 층과 무관하게 같습니다. <strong>특수 20%</strong> 만 층마다 다른 것으로 바뀌고, 장치가 없는 층에서는 그 20%도 기본 바닥으로 채워집니다.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>종류</th><th class="num">비율</th><th>동작</th><th class="num">사라지기까지</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="name">바닥 <span class="en">reinforced</span></td>
+          <td class="num">80%</td>
+          <td class="desc">한 번 밟으면 <strong>금이 갑니다</strong> — 그리고 <strong>다시 밟히기 전까지 버팁니다.</strong> 누구든 두 번째로 밟으면 그때부터 2.5초 뒤에 무너집니다.<br><b>단, 금 간 타일 위에 2.5초 머무르면 그 자리가 무너집니다</b> — 멈출 수 없습니다.<br><span style="color:var(--muted)">금이 간 자리는 층 색을 유지한 채 <strong>어둡게</strong> 죽습니다 — 어디가 이미 죽은 땅인지가 바닥에 그려집니다.</span></td>
+          <td class="num">2.5초 (2회째)<br>2.5초 (머무름)</td>
+        </tr>
+        <tr>
+          <td class="name">특수 <span class="en">special</span></td>
+          <td class="num">20%</td>
+          <td class="desc">층마다 다릅니다. 위 전개도 참고 — 의견제출통지 층만 이 20% 를 거절이유 15% + 바닥 5% 로 나눕니다.</td>
+          <td class="num">층별</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">왜 4종에서 2종으로 줄였나</span>
+    종전에는 일반(60%) · 취약(10%) · 강화(10%) · 특수(20%) 네 종류였습니다. 달리면서 색을 읽어 종류를 판별해야 했고, 특히 <b>취약 타일은 걸어서 건너면 절반쯤 발밑에서 꺼지는데 밟기 전에 알아볼 시간이 없었습니다.</b>
+    <ul>
+      <li><b>위협이 화면에 보이게 됩니다.</b> 1회 밟기 + 퓨즈 방식에서 플레이어를 죽이는 것은 등 뒤에서 조용히 타들어가는 타이머였습니다. 화면에 없는 것이 죽이니 배울 수가 없습니다. 2회 밟기는 첫 걸음이 바닥에 금을 남깁니다 — 난이도 하향이라기보다 <b>공정성 개선</b>입니다.</li>
+      <li><b>길목을 미리 밟아 없애는 플레이가 성립합니다.</b> 종전에는 밟으면 무조건 타이머가 돌았지만, 2회 규칙에서는 같은 줄을 두 번 밟는 것이 명백한 의도적 행위입니다.</li>
+      <li><b>자동 파괴 2.5초는 반드시 남아야 합니다.</b> 순수하게 "2번 밟아야 사라짐"으로만 두면 층이 죽지 않아 라운드가 상한에 걸려 무승부로 끝납니다.</li>
+    </ul>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">2026-09-16 — 바로 위 마지막 항목을 뒤집었습니다</span>
+    <b>걱정은 맞았고, 답이 틀렸습니다.</b> "2번 밟아야 사라짐"으로만 두면 층이 죽지 않는다 — 여기까지는 정확했습니다. 그런데 그 답으로 고른 <b>첫 밟기 자동 파괴</b>가 <b>2회 밟기 규칙 자체를 무의미하게</b> 만들고 있었습니다. 두 번째 사람이 2.5초 안에 오지 않으면 어차피 무너지므로, 실효 규칙은 내내 <b>"1번 밟으면 2.5초 뒤"</b> 였습니다.
+    <ul>
+      <li><b>같은 2.5초를 첫 밟기에서 마지막 밟기로 옮겼습니다.</b> 1번 밟으면 금이 간 채 버티고, 2번째로 밟히면 그때부터 2.5초입니다 — 두 번째에 즉시 꺼지면 피할 방법이 없기 때문입니다.</li>
+      <li><b>라운드가 짧다는 의견의 유일한 남은 지렛대였습니다.</b> 라운드 길이는 <code>층 수 × 층당 타일 수 × 한 칸 통과 시간 ÷ 주자 수</code> 로 정해지는데, 앞의 셋은 이미 손댔거나 부작용이 큽니다(층은 6개까지 늘렸고, 아레나를 넓히면 가로지르기가 길어지고, 이동을 늦추면 점프 사거리가 줄어듭니다). <b>타일당 필요 밟기 수</b>는 그 공식에 없던 항이고 아레나도 조작감도 건드리지 않습니다.</li>
+      <li><b>실측</b> — 반경 9 · 271장 · 한 칸 243ms · 200회 중앙값, 한 층이 버티는 시간: 1인 21.1 → <b>72~93초</b> · 2인 22.4 → <b>57~64초</b> · 4인 17.5 → <b>42.0초</b> (6층 환산 1.7분 → <b>4.2분</b>)</li>
+    </ul>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">이 규칙이 없으면 게임이 성립하지 않습니다 — 머무름 시계</span>
+    바닥이 "두 번 밟아야 무너진다"가 되면 <b>내가 서 있는 타일은 금만 간 채 영원히 버팁니다.</b> 그런데 시간이 다 되면 살아 있는 사람 전원이 승자이므로, <b>전원이 가만히 서 있으면 전원 공동 1위</b>가 됩니다. 행사장에서 한 명이 이걸 발견하면 그 회차는 거기서 끝납니다.
+    <br><br>
+    그래서 <b>금 간 타일 위에 2.5초 머무르면 그 자리가 무너집니다.</b> 달릴 때는 한 칸에 243ms 라 시계가 찰 틈이 없어 위의 이득은 그대로 남고, 멈추면 종전과 똑같이 2.5초입니다 — 종전에도 멈추면 발밑이 꺼져 한 층 떨어졌고, 그것이 <b>가만히 있을 수 없다</b>는 이 장르의 전제였습니다. 서사도 맞습니다: <b>머무르면 깎입니다.</b>
+  </div>
+</section>
+
+<!-- ───────────────────────── 가독성 ───────────────────────── -->
+<section class="block">
+  <h2>읽히게 만든 것들</h2>
+  <p class="sub">"타일이 배경과 구분되지 않는다" · "메시지가 겹쳐 복잡하다"는 의견에 대한 답입니다. 둘 다 <strong>측정해서</strong> 고쳤습니다.</p>
+
+  <div class="grid2">
+    <div class="card flat">
+      <span class="ckind">대비</span>
+      <h3 class="ctitle">명도가 같으면 눈은 형태를 못 봅니다</h3>
+      <p>재보니 <strong>타일과 배경의 WCAG 대비가 1.0~1.7</strong> 이었습니다. 1.0 이 "명도가 완전히 같다"이고 그래픽 요소 최소 권장치가 3.0 입니다 — 색상만으로 버티던 상태였습니다.</p>
+      <p class="note"><b>색만 바꿔서는 안 고쳐집니다.</b> 층 색 여섯이 명도 대역을 넓게 덮고 있어, 배경을 아무리 어둡게 해도 그중 한 층은 반드시 배경과 같은 밝기가 됩니다(최악 2.6 에서 한계).</p>
+      <dl class="spec">
+        <dt>금 간 타일</dt><dd>회색 → <b>어둡게</b> · 대비 1.11 → <b>5.00</b></dd>
+        <dt>금↔멀쩡</dt><dd>1.04 → <b>6.04</b></dd>
+        <dt>타일 테두리</dt><dd>정점 색으로 옆면·가장자리를 어둡게</dd>
+        <dt>경계 강도</dt><dd>0.381 → <b>0.589</b> (실측 픽셀)</dd>
+      </dl>
+    </div>
+
+    <div class="card flat">
+      <span class="ckind">깊이</span>
+      <h3 class="ctitle">구멍이 구멍으로 보이게</h3>
+      <p>위층은 흐리게 처리하고 있었지만 <strong>아래층은 그대로</strong>였습니다. 발밑 구멍으로 내려다보면 18 아래 층이 같은 파스텔로 또렷하게 보여, 바닥인지 구멍인지 구분이 안 됐습니다.</p>
+      <p class="note">투명도가 아니라 <b>밝기</b>를 낮춥니다 — 아래층은 "어디로 떨어질지 고르는" 정보라 반드시 보여야 합니다.</p>
+      <dl class="spec">
+        <dt>1칸 아래</dt><dd>×0.55 · 내 바닥과 대비 <b>4.33</b></dd>
+        <dt>2칸 아래</dt><dd>×0.42 · <b>6.31</b></dd>
+        <dt>3칸 이상</dt><dd>×0.35 · <b>6.7~9.6</b></dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">2026-09-17 — 층의 외곽이 너무 흐리다</span>
+    층 바깥은 <b>육각 난간</b>이 막습니다. 부딪히면 벽을 따라 미끄러지며 멈추므로, 이 게임에서 떨어지는 길은 <b>발밑이 무너지는 것</b> 하나뿐입니다. 그런데 그 난간이 거의 안 보였고, 원인이 셋이었습니다.
+    <ul>
+      <li><b>벽이 사실상 안 그려지고 있었습니다.</b> 세로 그라디언트가 높이 18% 에서 이미 0.42 로 떨어지는데 재질 투명도 0.55 가 거기 또 곱해져, <b>윗절반의 실효 알파가 0.07</b> 이었습니다.</li>
+      <li><b>발밑에는 아무 표시도 없었습니다.</b> 벽은 바닥에서 <b>위로 올라가는</b> 물건이라, 카메라가 뒤통수 위에 있는 이 게임에서는 시야 위쪽에 걸립니다. 정작 판단은 발끝에서 내리는데 발끝에 선이 없었습니다.</li>
+      <li>레일이 벽 꼭대기, 즉 그라디언트가 0 으로 끝나는 자리에 있어 <b>허공에 뜬 가는 선 하나</b>로 보였습니다.</li>
+    </ul>
+    그래서 한 겹을 더 깔았습니다 — <b>바닥 경계선</b>. 타일 윗면 높이에 누운 육각 띠라 달리는 중에 발끝으로 바로 읽힙니다. 벽은 "저 너머는 못 간다", 바닥선은 "여기가 끝이다" 로 역할이 갈립니다.
+    <br><br>
+    <span style="color:var(--muted)">벽 실효 알파(높이 55%) 0.066 → <b>0.23</b> · 벽 투명도 0.55 → <b>0.78</b> · 레일 0.16/0.85 → <b>0.26/1.0</b> · 바닥 경계선 <b>없음 → 있음</b>.<br><b>가장자리에 다가가면 내 층 난간만 밝아집니다</b>(78%에서 시작해 96%에서 최대. 실측 87%에서 0.50) — 여섯 층을 전부 진하게 두면 아레나가 유리병 속처럼 보이고 아래층 지형이 그 선들에 묻힙니다.<br>위에서 아래를 볼수록 외곽이 흐려지는 것은 <b>의도된 깊이 표현</b>입니다. 이번 변경은 그 단계를 건드리지 않고 기준값만 올렸습니다.</span>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">메시지 — 장소는 위, 사건은 아래</span>
+    층 안내(장소)와 타일 설명(사건)이 화면 같은 자리를 다투어 <b>28px 물리적으로 겹쳤습니다.</b> 성격이 다른 것을 다른 자리에 두어 겹칠 수 있는 구조 자체를 없앴습니다.
+    <ul>
+      <li><b>층 배너는 위</b> — 층 이름 22 → 34px, 기믹을 한 문장으로 뭉치지 않고 아이콘 항목으로 분리, 2.6초</li>
+      <li><b>사건 메시지는 아래</b> — 간격 −28px → <b>+299px</b>. 시선이 자기 캐릭터에 있으므로 오히려 더 잘 보입니다</li>
+      <li><b>층 목록에 기믹 상시</b> — 배너는 사라지지만 내가 선 층의 기믹은 왼쪽 목록에 계속 펼쳐져 있습니다</li>
+      <li><b>큐잉</b> — 배너가 떠 있는 동안 도착한 타일 안내는 줄을 세웠다가 <b>2.5초</b> 간격으로 하나씩 <span style="color:var(--muted)">(0.6초였는데, 토스트가 3.6초 떠 있고 동시 표시가 2개라 첫 줄을 다 읽기 전에 밀려났습니다)</span></li>
+    </ul>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">2026-09-17 — 알림이 너무 잦아 몰입이 어렵다</span>
+    자리를 나눈 것만으로는 부족했습니다. 세어 보니 한 회차에 뜨는 줄의 <b>대부분이 내가 몰라도 되는 것</b>이었습니다.
+    <ul>
+      <li><b>이미 화면에 떠 있는 것을 또 말했습니다.</b> 어둠은 전면 배너가 켜져 있는 내내 화면을 덮고 있는데, 토스트가 <b>18초마다</b> 같은 말을 반복했습니다(지속 8초 + 간격 10초).</li>
+      <li><b>남이 한 일을 중계했습니다.</b> 5F 타일의 20%가 검색 타일이라 4인 게임에서 가장 잦은 줄이 이것이었고, 게다가 <b>검색 펄스·폭발·되살아나는 타일은 3D 화면에 이미 보입니다</b> — 글자는 같은 사건을 두 번째로 말하는 것이었습니다.</li>
+      <li><b>같은 줄이 연달아 떴습니다.</b> 위치 보정·착지 실패·개입 거절처럼 원인이 지속되는 동안 매번 새 줄이 쌓였습니다.</li>
+    </ul>
+    <b>L5 에서 60초 실제 플레이로 측정 — 12줄 → 2줄.</b> 어둠 7회 호출 → 0(회차 첫 1회에서 이미 소진) · 선행기술 검색 4회 → 1 · 거절이유 1회 → 1.
+    <br><br>
+    <span style="color:var(--muted)"><b>지운 것이 아니라 꺼 둔 것입니다</b> — 행사장에서 "그 줄이 보고 싶다"가 나오면 브라우저 설정 한 줄로 전부 돌아옵니다.<br><b>초당 몇 줄 같은 전역 제한은 일부러 넣지 않았습니다.</b> 중요한 줄 둘이 같은 순간에 오는 경우(착지 실패 + 탈락)가 실제로 있는데, 시간으로 자르면 그때 어느 쪽이 사라질지 고를 수 없습니다. <b>무엇을</b> 줄일지 정하는 편이 예측 가능합니다.</span>
+  </div>
+</section>
+
+<!-- ───────────────────────── 라운드의 끝 ───────────────────────── -->
+<section class="block">
+  <h2>라운드의 끝 — 도장이 찍힌다</h2>
+  <p class="sub">시작이 "게이트가 열린다"이므로 끝은 "도장이 찍힌다"입니다. 탈락과 승리가 같은 부품을 쓰고 색과 문구만 갈립니다.</p>
+
+  <div class="grid2">
+    <div class="card" style="--lc:var(--l2)">
+      <span class="ckind">탈락</span>
+      <h3 class="ctitle">거절결정</h3>
+      <p>구름에 닿는 순간 <strong>서류 조각</strong>이 솟구치고, <strong>1.6초</strong>에 걸쳐 감속하며 가라앉습니다. 62% 지점에서 붉은 <strong>거절결정 도장</strong>이 화면에 쿵 찍힙니다.</p>
+      <p class="note">종전에는 0.75초 만에 끝나 <b>졌다는 것을 느낄 틈이 없었습니다.</b> 다만 "슬로우"를 전역 시간으로 만들지는 않았습니다 — 다른 주자는 계속 뛰고 있습니다.</p>
+      <dl class="spec">
+        <dt>문구</dt><dd>거절결정 · REJECTED · 특허법 제62조</dd>
+      </dl>
+    </div>
+
+    <div class="card" style="--lc:var(--l4)">
+      <span class="ckind">승리</span>
+      <h3 class="ctitle">등록결정</h3>
+      <p>남은 타일이 멎고 승자 발밑에서 <strong>빛기둥</strong>이 솟습니다. 카메라가 <strong>0.42 rad/s</strong>로 공전하는 사이 <strong>특허등록증</strong>이 펼쳐지고, 그 위에 남색 <strong>등록결정 도장</strong>이 찍힙니다.</p>
+      <p class="note">빛기둥은 <b>시작 연출의 부품을 그대로 재사용</b>합니다 — 시작의 게이트와 끝의 빛기둥이 같은 빛이어야 한 게임으로 보입니다.</p>
+      <dl class="spec">
+        <dt>등록번호</dt><dd>맵 시드에서 생성 — 같은 라운드를 본 모두가 같은 번호</dd>
+        <dt>결과 패널</dt><dd>3.4초 뒤 (연출이 끝난 다음)</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── 이벤트 조정 ───────────────────────── -->
+<section class="block">
+  <h2>층 특성은 라운드 시작 직후 발동하지 않습니다</h2>
+  <p class="sub">특성별 시계를 그대로 두면 라운드 시작하자마자 가장 가혹한 것이 오고, 특성끼리 겹쳐 의도 없는 구간이 생깁니다. 그래서 조정자를 하나 둡니다.</p>
+
+  <div class="grid2">
+    <div class="card flat">
+      <span class="ckind">예열</span>
+      <h3 class="ctitle">시작 후 25초는 조용합니다</h3>
+      <p>라운드가 시작되고 <strong>25초 동안은 어떤 층 특성도 발동하지 않습니다.</strong> 전원이 최상층으로 낙하해 조작을 익히는 구간입니다.</p>
+      <p class="note">지금 남은 층 특성은 <b>회전 하나뿐</b>이라, 실질적으로는 "회전이 25초 뒤부터 시작된다"는 뜻입니다.</p>
+    </div>
+
+    <div class="card flat">
+      <span class="ckind">간격 · 배타</span>
+      <h3 class="ctitle">한 번에 하나씩, 최소 8초 쉬고</h3>
+      <p>켜졌다 꺼지는 <strong>지속형</strong> 특성은 동시에 발동하지 않고, 하나가 끝나면 최소 8초를 쉽니다.</p>
+      <p class="note">지속형(심사 가속·어둠)을 전부 빼면서 <b>지금은 막을 대상이 없습니다.</b> 조정자를 지우지 않고 남겨 둔 이유는, 나중에 지속형 특성을 되살리거나 새로 만들 때 같은 실수를 반복하지 않기 위해서입니다.</p>
+    </div>
+  </div>
+
+  <p class="note" style="margin-top:16px; max-width:72ch">
+    <b>회전은 예외입니다.</b> 회전은 켜졌다 꺼지는 게 아니라 방향만 뒤집히는 순간 이벤트라, "겹친다"는 개념이 성립하지 않습니다. 조정을 받게 하면 회전 방향이 영영 안 바뀝니다.
+  </p>
+</section>
+
+<!-- ───────────────────────── 대기실 ───────────────────────── -->
+<section class="block">
+  <h2>대기실 — 시계가 아니라 사람이 시작시킵니다</h2>
+  <p class="sub">참가를 누르면 최상층 위 <b>공중 발판</b>에 섭니다. 여기가 곧 대기실입니다 — 각자 자기 발판에 서 있고, 오른쪽에 명단이 있고, 시작하면 발판이 갈라지며 다 같이 떨어집니다. <b>별도의 로비 화면을 만들지 않은 이유</b>가 이것입니다: 화면을 한 겹 끼우면 그 연출이 뒤로 밀립니다.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>누가</th><th>무엇을</th><th>언제</th></tr></thead>
+      <tbody>
+        <tr><td class="name">방장</td><td class="desc"><b>심사 개시</b> <span class="en">ENTER</span> <span style="color:var(--muted)">— 혼자면 <b>연습 시작</b></span></td><td class="desc">전원이 준비를 마쳤을 때</td></tr>
+        <tr><td class="name">그 외</td><td class="desc"><b>준비</b> <span class="en">ENTER</span> <span style="color:var(--muted)">— 다시 누르면 취소</span></td><td class="desc">언제든</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">2026-09-17 — 종전에는 시계가 시작시켰습니다</span>
+    정원이 차거나 20초가 지나면 알아서 시작했습니다. 그래서 늘 둘 중 하나였습니다 — <b>아직 안 왔는데 시작하거나, 다 모였는데 20초를 기다리거나.</b> 같이 온 사람끼리 한 방에 모이려면 <code>RM-9BUG6</code> 같은 방 번호를 서로 불러 줘야 했습니다.
+    <ul>
+      <li><b>정원이 차도 자동으로 시작하지 않습니다.</b> 종전에는 4명째가 들어오는 순간 카운트다운이었는데, 마지막에 들어온 사람은 자기 이름을 확인할 새도 없이 끌려 들어갑니다. 정원이 찼다는 것은 <b>준비를 누를 사람이 다 모였다</b>는 뜻일 뿐입니다.</li>
+      <li><b>방장에게는 준비가 없습니다.</b> 방장의 준비는 <b>심사 개시</b> 를 누르는 것 자체입니다. 둘 다 주면 준비를 누른 뒤 시작을 또 눌러야 하는 두 단계가 됩니다.</li>
+      <li><b>버튼이 왜 안 눌리는지를 버튼 위에 적습니다</b> — <span style="color:var(--muted)">준비 2/3 · 아직 박발명 님</span>. 비활성 버튼만 두면 고장으로 읽히고, 누구를 기다리는지 알아야 방장이 그 사람에게 말을 걸 수 있습니다.</li>
+      <li>명단은 <b>대기 중에만 층 번호 대신 준비 상태</b>를 보여 줍니다. 모두 같은 발판 위라 층이 정보가 아닙니다.</li>
+    </ul>
+  </div>
+
+  <div class="grid2">
+    <div class="card flat">
+      <span class="ckind">방장</span>
+      <h3 class="ctitle">처음 들어온 사람, 그다음 사람</h3>
+      <p>방에 <b>처음 들어온 주자</b>가 방장입니다. 나가면 <b>남은 사람 중 가장 먼저 들어온 사람</b>에게 넘어갑니다 — 한 번 더 나가면 그다음 사람으로, 입장 순서대로입니다.</p>
+      <p class="note">라운드 중에 넘어갈 때는 알리지 않습니다 — 뛰는 중에 알려 봐야 할 일이 없고, 다음 회차 대기실에서 배지로 보입니다.<br>주자 명단이 <b>넣은 순서를 지키는 자료구조</b>라, 첫 항목을 집으면 그 사람입니다. 입장 시각을 따로 들고 다니지 않습니다.</p>
+      <dl class="spec">
+        <dt>지정</dt><dd>첫 입장 주자</dd>
+        <dt>위임</dt><dd>입장 순서대로</dd>
+        <dt>관전자</dt><dd>방장 안 됨</dd>
+      </dl>
+    </div>
+    <div class="card flat">
+      <span class="ckind">안전망</span>
+      <h3 class="ctitle">멈춰 버리지 않게</h3>
+      <p>행사장은 <b>조작법을 모르는 사람이 계속 들어오는 자리</b>입니다. 방장이 자리를 뜨거나 누군가 준비 버튼을 못 찾으면, 사람이 시작시키는 구조는 그대로 멈춥니다. 종전의 시계는 그걸 막고 있던 장치이기도 했습니다.</p>
+      <p class="note"><b>혼자일 때는 안전망이 없습니다 — 눌러야 시작합니다.</b> 자동으로 돌면 구경만 하려고 열어 둔 탭이 제멋대로 연습 회차를 돌립니다. 종전 <span class="en">SOLO_WAIT_MS</span> 가 정확히 그렇게 동작했습니다.</p>
+      <dl class="spec">
+        <dt>전원 준비 후</dt><dd><b>15</b>초 <span class="en">READY_AUTO_MS</span></dd>
+        <dt>아무도 안 누르면</dt><dd><b>90</b>초 <span class="en">LOBBY_STALL_MS</span></dd>
+        <dt>혼자</dt><dd>없음</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">참가 버튼이 둘이 됐습니다 · 그리고 옛 우려</span>
+    <b>빠른 참가</b>(자리 있는 방에 자동 배정, 종전 동작)와 <b>방 만들기</b>(빈 방을 일부러 엽니다 — 만든 사람이 방장)입니다. 혼자 온 사람은 생각 없이 왼쪽을 누르면 되고, 일행은 방을 파서 모입니다.
+    <br><br>
+    이 자리에는 원래 <b>"참가자가 방을 새로 만들 수단은 없습니다"</b> 라고 적혀 있었습니다. 근거는 <b>12명이 6개 방에 2명씩 흩어지면 어느 방도 정원이 안 차서 전부 타임아웃까지 기다리게 된다</b>는 것이었고, 그 시절 규칙에서는 맞는 말이었습니다.
+    <br><br>
+    <b>시작 조건이 바뀌면서 그 전제가 사라졌습니다.</b> 이제 정원과 무관하게 방장이 누르면 2명이라도 시작합니다 — 흩어지는 것이 곧 멈추는 것이 아니게 되어, 방을 만드는 자유를 막을 이유가 없어졌습니다. 다만 기본값은 여전히 빠른 참가입니다(버튼이 더 크고 왼쪽에 있습니다).
+  </div>
+
+  <div class="changed">
+    <span class="ckind">화면에 있었지만 누를 수 없던 버튼</span>
+    만들어 놓고 실제로 눌러 보니 <b>아무 반응이 없었습니다.</b> HUD 는 통째로 클릭을 통과시키고(<span class="en">pointer-events:none</span>) 그 안에서 눌러야 하는 것만 하나씩 되살리는 구조인데, 새로 만든 대기실 패널에 그걸 빠뜨렸습니다. <b>버튼은 멀쩡히 그려지지만 클릭이 뒤의 3D 화면으로 그대로 지나갑니다.</b>
+    <br><br>
+    <span style="color:var(--muted)"><b>검증이 이걸 못 잡은 이유</b> — 자동화로 버튼을 누를 때 쓴 방법이 <span class="en">click()</span> 이었는데, 그건 클릭 통과 여부를 건너뛰고 기능을 직접 부릅니다. <b>실제 마우스로는 닿지 않는 버튼을 "눌러서 잘 된다"고 확인한 셈</b>입니다. 지금은 브라우저 자신의 히트 테스트로 봅니다 — 고치기 전에는 버튼 한가운데를 찍으면 <span class="en">CANVAS</span> 가, 고친 뒤에는 버튼이 잡힙니다. 새로 만든 누를 수 있는 것 8개를 같은 방법으로 전부 확인했습니다.</span>
+    <br><br>
+    같이 <b>ENTER 키</b>도 열었습니다. 혼자 들어오면 화면에 자기 이름 하나뿐이라 <b>버튼을 찾기 전에 키부터 눌러 봅니다</b> — 실제로 그 보고를 받았습니다. 버튼 글자에도 <b>ENTER</b> 를 같이 적었습니다. 스페이스는 쓰지 않습니다(점프라서, 발판 위에서 뛰다가 라운드가 시작됩니다).
+  </div>
+</section>
+
+<!-- 연습 모드 -->
+<section class="block">
+  <h2>혼자일 때 — 연습 모드(단독 심사)</h2>
+  <p class="sub">행사장에서 처음 와서 앉는 사람은 대개 <b>혼자</b>입니다. 그런데 이 게임의 승리 조건은 '마지막 한 사람'이라 혼자서는 성립하지 않습니다. 종전에는 그 경로가 <b>이름 없이</b> 존재했습니다 — 기다리다 그냥 시작되고, 떨어지면 "전원 탈락"이라고 했습니다. 그 '전원'이 나 하나입니다.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>단계</th><th>화면에 나오는 말</th></tr></thead>
+      <tbody>
+        <tr><td class="name">대기</td><td class="desc">혼자입니다 — 지금 시작하면 <b>연습 모드 · 단독 심사</b> 로 진행됩니다</td></tr>
+        <tr><td class="name">시작</td><td class="desc"><b>연습 시작</b> <span class="en">ENTER</span> <span style="color:var(--muted)">— 혼자일 때는 기다려 주지 않습니다. 눌러야 시작합니다</span></td></tr>
+        <tr><td class="name">전환</td><td class="desc">연습 모드 — <b>단독 심사를 시작합니다</b></td></tr>
+        <tr><td class="name">착수</td><td class="desc"><b>단독 심사</b> 착수까지 <span class="en">5 · 4 · 3 …</span></td></tr>
+        <tr><td class="name">끝 (버팀)</td><td class="desc">등록결정 — <b>혼자서 심사 기간을 끝까지 버텼습니다. 등록결정서가 발부되었습니다.</b></td></tr>
+        <tr><td class="name">끝 (추락)</td><td class="desc">단독 심사 종료 — <b>6개 층 중 3개 층을 내려갔습니다. 다시 해 보세요.</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="card flat">
+      <span class="ckind">목표</span>
+      <h3 class="ctitle">등수가 아니라 기록</h3>
+      <p>혼자면 겨룰 상대가 없으므로 <b>몇 개 층을 내려갔고 얼마나 버텼나</b>가 목표가 됩니다. 라운드 상한은 정식과 같은 6분이고, 이제 목표가 아니라 상한일 뿐입니다.</p>
+      <p class="note"><b>다시 할 이유를 만들려면 비교할 대상이 필요하고, 그 대상은 지난번의 나입니다.</b> 개인 최고 기록을 브라우저에 남겨 결과 화면에서 비교합니다. 판정 기준은 <b>더 깊이, 같은 깊이면 더 오래</b> — 시간만 보면 맨 위층에서 얌전히 도는 쪽이 최고 기록이 되어 버립니다. 서버에 남기지 않는 이유는 계정이 없고 행사장에서 한 PC 를 여러 사람이 쓰기 때문입니다.</p>
+      <dl class="spec">
+        <dt>상한</dt><dd><b>6</b>분 <span class="en">(종전 2분)</span></dd>
+        <dt>기록</dt><dd>층 · 버틴 시간</dd>
+        <dt>보관</dt><dd>브라우저</dd>
+      </dl>
+    </div>
+    <div class="card flat">
+      <span class="ckind">양보</span>
+      <h3 class="ctitle">사람이 오면 연습을 마칩니다</h3>
+      <p>행사장에서 제일 나쁜 상황은 <b>"사람이 왔는데 혼자 도는 연습이 끝나기를 기다리는 것"</b>입니다. 연습 중 주자가 도착하면 그 회차를 그 자리에서 마치고 정식 심사를 준비합니다.</p>
+      <p class="note">승패로 치지 않습니다 — 살아 있던 사람을 승자로 올리지도, 탈락으로 내리지도 않습니다. 기록은 그때까지 버틴 값 그대로 남습니다.<br>대기 화면 뒤에서 구경만 하는 상태는 제외합니다 — 페이지를 열어만 둬도 남의 회차가 끊기면 안 됩니다.</p>
+      <dl class="spec">
+        <dt>판정</dt><dd>승패 아님</dd>
+        <dt>기록</dt><dd>그대로 유지</dd>
+        <dt>다음</dt><dd>정식 회차</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">왜 상한을 2분에서 6분으로 올렸나</span>
+    2분은 종전 바닥 규칙에서 <b>"실제로 도달 가능한 목표"</b>였습니다. 6분을 그대로 쓰면 혼자 온 사람은 늘 실패 화면만 보게 되니까요. 그런데 두 번 밟기로 바뀌며 한 층이 70~90초를 버티게 되어, <b>2분으로는 한 층도 겨우 내려갑니다</b> — 목표로 삼을 수 있는 길이가 아니라 그냥 아무 일도 안 일어나는 2분입니다. 목표를 시간 만료에서 기록으로 옮기면서 이 값은 상한으로 물러났습니다.
+  </div>
+</section>
+
+<!-- ───────────────────────── 관전자 ───────────────────────── -->
+<section class="block">
+  <h2>관전자 — 한 번의 개입</h2>
+  <p class="sub">이번 회차에 <b>뛰지 않는 사람</b>만 개입할 수 있고, <b>회차당 한 번</b>뿐입니다. 4명이 노는 게임을 구경하는 사람까지 참여하는 게임으로 만드는 장치입니다.</p>
+
+  <div class="changed">
+    <span class="ckind">디버프를 없앴습니다</span>
+    종전에는 관전자가 <b>의견제출통지서를 투하</b>해 남의 발밑을 무너뜨릴 수 있었습니다. 기믹보다 토스트에 <b>이름이 박힌다</b>는 점이 문제였습니다 — "○○ 님이 의견제출통지서를 투하했습니다". 먼저 탈락한 동료가 아직 뛰는 동료를 떨어뜨리고, 그 장면이 이름과 함께 남습니다. 게다가 탈락자는 자연히 <b>1등을 노리게</b> 되어, 이기고 있는 한 사람에게 개입이 몰립니다. 사내 행사에서 남기고 싶은 장면이 아닙니다.
+  </div>
+
+  <div class="grid2">
+    <div class="card flat">
+      <span class="ckind">보정 · 제47조</span>
+      <h3 class="ctitle">보정 기회 제공</h3>
+      <p>지목한 주자를 <strong>한 층 위로</strong> 올려보냅니다. 이 게임에서 내려가는 것이 권리가 깎이는 것이므로, 올라가는 것은 <b>한 단계 되돌아가 다시 다투는 것</b> — 보정 그 자체입니다.</p>
+      <p class="note">착지할 자리를 <b>먼저 확보</b>하고 쏩니다. 위층 그 자리가 무너져 있으면 <b>그 타일을 되살린 뒤</b> 올려보냅니다. 관전자는 위층 상태를 볼 수 없으니, 판단할 수 없는 것으로 책임을 지우면 도와주려던 호의가 사람을 죽입니다. 무너진 자리를 되돌린다는 뜻이라 이름과도 맞습니다.</p>
+      <dl class="spec">
+        <dt>올라가는 폭</dt><dd><b>1</b>개 층</dd>
+        <dt>발동 경로</dt><dd>점프 타일과 동일</dd>
+        <dt>착지</dt><dd>보장</dd>
+      </dl>
+    </div>
+
+    <div class="card flat">
+      <span class="ckind">제한</span>
+      <h3 class="ctitle">회차당 1회 · 순수 관전자만</h3>
+      <p><b>쿨다운이 아닙니다.</b> 쿨다운은 개입을 결정이 아니라 작업으로 만듭니다 — 열렸으니 누르게 되고 누구를 왜 돕는지가 사라집니다. 한 번뿐이면 <b>누구를, 언제</b>가 전부 의미를 갖습니다.</p>
+      <p class="note"><b>탈락한 주자는 제외됩니다.</b> 이 회차 결과에 이해관계가 있어, 방금 나를 이긴 사람이 뛰고 있는데 개입할 수 있으면 그건 곧 편들기입니다. 탈락자는 <code>room.players</code> 에 남은 채 관전자로도 등록되므로 서버는 그 두 곳을 모두 봅니다.</p>
+      <dl class="spec">
+        <dt>대상</dt><dd>이번 회차 비참가자</dd>
+        <dt>횟수</dt><dd>회차당 <b>1</b>회</dd>
+        <dt>복구</dt><dd>다음 회차 시작</dd>
+      </dl>
+    </div>
+  </div>
+
+  <p class="note" style="margin-top:16px; max-width:72ch">
+    <b>거절된 시도는 기회를 쓰지 않습니다.</b> 맨 위층이거나(올려보낼 곳 없음), 위상 타일이 마침 꺼져 있어 자리를 확보할 수 없으면 발동 자체를 막고 사유를 말해 줍니다. 실패한 시도로 하나뿐인 기회가 날아가면 안 되기 때문입니다.
+  </p>
+  <p class="note" style="max-width:72ch">
+    <b>관전자 수는 제한하지 않아도 됩니다.</b> 행사장에서 20명이 구경하면 20번의 개입이 가능합니다 — 종전 쿨다운 방식이었다면 20명이 9초마다 계속 눌러 한 사람만 죽지 않았겠지만, 1회 제한이 그 쏠림을 구조적으로 막습니다. 덤으로 20명이 각자 "내가 저 사람을 올려보냈다"는 기억을 하나씩 갖게 됩니다.
+  </p>
+</section>
+
+<!-- 배경 맵과 배경음 -->
+<section class="block">
+  <h2>배경 맵 3종과 소리</h2>
+  <p class="sub">같은 타워를 세 가지 하늘 아래에서 달립니다. 지형과 규칙은 완전히 같고 하늘·구름·바다·소품 색만 바뀝니다 — <b>이미지 파일이 아니라 셰이더와 절차적 생성</b>이라 맵이 늘어도 받는 양은 그대로입니다.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th class="num">순서</th><th>이름</th><th>배경음 파일</th><th>지금</th></tr></thead>
+      <tbody>
+        <tr><td class="num"><b>1</b></td><td class="name">캔디 스카이 <span class="en">candy</span></td><td class="desc"><code>bgm_map1.mp3</code></td><td class="num"><b>1.4</b>MB</td></tr>
+        <tr><td class="num"><b>2</b></td><td class="name">네온 아레나 <span class="en">neon</span></td><td class="desc"><code>bgm_map2.mp3</code></td><td class="num"><b>2.7</b>MB</td></tr>
+        <tr><td class="num"><b>3</b></td><td class="name">새벽 구름 <span class="en">dawn</span></td><td class="desc"><code>bgm_map3.mp3</code></td><td class="num"><b>0.5</b>MB</td></tr>
+        <tr><td class="num">—</td><td class="name">대기 화면 · 카운트다운</td><td class="desc"><code>bgm_lobby.mp3</code></td><td class="num none">없음</td></tr>
+        <tr><td class="num">—</td><td class="name">결과 화면</td><td class="desc"><code>bgm_result.mp3</code></td><td class="num none">없음</td></tr>
+        <tr><td class="num">—</td><td class="name"><b>공통 폴백</b></td><td class="desc"><code>bgm_main.mp3</code></td><td class="num"><b>2.3</b>MB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2">
+    <div class="card flat">
+      <span class="ckind">배정</span>
+      <h3 class="ctitle">무작위에서 순서로</h3>
+      <p>종전에는 회차마다 무작위로 뽑았습니다(직전 것만 제외). 지금은 한 방 안에서 <b>1 → 2 → 3 → 1</b> 로 돕니다.</p>
+      <p class="note">무작위는 보통 "다음이 무엇일지 모른다"는 재미를 주는데 여기서는 반대로 작동했습니다 — 행사장에서 <b>"맵이 세 개 있다"</b>를 보여 주려면 세 회차를 돌려야 하는데 같은 맵이 한 번 걸러 또 나옵니다. 게다가 맵마다 배경음이 달라지면서 <b>"지금 몇 번째 맵인가"가 소리로도</b> 읽히게 됐는데, 순서가 없으면 그 흐름이 생기지 않습니다.</p>
+      <dl class="spec">
+        <dt>방 안에서</dt><dd>1 → 2 → 3 → 1</dd>
+        <dt>새 방</dt><dd>서버 커서에서</dd>
+        <dt>이유</dt><dd>두 방이 같은 배경만 보여 주지 않게</dd>
+      </dl>
+    </div>
+    <div class="card flat">
+      <span class="ckind">음원</span>
+      <h3 class="ctitle">나중에 파일만 넣으면 됩니다</h3>
+      <p>정해진 이름으로 <code>public/assets/audio/</code> 에 넣기만 하면 되고 코드는 손대지 않습니다. <b>전부 선택 사항</b>이라 하나씩 만들어 채워도 됩니다 — 없는 것은 공통 곡으로 자동으로 내려앉습니다.</p>
+      <p class="note"><b>왜 맵 이름이 아니라 번호인가.</b> "캔디 스카이" 같은 이름은 언제든 바뀔 수 있는 표시용 문구입니다. 파일 이름이 거기 묶이면 이름을 고치는 순간 <b>음악이 조용히 사라집니다.</b> 번호는 맵 순서 그 자체라 흔들리지 않고, 맵을 4개로 늘리면 <code>bgm_map4.mp3</code> 가 자동으로 후보가 됩니다.</p>
+      <dl class="spec">
+        <dt>형식</dt><dd>mp3 · 루프</dd>
+        <dt>권장 용량</dt><dd>곡당 <b>1</b>MB 내외</dd>
+        <dt>전환</dt><dd><b>0.9</b>초 크로스페이드</dd>
+      </dl>
+    </div>
+  </div>
+
+  <h3 class="ctitle" style="margin-top:26px">효과음</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>파일</th><th>언제</th><th class="num">지금</th></tr></thead>
+      <tbody>
+        <tr><td class="name"><code>sfx_tile1</code><br><code>sfx_tile2</code></td>
+            <td class="desc"><b>바닥을 처음 밟을 때 / 두 번째로 밟을 때</b> — 소리가 다릅니다</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name"><code>sfx_bomb</code></td>
+            <td class="desc"><b>거절이유 타일 폭발</b> — 자기 자신 + 이웃 6칸</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name"><code>sfx_boost</code></td>
+            <td class="desc"><b>신속심사 타일 사출</b> — <b>내 것만</b> (남의 사출은 조용)</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name"><code>sfx_power_down</code><br><code>sfx_power_up</code></td>
+            <td class="desc"><b>암전 시작 / 끝</b> — 내가 그 층에 있을 때만</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name"><code>sfx_opportunity</code></td>
+            <td class="desc"><b>관전자의 보정 기회</b>가 발동할 때 — 올라가는 사람 자리에서</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name"><code>sfx_2_1_go</code></td>
+            <td class="desc"><b>카운트다운 2초 지점</b> — 한 파일에 2·1·GO 가 들어 있습니다</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name"><code>sfx_stair_jump_1</code><br><code>sfx_stair_jump_2</code></td>
+            <td class="desc"><b>점프 타일</b> — 1층 위로 / 2층 위로</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name"><code>sfx_click</code></td>
+            <td class="desc">대기 화면의 버튼 · 게임 화면의 <b>층 안내(좌)·출원인 명단(우)</b> 클릭</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name"><code>sfx_jump</code> · <code>sfx_land</code></td><td class="desc">점프 · 착지</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name"><code>sfx_death</code> · <code>sfx_win</code></td><td class="desc">구름바다 추락 · 등록결정</td><td class="num"><b>있음</b></td></tr>
+        <tr><td class="name en">start · tick · crack · eliminate · booster · lose</td>
+            <td class="desc">시작 · 카운트다운 5·4·3 · 금 · 탈락 · 검색 스캔 · 거절결정</td><td class="num none">없음</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">소리를 고를 때의 기준 — "화면을 안 봐도 알 수 있게"</span>
+    이 게임은 발밑이 계속 바뀌는데, <b>달리는 동안 시선이 가장 덜 가는 곳이 바로 발밑</b>입니다. 그래서 소리는 장식이 아니라 <b>화면이 못 알려 주는 것을 대신 알리는 자리</b>에만 붙였습니다.
+    <ul>
+      <li><b>바닥을 처음 밟을 때와 두 번째로 밟을 때의 소리가 다릅니다.</b> 바닥은 두 번 밟아야 무너지는데, 소리가 같으면 지금 밟은 것이 몇 번째인지 화면을 봐야만 알 수 있습니다.</li>
+      <li><b>암전은 시작과 끝을 모두 알립니다.</b> 시야가 좁아지는 순간에는 오히려 화면을 덜 보게 되므로, 소리로 못 박아 두면 언제 끝나는지를 기다릴 수 있습니다.</li>
+      <li><b>내 층·내 행동만 냅니다.</b> 암전은 내가 그 층에 있을 때만, 신속심사 사출은 내 것만 — 남의 것까지 내면 4인 게임에서 정체 모를 소음이 됩니다.</li>
+      <li><b><code>sfx_2_1_go</code> 는 한 파일에 2·1·GO 셋이 들어 있습니다.</b> 그래서 2초 지점에서 <b>한 번만</b> 틀고 그 뒤로는 tick 을 내지 않습니다 — 겹쳐 내면 두 소리가 어긋나 박자가 깨집니다.</li>
+      <li><b>전부 없어도 됩니다.</b> 파일을 지우면 종전 소리로 그대로 내려앉습니다.</li>
+    </ul>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">점프 소리를 층수마다 나눈 이유 · 클릭 소리를 좌표로 받는 이유</span>
+    <b>1층과 2층이 같은 소리면 몇 층 올라갔는지를 화면으로만 알 수 있습니다.</b> 그런데 솟는 동안 시선은 이미 착지 지점에 가 있습니다. 관전자의 <b>보정 기회</b>는 <b>자기 소리</b>(<code>sfx_opportunity</code>)가 따로 있고, 실제로 올라가는 순간에는 1층 점프 소리가 함께 납니다 — 앞은 "기회가 쓰였다", 뒤는 "올라간다" 로 역할이 다릅니다. 파일이 없으면 기본 점프 소리로 내려앉습니다.
+    <br><br>
+    <b>층 안내·명단 패널은 클릭을 받지 않습니다.</b> 폭 208·212px 에 세로로 긴 패널이라 클릭을 받게 하면 <b>그 위에서 시작한 시점 드래그가 캔버스로 내려가지 않아 회전이 막힙니다.</b> 그래서 좌표가 패널 안인지만 보고 소리를 내고, <b>6px 이상 움직였으면</b> 드래그로 보아 소리를 내지 않습니다.
+  </div>
+
+    <div class="changed">
+    <span class="ckind">2026-09-17 — 배경음을 128kbps 로 다시 인코딩했습니다</span>
+    받아 온 파일은 전부 <b>193~274kbps</b> 였습니다. 감상용으로는 맞는 값이지만 배경음, 그것도 게임이 45% 로 줄여 트는 소리에는 과합니다. <b>길이는 그대로 두고</b> 비트레이트만 낮추고 앨범 아트와 태그를 뺐습니다.
+    <ul>
+      <li><code>bgm_main</code> 193kbps 3.52MB → <b>2.34MB</b> (−34%)</li>
+      <li><code>bgm_map1</code> 214kbps 2.41MB → <b>1.44MB</b> (−40%)</li>
+      <li><code>bgm_map2</code> 274kbps 5.78MB → <b>2.71MB</b> (−53%)</li>
+      <li><code>bgm_map3</code> 208kbps 0.83MB → <b>0.51MB</b> (−38%)</li>
+      <li><b>합계 12.54MB → 7.00MB (−44%)</b> · 길이는 네 파일 모두 <b>0초 차이</b></li>
+    </ul>
+    한 사람이 한 판에 받는 배경음이 9.3MB → <b>최대 5.0MB</b> 가 됐습니다. 원본은 <code>assets_unused/audio_원본_20260917/</code> 에 두었습니다 — <code>public/</code> 밖이라 서빙되지 않습니다.
+    <br><br>
+    <span style="color:var(--muted)"><b>한 번 틀렸던 것</b> — 처음에는 mp3 첫 프레임 헤더만 읽어 "48~64kbps 인데 12분짜리라 길이를 줄여야 한다"고 봤습니다. VBR 파일이라 첫 프레임 값이 곡 전체를 대표하지 않습니다. ffprobe 로 다시 재니 정반대였고 — 길이는 33초~2분 57초로 짧고 비트레이트가 높았습니다 — "비트레이트만 낮춘다"로 충분히 해결됐습니다.</span>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">왜 라운드 중(맵별)만 나누었나</span>
+    대기 화면은 아직 어느 맵을 달릴지 모르는 시간이고, 결과 화면은 8초입니다. 맵마다 세 곡씩 아홉 곡을 만들 일이 아닙니다 — <b>"이 맵의 노래"는 실제로 그 맵을 달리는 동안에만 의미가 있습니다.</b>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">"파일이 없다"를 브라우저에게 물어볼 수 없습니다</span>
+    없는 파일(404)에 대해 크롬은 <code>&lt;audio&gt;</code> 의 error 를 <b>쏘지 않습니다.</b> <code>stalled</code> 만 한 번 남기고 로딩 상태로 멈춰 있습니다 <span style="color:var(--muted)">(실측: 재생 시작 → 3.3초 뒤 stalled · error 없음 · readyState 0)</span>. 이걸 모르고 error 를 기다리면 <b>폴백이 아예 동작하지 않고 배경음이 조용히 안 나옵니다</b> — 맵별 곡을 아직 안 만든 지금이 바로 그 상태였습니다.
+    <ul>
+      <li><b>재생 전에 있는지 먼저 물어봅니다</b> — HEAD 요청 한 번, 결과는 캐시. 같은 주소라 실제 재생은 캐시를 씁니다.</li>
+      <li><b>후보는 반드시 순서대로.</b> "있다고 확인된 아무 후보"를 먼저 고르면, 공통 곡이 대기 화면에서 한 번 확인된 뒤로는 맵별 곡을 <b>물어보지도 않고</b> 공통 곡으로 갑니다 — 맵별 음악이 영영 안 걸립니다.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ───────────────────────── 층 순서 ───────────────────────── -->
+<section class="block">
+  <h2>행사장에서 돌리기</h2>
+  <p class="sub">기획이 아니라 <b>운영</b>입니다. 개발 노트북에서 멀쩡하다는 것은 아무 근거가 되지 못했습니다 — 업무 환경 PC 에서는 화면이 툭툭 끊기고, 대기 화면에서 기본 캐릭터가 보이다가 한참 뒤에야 진짜 캐릭터로 바뀌었습니다. 증상은 하나로 보였지만 원인은 셋이었습니다. 여기에 <b>참가자의 폰</b>이 하나 더 붙습니다 — PC 앞에 앉는 사람은 넷이지만 폰을 든 사람은 전부입니다.</p>
+
+  <div class="grid2">
+    <div class="card flat">
+      <span class="ckind">병목 1</span>
+      <h3 class="ctitle">드로우콜 — CPU 쪽</h3>
+      <p>타일 1,626장을 하나씩 그리느라 <b>드로우콜이 546개</b>였습니다. GPU 가 칠하는 비용이 아니라 CPU 가 명령을 밀어 넣는 비용입니다.</p>
+      <p class="note"><b>증거</b> — 해상도를 <b>9.6배</b> 낮춰도 타일 비용이 4.66 → 4.28ms 로 <b>8%</b>밖에 안 줄었습니다. 화질을 낮춰서는 못 고치는 종류였습니다.</p>
+      <dl class="spec">
+        <dt>해결</dt><dd>타일을 InstancedMesh 로</dd>
+        <dt>드로우콜</dt><dd>546 → <b>36</b></dd>
+        <dt>렌더</dt><dd>6.3ms → <b>2.0ms</b></dd>
+        <dt>화면</dt><dd>같은 방·같은 시점에서 타일 화소차 <b>0.07</b>/255</dd>
+      </dl>
+    </div>
+
+    <div class="card flat">
+      <span class="ckind">병목 2</span>
+      <h3 class="ctitle">칠하는 양 — GPU 쪽</h3>
+      <p>그래픽 드라이버가 없거나 정책으로 막힌 PC 에서는 브라우저가 <b>소프트웨어 렌더러</b>로 떨어집니다. 사무용 PC 에서 "툭툭 끊긴다"의 가장 흔한 정체입니다.</p>
+      <p class="note">시작할 때 기기 등급을 재서 안티앨리어싱·그림자를 정하고, 프레임이 모자라면 <b>해상도만</b> 단계적으로 낮춥니다. 그림자를 런타임에 끄면 재질 1,683개가 한꺼번에 재컴파일되어 오히려 몇 초 멈춥니다.</p>
+      <dl class="spec">
+        <dt>기기 등급</dt><dd>정상 / 약함 / 소프트웨어</dd>
+        <dt>단계</dt><dd>최고 · 높음 · 보통 · 절약 · 최소</dd>
+        <dt>최소 단계</dt><dd>30fps 고정</dd>
+      </dl>
+      <p class="note"><b>모바일 대응 중에 드러난 버그</b> — 화질 판단을 "그리는 코드" 안에서 하고 있었습니다. 최소 단계는 한 프레임 걸러 그리므로 거기서 재는 fps 가 30 에 고정되는데 승격 조건이 58fps 였습니다. 즉 <b>한 번 최소로 내려간 기기는 여유가 생겨도 영영 올라오지 못했습니다.</b> PC 는 최소까지 갈 일이 드물어 드러나지 않았지만, 폰은 대개 최소에서 시작합니다.</p>
+    </div>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">2026-09-17 — 나가는 길이 아예 없었습니다</span>
+    한 번 참가하면 결과 화면에도 버튼이 없고 <span class="en">ESC</span> 도 안 먹어서, <b>탭을 닫는 것 말고는 방을 벗어날 방법이 없었습니다.</b> 한 대를 여러 사람이 번갈아 쓰는 자리에서는 <b>자리를 넘기는 동작이 게임 자체만큼 자주</b> 일어납니다. 길을 셋 뒀습니다 — <b>결과 화면 버튼</b> · <b>게임 중 ESC 메뉴</b> · <b>상단바 메뉴 버튼</b>(터치에서도 보입니다. ESC 는 폰에 없고, 무엇보다 키가 있다는 것을 아무도 모릅니다).
+    <ul>
+      <li><b>부분 초기화가 아니라 페이지를 다시 엽니다.</b> 소켓·씬·물리·타일 1,600여 장·오디오가 서로 얽혀 있어, 되돌려야 할 곳을 한 군데라도 빠뜨리면 그 자리가 아니라 <b>다음 판 중간에</b> 터집니다. 에셋은 전부 캐시라 다시 받지 않고, 무엇보다 다음 사람이 깨끗한 상태에서 시작합니다.</li>
+      <li><b>먼저 끊고 나서 다시 엽니다.</b> 그냥 다시 열면 서버가 이탈을 알아차릴 때까지 내 자리가 남아 있어, 정원이 찬 방이라면 <b>새로 뜬 내 탭이 자기 자리에 못 들어가고 관전자로 밀립니다.</b></li>
+      <li><b>중단 메뉴에 "일시정지"라고 쓰지 않았습니다.</b> 붕괴 시각의 주인은 서버라 이 창이 떠 있는 동안에도 발밑은 그대로 무너집니다 — 멈춘다고 적어 두면 그 문장을 믿고 손을 뗀 사람이 떨어집니다.</li>
+      <li>창을 여는 순간 눌려 있던 키를 텁니다. 창이 뜨면 뗀 신호가 오지 않아, 닫은 뒤에도 <b>그 방향으로 계속 달려 나갑니다</b> — 나가려다 만 사람이 그 자리에서 떨어지는 결과가 됩니다.</li>
+    </ul>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">두 수단은 서로를 대신하지 못합니다</span>
+    인스턴싱 <b>전</b>에는 해상도를 낮춰도 렌더가 6.3 → 5.75ms 로 8%만 줄었습니다 — CPU 가 병목이라 화질 조절이 듣지 않았습니다.
+    인스턴싱 <b>후</b>에는 2.0 → 0.7ms 로 제대로 줄어듭니다.
+    <b>화질 조절은 인스턴싱을 하고 나서야 제 역할을 하게 됐습니다.</b>
+  </div>
+
+  <h3 class="ctitle" style="margin-top:26px">첫 진입까지 받는 양</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>자원</th><th class="num">종전</th><th class="num">지금</th></tr></thead>
+      <tbody>
+        <tr><td class="name">index.html</td><td class="num">491 KB</td><td class="num"><b>159 KB</b></td></tr>
+        <tr><td class="name">socket.io.js</td><td class="num">157 KB</td><td class="num"><b>37 KB</b></td></tr>
+        <tr><td class="name">캐릭터 모델</td><td class="num">7,631 KB</td><td class="num"><b>2,975 KB</b></td></tr>
+        <tr><td class="name">three.js · 글꼴</td><td class="num none">외부 CDN</td><td class="num"><b>557 KB</b></td></tr>
+        <tr><td class="name"><b>합계</b></td><td class="num"><b>8.08 MB</b></td><td class="num"><b>3.64 MB</b></td></tr>
+        <tr><td class="name">두 번째 방문</td><td class="num none">대부분 다시 받음</td><td class="num"><b>36 KB</b></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="max-width:74ch; margin-top:16px">
+    캐릭터 모델은 <b>형상을 그대로 두고 텍스처 해상도만</b> 낮췄습니다 — 삼각형 37,237 · 메시 13 · 애니메이션 4개가 전부 동일합니다.
+    무거웠던 것이 형상이 아니라 텍스처였기 때문입니다: 이미지 20장이 5.33MB 로 파일의 72% 였고, 그중 몸통 노멀맵 한 장이 2048²·2.7MB 였습니다.
+    <b>게임 카메라에서 캐릭터는 화면에 65px, 얼굴은 17px 입니다</b> — 65px 짜리에 2048² 는 화면 해상도의 31배입니다.
+    얼굴 계열만 원본 해상도로 남겼습니다. 이 캐릭터가 싸 보이게 되는 지점은 몸통이 아니라 눈·눈썹·아이라인이라서입니다.
+  </p>
+
+  <h3 class="ctitle" style="margin-top:26px">사내망에서 막히면 어떻게 되는가</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>막히는 것</th><th>종전</th><th>지금</th></tr></thead>
+      <tbody>
+        <tr><td class="name">cdnjs · jsdelivr</td>
+            <td class="desc"><b>게임이 아예 뜨지 않음</b><br><span class="en">3D 엔진이 없으면 첫 줄에서 죽습니다</span></td>
+            <td class="desc">자체 서빙 — 영향 없음</td></tr>
+        <tr><td class="name">fonts.googleapis.com</td>
+            <td class="desc"><b>첫 화면이 수십 초 빈 채로</b><br><span class="en">응답이 오지 않는 방식으로 막히면 글꼴 요청이 렌더를 붙잡습니다</span></td>
+            <td class="desc">자체 서빙 — 영향 없음</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note" style="max-width:74ch; margin-top:16px">
+    한 라운드를 끝까지 돌리며 <b>외부 호스트 요청 0건</b>을 확인했습니다.
+    글꼴은 이 게임이 실제로 화면에 쓰는 글자(한글 656자)에 해당하는 서브셋만 받아 둡니다 — 참가자가 이름에 아주 드문 음절을 쓰면 그 글자만 시스템 글꼴로 나오지만 깨지지는 않습니다.
+    3D 엔진을 못 불러온 경우에도 빈 화면 대신 <b>원인과 복구 방법이 적힌 안내</b>가 뜹니다 — 행사 당일 무엇이 잘못됐는지 화면만 보고 알 수 있어야 합니다.
+  </p>
+
+  <h3 class="ctitle" style="margin-top:26px">회선에 맞춰 스스로 조절</h3>
+  <p class="note" style="max-width:74ch; margin-top:16px">
+    원격 주자는 약간 과거로 그립니다. 패킷이 늦어도 끊기지 않게 두는 여유인데 <b>110ms 로 고정</b>되어 있었습니다.
+    사내망(RTT 1~2ms)에서는 과하고, 그만큼 남의 캐릭터가 늦게 보입니다 — 마주 달릴 때 밀치기 판정이 어긋나 보이는 원인입니다.
+    지금은 <b>스냅샷 도착 간격의 흔들림</b>을 재서 70~260ms 사이로 계속 조절합니다.
+    RTT 가 아니라 흔들림을 보는 이유는, 버퍼가 막아 주는 것이 지연 자체가 아니라 지연의 <b>흔들림</b>이기 때문입니다.
+    바꿀 때는 초당 12ms 씩만 움직입니다 — 한 번에 바꾸면 원격 주자 전원이 동시에 순간이동한 것처럼 보입니다.
+    <span style="color:var(--muted)">사내망 실측 목표는 약 80ms 로, 고정값보다 30ms 덜 지연됩니다.</span>
+  </p>
+
+  <h3 class="ctitle" style="margin-top:26px">참가자의 폰 — 가로 전용</h3>
+  <p class="sub">종전에는 <b>접속은 되는데 조작이 아예 되지 않았습니다.</b> 화면만 보이고 캐릭터가 움직이지 않으니 "고장난 것"으로 읽힙니다. 원인은 넷이었고 전부 클라이언트 쪽입니다 — 이동이 클라이언트 권위라 서버 프로토콜은 한 줄도 바뀌지 않았습니다.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>원인</th><th>종전 결과</th></tr></thead>
+      <tbody>
+        <tr><td class="name">이동·점프·질주가 <b>키보드 전용</b></td><td class="desc">움직일 방법이 없음 <span class="en">— 터치를 받는 코드가 한 줄도 없었습니다</span></td></tr>
+        <tr><td class="name">시점이 <b>마우스 전용</b></td><td class="desc">돌릴 수 없고 핀치 줌도 없음 <span class="en">— 브라우저가 합성해 주는 것은 탭 한 번뿐</span></td></tr>
+        <tr><td class="name">화면 제스처를 브라우저가 가져감</td><td class="desc">시점을 돌리려 쓸면 <b>페이지가 새로고침</b></td></tr>
+        <tr><td class="name">기기 등급에 <b>모바일 기준 없음</b></td><td class="desc">폰이 "정상 PC"로 판정 → 최고 화질로 시작 → 발열</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="card flat">
+      <span class="ckind">왼쪽</span>
+      <h3 class="ctitle">기울기가 곧 속도</h3>
+      <p>엄지를 <b>댄 자리에</b> 스틱이 생깁니다. 가로로 든 폰의 세로 폭은 390~430px 뿐이라, 고정 위치에 두면 손 크기에 따라 닿지 않는 사람이 생깁니다.</p>
+      <p class="note"><b>질주 버튼은 두지 않았습니다.</b> 이 게임은 "타일이 무너지기 전에 지나가나"가 전부라 속도를 손가락에 쥐고 있어야 합니다. 버튼을 나누면 엄지 하나로 방향과 속도를 동시에 못 잡고, 붕괴 직전 타일 앞에서 멈출 수 없으면 게임이 달리기만 남습니다.</p>
+      <dl class="spec">
+        <dt>걷기 구간</dt><dd>기울기 ~<b>0.6</b></dd>
+        <dt>절반 기울임</dt><dd><b>13.6</b> 유닛/초</dd>
+        <dt>최대</dt><dd><b>21.4</b> <span class="en">(질주 상한 21.5)</span></dd>
+      </dl>
+    </div>
+    <div class="card flat">
+      <span class="ckind">오른쪽</span>
+      <h3 class="ctitle">시점과 점프</h3>
+      <p>빈 곳을 끌면 시점, 두 손가락이면 줌, 오른쪽 아래가 점프입니다. 두 손가락일 때는 회전을 끊습니다 — 안 끊으면 핀치하는 동안 화면이 같이 빙빙 돕니다.</p>
+      <p class="note">손가락을 <b>따로따로 추적</b>해야 "스틱을 쥔 채 점프"가 됩니다. 안 그러면 점프하는 순간 스틱이 그쪽으로 끌려가 주자가 오른쪽으로 꺾입니다.</p>
+      <dl class="spec">
+        <dt>이동 영역</dt><dd>화면 왼쪽 <b>44%</b></dd>
+        <dt>점프</dt><dd>속도 <b>21.5</b></dd>
+        <dt>세로 화면</dt><dd>안내 후 대기</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="changed">
+    <span class="ckind">세로는 지원하지 않습니다 — 막는 대신 이유를 적습니다</span>
+    3D 에서 다음 타일이 보이려면 시야가 <b>가로로 넓어야</b> 하고, 세로로 들면 HUD 만으로 화면의 1/3 이 찹니다.
+    세로로 들고 있으면 "가로로 돌려주세요 — 세로 화면에서는 다음 타일이 보이지 않습니다" 가 뜹니다.
+    참가 버튼에서 전체화면과 가로 고정을 함께 요청합니다 <span style="color:var(--muted)">(주소창이 세로 폭의 15% 를 먹는데, 가로 폰에서는 그 15% 가 곧 시야 한 줄입니다. 거절돼도 게임은 그대로 동작합니다).</span>
+  </div>
+
+  <p class="note" style="max-width:74ch">
+    <b>화면에 얹힌 것도 같이 옮겼습니다.</b> 상단바에서 MAP·관전자·RTT·제목을 빼고(가로 폰에 아홉 칸은 안 들어갑니다), 조작 안내를 <b>위로</b> 올렸습니다 — 아래 좌우는 양 엄지가 차지하고, 가운데에 두면 왼쪽 이동 영역과 실측 170px 겹쳤습니다. 노치·홈 인디케이터도 피합니다.
+    화질은 상한을 따로 둡니다 — 폰은 화면 배율이 3 인 것이 흔해, PC 와 같은 상한을 쓰면 <b>6.7인치 화면에 PC 모니터보다 많은 화소를 그리게</b> 됩니다. 그림자도 끕니다(씬을 한 번 더 그리는 일인데 6인치에서 발밑 그림자는 거의 안 보입니다).
+  </p>
+
+  <div class="changed">
+    <span class="ckind">당일 문제가 생기면 — F2</span>
+    게임 화면에서 <b>F2</b> 를 누르면 진단 패널이 열립니다. 볼 곳은 세 줄입니다.
+    <ul>
+      <li><b>화질</b> — <code>기기 소프트웨어</code> 가 뜨면 그 PC 의 그래픽 드라이버 문제입니다. 게임 문제가 아닙니다.</li>
+      <li><b>보간지연</b> — 간격의 <b>±</b> 값이 크면 회선이 흔들리는 것입니다. 그때 지연이 커져 있는 것이 정상 동작입니다.</li>
+      <li><b>타일</b> — 인스턴스 묶음 수와 붕괴 중인 타일 수.</li>
+      <li><b>터치 조작 점검</b> — 주소 끝에 <code>?touch=1</code> 을 붙이면 PC 에서도 켜집니다(<code>?touch=0</code> 은 반대). 행사 전 점검을 PC 로 해야 하는데 폰을 매번 붙이지 않고는 확인할 방법이 없었습니다.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="block">
+<h2>한눈에 보기</h2>
+  <p class="sub">아래로 떨어지는 것이 곧 권리가 깎여 내려가는 것이므로, 층 순서가 뒤바뀌면 절차를 거꾸로 설명하는 셈이 됩니다.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th class="num">층</th><th>이름</th><th>특수 타일</th><th>층 특성</th><th class="num">높이</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="num">L6</td><td class="name"><span class="chip" style="background:var(--l6)"></span>우선심사 패스트트랙 <span class="en">Fast-Track</span></td><td class="desc">신속심사 (2칸 사출)</td><td class="none">—</td><td class="num">90</td></tr>
+        <tr><td class="num">L5</td><td class="name"><span class="chip" style="background:var(--l5)"></span>실체심사 / 선행기술조사 <span class="en">Examination</span></td><td class="desc">선행기술 검색 (시야 3→8칸)</td><td class="desc">어둠 (18초마다 8초)</td><td class="num">72</td></tr>
+        <tr><td class="num">L4</td><td class="name"><span class="chip" style="background:var(--l4)"></span>의견제출통지 <span class="en">Office Action</span></td><td class="desc">거절이유 15%</td><td class="desc">회전</td><td class="num">54</td></tr>
+        <tr><td class="num">L3</td><td class="name"><span class="chip" style="background:var(--l3)"></span>보정 <span class="en">Amendment</span></td><td class="none">—</td><td class="none">—</td><td class="num">36</td></tr>
+        <tr><td class="num">L2</td><td class="name"><span class="chip" style="background:var(--l2)"></span>청구항 <span class="en">Claim</span></td><td class="desc">위상 (2초 ON / 1초 OFF)</td><td class="none">—</td><td class="num">18</td></tr>
+        <tr><td class="num">L1</td><td class="name"><span class="chip" style="background:var(--l1)"></span>아이디어 <span class="en">Ideation</span></td><td class="desc">점프 (1단 / 2단)</td><td class="none">—</td><td class="num">0</td></tr>
+        <tr><td class="num">—</td><td class="name"><span class="chip" style="background:var(--sea)"></span>구름바다 <span class="en">Sea of Clouds</span></td><td class="desc">닿으면 거절결정</td><td class="none">—</td><td class="num">−16</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="note" style="margin-top:20px; max-width:72ch">
+    <b>실체심사가 의견제출통지보다 반드시 위층입니다.</b> 심사관이 실체심사에서 선행기술을 조사하고, 거절이유를 발견했을 때 비로소 의견제출통지서를 발송합니다(특허법 제63조). 보정은 그 통지를 받은 뒤의 단계이므로 그 아래입니다.
+  </p>
+
+  <div class="changed">
+    <span class="ckind">2026-09-17 — 효과음 8종이 붙었습니다</span>
+    소리가 없던 자리에 파일이 들어왔습니다. <b>규칙은 하나도 바뀌지 않았고</b>, 어떤 일이 일어났는지를 화면 대신 소리로도 알 수 있게 된 것이 전부입니다.
+    <ul>
+      <li><b>바닥 밟기가 첫 번째·두 번째로 갈라졌습니다</b> — <code>sfx_tile1</code> / <code>sfx_tile2</code>. 두 번 밟아야 무너지는 규칙이 <b>귀로 읽힙니다.</b></li>
+      <li><b>거절이유 타일 폭발</b>(<code>sfx_bomb</code>) · <b>신속심사 사출</b>(<code>sfx_boost</code>) · <b>암전 시작/끝</b>(<code>sfx_power_down</code> / <code>_up</code>) · <b>카운트다운 2·1·GO</b>(<code>sfx_2_1_go</code>).</li>
+      <li><b>관전자의 보정 기회에 소리가 생겼습니다</b>(<code>sfx_opportunity</code>). <b>여기에는 그동안 소리가 아예 없었습니다</b> — 문서상 "booster 를 쓴다"고 되어 있었지만 실제로 그 소리는 선행기술 검색 스캔과 (지금 안 쓰는) 보정 타일에만 걸려 있었습니다. 올라가는 사람 자리에서 납니다.</li>
+      <li><b><code>ASSET_VER</code> 을 7 로 올렸습니다.</b> 이 폴더는 <code>immutable</code> 로 나가서, 안 올리면 이미 받아 간 브라우저가 1년 동안 옛 파일을 씁니다.</li>
+    </ul>
+  </div>
+  <div class="changed">
+    <span class="ckind">2026-09-17 — 그 전에: 5F 에 어둠과 선행기술 검색을 되살렸습니다</span>
+    <ul>
+      <li><b>층 특성 · 어둠</b> — <b>18초마다 8초</b>(어두운 시간 44%), 주변 2~3칸 밖이 완전한 검정. 실측: 0~1칸 0.81 / 2칸 0.29 / <b>3칸 이상 0.00</b>.</li>
+      <li><b>특수 타일 · 선행기술 검색</b>(20%) — 밟으면 레이더 스캔과 함께 2초 동안 시야 3→8칸.</li>
+      <li><code>LAYER_DEFS</code> 태그를 되돌린 것이 전부입니다 — 구현은 2026-09-14 에 끊을 때부터 그대로 살아 있었습니다.</li>
+      <li>⚠ 숨 고르는 층이 <b>둘에서 하나(L3)</b>로 줄었습니다.</li>
+    </ul>
+  </div>
+  <div class="changed">
+    <span class="ckind">2026-09-17 — 그 전에: 소리가 실제로 들어왔습니다</span>
+    <ul>
+      <li><b>배경음 3곡</b>(맵별) + <b>효과음 7종</b>이 폴더에 들어왔습니다. 코드는 이름 규칙대로 자동으로 집습니다.</li>
+      <li><b>점프 타일 소리를 층수마다 나눴습니다</b> — <code>sfx_stair_jump_1</code> / <code>_2</code>. <span style="color:var(--muted)">(관전자의 보정 기회도 이때는 1층 소리를 썼습니다 — 지금은 <code>sfx_opportunity</code> 가 따로 있습니다.)</span></li>
+      <li><b>클릭 소리</b>를 대기 화면 버튼과 게임 화면 좌우 패널에 붙였습니다. 패널에 클릭을 받게 하지 않고 <b>좌표로만</b> 판정해, 그 위에서 시작한 시점 드래그가 그대로 동작합니다.</li>
+      <li><b><code>ASSET_VER</code> 을 4 로 올렸습니다.</b> 안 올리면 이미 받아 간 브라우저가 1년 동안 옛 파일을 씁니다(<code>immutable</code> 캐시).</li>
+    </ul>
+  </div>
+  <div class="changed">
+    <span class="ckind">2026-09-17 — 그 전에: 버그 수정 3건 (플레이 중 발견)</span>
+    <ul>
+      <li><b>머무름 시계가 첫 회차 뒤로는 동작하지 않았습니다.</b> 규칙은 맞았고 구현이 틀렸습니다 — 착지하면 "이 타일을 밟았다"가 먼저 가고 <b>바뀐 층 번호는 그다음에</b> 갑니다. 그런데 서버가 "층이 바뀌었으면 머무름 기준점을 지운다"로 판정해, 방금 착지한 타일의 시계까지 지웠습니다. <b>발판에서 처음 떨어진 뒤로는 어느 층에서도 발밑이 무너지지 않았습니다</b>(실측 7.4초 무반응). 지금은 <b>"그 타일이 지금 내 층인가"</b> 로 봅니다 — 도착 순서와 무관해집니다.
+        <span style="color:var(--muted)">검증(가만히 서 있기): L6 2.50 · L5 2.53 · L4 2.57 · L3 2.55 · L2 2.54초 → 구름바다.</span></li>
+      <li><b>신속심사 타일이 사출 없이 그냥 깨지고 있었습니다.</b> 한 번도 움직이지 않은 사람에게는 방향을 알 수 없다는 이유로 사출을 건너뛰었는데, 특수 타일은 한 번에 무너지므로 그 사람에게는 <b>"한 번 밟았는데 그냥 깨졌다"</b> 로만 보입니다. 라운드 시작 직후가 정확히 그 구간입니다. 이제 방향을 모르면 <b>아레나 안쪽</b>으로 보냅니다.</li>
+      <li><b>출원인 명단에서 내 층만 고정되어 있었습니다.</b> 스냅샷에서 내 것은 건너뛰므로(로컬 예측을 덮으면 안 됩니다) 참가 시점의 층에 멈춰 있었습니다. 이동이 클라이언트 권위이므로 <b>남의 층은 스냅샷에서, 내 층은 로컬에서</b> 읽습니다.</li>
+    </ul>
+  </div>
+  <div class="changed">
+    <span class="ckind">2026-09-17 — 그 전에 달라진 것: 배경 맵 순서와 맵별 배경음</span>
+    <ul>
+      <li><b>배경 맵을 순서대로 배정합니다</b>(종전 무작위). 방 안에서는 1 → 2 → 3 → 1, 새 방은 서버 커서에서 받아 갑니다.</li>
+      <li><b>맵마다 배경음을 다르게 걸 수 있습니다.</b> <code>bgm_map1~3.mp3</code> 를 <code>public/assets/audio/</code> 에 넣기만 하면 되고, 없으면 공통 곡으로 내려앉습니다 — 지금처럼 하나도 없어도 종전과 똑같이 동작합니다.</li>
+      <li><b>"파일이 없다"를 재생 전에 확인하도록 고쳤습니다.</b> 404 에 대해 크롬이 error 를 안 쏘기 때문에, 종전 방식으로는 폴백이 동작하지 않고 배경음이 조용히 꺼졌습니다.</li>
+    </ul>
+  </div>
+  <div class="changed">
+    <span class="ckind">2026-09-16 — 그 전에 달라진 것 ③: 바닥 규칙과 연습 모드</span>
+    <ul>
+      <li><b>바닥은 두 번 밟아야 무너집니다.</b> 종전에는 첫 밟기에 시계가 걸려 2회 밟기 규칙이 사실상 무의미했습니다. 같은 2.5초를 마지막 밟기로 옮겼습니다 — 4인 기준 한 층이 17.5 → <b>42.0초</b>, 6층 환산 1.7 → <b>4.2분</b>.</li>
+      <li><b>머무르면 그 자리가 무너집니다.</b> 위 변경만 하면 가만히 서 있기가 최적 전략이 되어 전원 공동 1위로 끝납니다. 시계를 없애지 않고 '서 있는 동안'으로 옮겼습니다.</li>
+      <li><b>혼자일 때는 연습 모드(단독 심사)</b> 로 이름을 붙였습니다. 대기 → 전환 안내 → 단독 심사 → <b>등록결정서 발부 또는 기록</b>. 개인 최고 기록과 비교합니다.</li>
+      <li><b>"전원 탈락"을 없앴습니다.</b> 혼자 떨어졌는데 그 '전원'이 나 하나였습니다.</li>
+      <li><b>연습 회차는 사람에게 양보합니다.</b> 주자가 도착하면 그 자리에서 마치고 정식 심사를 준비합니다.</li>
+      <li><b>기본 이름 심사관 → 출원인.</b> 발밑을 무너뜨리는 쪽이 심사관이고 그 위에서 버티는 쪽이 출원인이라, 역할이 거꾸로 읽히고 있었습니다.</li>
+      <li><b>대기 화면의 심사 규격을 표와 그림으로.</b> 종전에는 층·바닥·특수 타일·승패가 <b>한 문단</b>으로 흘러 참가 직전에 읽을 수가 없었습니다.</li>
+    </ul>
+  </div>
+  <div class="changed">
+    <span class="ckind">2026-09-16 — 그 전에 달라진 것 ②: 모바일 (가로 전용)</span>
+    <ul>
+      <li><b>폰에서 조작이 됩니다.</b> 종전에는 접속만 되고 이동·점프·시점이 전부 키보드/마우스 전용이라 <b>움직일 방법이 없었습니다</b>. 왼쪽 가상 스틱 + 오른쪽 시점 드래그 + 점프 버튼 + 핀치 줌.</li>
+      <li><b>기울기가 곧 속도.</b> 입력을 방향과 세기로 나눴습니다 — 종전 코드는 불리언 4개를 더한 뒤 정규화해서 "얼마나 기울였나"가 통째로 사라졌습니다. 키보드 조작은 종전과 완전히 동일합니다.</li>
+      <li><b>브라우저 제스처 차단.</b> 시점을 돌리려 화면을 쓸면 페이지가 새로고침되던 것을 막았습니다.</li>
+      <li><b>모바일 기기 등급·화질 상한·그림자.</b> 폰이 "정상 PC"로 판정되어 최고 화질로 시작하다 발열로 내려오던 것을 고쳤습니다.</li>
+      <li><b>적응형 품질이 최소 단계에 갇히던 버그 수정.</b> 한 번 내려가면 영영 올라오지 못했습니다 — 폰은 대개 최소에서 시작하므로 전부 거기 갇힙니다.</li>
+      <li><b>세로는 안내로 처리.</b> 가로를 권하는 화면을 띄웁니다.</li>
+    </ul>
+  </div>
+  <div class="changed">
+    <span class="ckind">2026-09-16 — 그 전에 달라진 것 ①: 관전자 규칙</span>
+    <ul>
+      <li><b>디버프 삭제.</b> 관전자의 의견제출통지서 투하를 없앴습니다. 이름이 박힌 채 동료를 떨어뜨리는 장면이 사내 행사에 맞지 않고, 탈락자가 1등을 노려 개입이 한 사람에게 몰렸습니다.</li>
+      <li><b>버프를 '보정 기회'로.</b> 발판을 깔아 주는 대신 주자를 <b>한 층 위로</b> 올려보냅니다 — 한 단계 되돌아가 다시 다투는 것이라 보정(제47조)에 정확히 대응합니다.</li>
+      <li><b>쿨다운 → 회차당 1회, 순수 관전자만.</b> 탈락한 주자는 개입할 수 없습니다. 한 번뿐이라 누구를 언제 돕는지가 전부 의미를 갖습니다.</li>
+      <li><b>착지 보장.</b> 올려보낼 자리가 무너져 있으면 그 타일을 되살린 뒤 쏩니다. 확보할 수 없으면 발동을 거절하고 <b>기회는 그대로 둡니다</b>.</li>
+    </ul>
+  </div>
+  <div class="changed">
+    <span class="ckind">2026-09-15 — 그 전에 달라진 것 (전부 운영·성능, 규칙 변경 없음)</span>
+    <ul>
+      <li><b>타일을 InstancedMesh 로.</b> 드로우콜 546 → <b>36</b>, 렌더 6.3 → <b>2.0ms</b>. 무너지는 타일만 진짜 메시로 빼냅니다 — 붕괴는 회전과 반투명이 겹치는데 한 묶음 안의 인스턴스는 깊이 정렬이 안 되기 때문입니다. 화면은 같습니다(타일 화소차 평균 0.07/255).</li>
+      <li><b>외부 의존 제거.</b> three.js·글꼴을 자체 서버에서 내려줍니다. 사내망에서 CDN 이 막히면 <b>게임이 아예 뜨지 않았고</b>, 글꼴 서버가 응답 없이 막히면 첫 화면이 수십 초 비어 있었습니다.</li>
+      <li><b>첫 진입 8.08MB → 3.64MB</b>(재방문 36KB). 캐릭터 텍스처 축소 + gzip/br + 캐시 정책. 형상·애니메이션은 그대로입니다.</li>
+      <li><b>적응형 품질·적응형 보간.</b> 기기 등급을 재서 화질을, 회선의 흔들림을 재서 보간 지연을 자동 조절합니다.</li>
+      <li><b>대기 화면에 내려받기 진행률.</b> "기본 캐릭터가 보이다가 한참 뒤에 바뀌는" 것이 고장으로 읽혔습니다 — 기다리는 중임을 보여 주면 같은 시간도 진행으로 읽힙니다.</li>
+      <li><b>배경음이 꺼지던 버그 수정.</b> 크로스페이드가 이전 곡의 <code>src</code> 를 비우면서 나는 오류를 "파일 없음"으로 받아, 세 페이즈가 같은 파일을 쓰는 구성에서 <b>첫 전환 한 번에 배경음이 영영 꺼지고</b> 있었습니다.</li>
+    </ul>
+  </div>
+  <div class="changed">
+    <span class="ckind">2026-09-14 — 그 전에 달라진 것</span>
+    <ul>
+      <li><b>층 5개 → 6개.</b> 의견제출통지와 청구항 사이에 <b>보정</b> 층을 신설했습니다. 라운드가 너무 빨리 끝난다는 의견에 대한 답입니다 — 층이 곧 목숨이라 라운드 길이가 층 수에 비례합니다. 층당 타일을 늘리는 쪽은 아레나가 같이 커져(이미 가로지르기 6.5초) 택하지 않았고, 이동 속도를 낮추는 쪽은 점프 사거리가 칸 단위로 줄어 "너무 어렵다"는 의견과 부딪쳐 택하지 않았습니다.</li>
+      <li><b>장치 8개 → 5개.</b> 기준은 <b>"보이는 난이도만 남긴다"</b>였습니다. 제거: 심사 가속 · 어둠 · 선행기술 검색 · 보정 타일. 코드는 지우지 않고 <code>LAYER_DEFS</code> 태그 연결만 끊었으므로, 되돌리면 그대로 되살아납니다.</li>
+      <li><b>타일 4종 → 2종.</b> 바닥은 2회 밟기 규칙으로 통일했습니다. <span style="color:var(--muted)">(당시에는 "또는 2.5초 자동" 이 함께 있었습니다 — 2026-09-16 에 걷어냈습니다)</span></li>
+      <li><b>회전층 좌표 버그 수정.</b> 화면과 물리의 회전 방향이 거울상이라, 회전층에서 <b>보이는 자리와 밟히는 자리가 2θ 만큼 어긋나</b> 있었습니다. 부순 타일 136장 중 58장에 발판이 남고, 멀쩡한 타일 135장 중 56장은 밟히지 않았습니다. 지금은 양쪽 다 0입니다.</li>
+      <li><b>가독성.</b> 타일 대비(금 간 타일 어둡게 · 아래층 감쇠 · 테두리)와 메시지 배치(장소 위 · 사건 아래 · 큐잉)를 측정 기반으로 고쳤습니다 — 위 "읽히게 만든 것들" 참고.</li>
+      <li><b>종료 연출 신설.</b> 종전에는 마지막 1인이 정해져도 화면에서 아무 일도 일어나지 않고 정적인 결과 패널만 떴습니다.</li>
+      <li><b>대기실과 로비.</b> 페이지를 열면 곧바로 관전으로 붙어 <b>대기 화면 뒤에서 진짜 게임이 돕니다.</b> 심사실(방) 목록·캐릭터 미리보기·대기 배경음·입장 전환 연출이 붙었습니다. 방은 40개까지 실측했고 코어 1개의 21% 였습니다. <span style="color:var(--muted)">자세한 내용은 스토리텔링 기획서 05절.</span></li>
+    </ul>
+  </div>
+</section>
+
+<footer class="end">
+  server.js · public/index.html 현재 값 기준 · 6층 × 271타일 = 1,626 · 타일 넓이 ×2.00 · 정원 4인 · 맵 반경 9
+</footer>
+
+</div>
+

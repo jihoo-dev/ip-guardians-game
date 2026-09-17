@@ -46,38 +46,16 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
 .panel{pointer-events:auto}
 
 /* ---------------------------------------------------- top status bar ---- */
-/* ── 상단바 높이는 고정입니다 ─────────────────────────────────────────
- * ★ 다른 요소들이 이 높이를 <b>숫자로 베껴 쓰고</b> 있었습니다 —
- *   관전 배너(top:52) · 층 목록(top:96) · 터치 안내문.
- *   그래서 칸 하나가 줄바꿈되어 바가 53 → 72px 이 되자
- *   <b>관전 배너가 상단바 밑에 깔렸습니다</b>(서든데스 칸을 넣다 겪음).
- *
- *   내용에 따라 높이가 변하지 않게 못 박고, 그 값을 베끼는 대신
- *   같은 토큰을 쓰게 합니다. 이제 칸을 더 넣어도 아래가 밀리지
- *   않습니다 — 넘치면 그 칸 안에서 잘립니다.
- * ★ 터치에서는 노치 여백만큼 더합니다(padding 이 아니라 height 에
- *   더해야 border-box 에서 칸이 눌리지 않습니다).               */
-:root{--topbar-h:53px}
 #topbar{
   position:absolute;top:0;left:0;right:0;display:flex;align-items:stretch;
   gap:1px;background:var(--rule);border-bottom:1px solid var(--rule);
-  height:var(--topbar-h);overflow:hidden;
 }
-#topbar .tb{overflow:hidden}
 .tb{background:rgba(5,6,10,.82);backdrop-filter:blur(8px);padding:9px 14px;display:flex;flex-direction:column;gap:2px}
 .tb .k{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:rgba(236,231,216,.45)}
 .tb .v{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.04em}
 #tbTitle{flex:1;justify-content:center}
-#tbTitle .v{font-family:var(--kr);font-weight:900;font-size:14px;letter-spacing:.02em;
-  white-space:nowrap}
+#tbTitle .v{font-family:var(--kr);font-weight:900;font-size:14px;letter-spacing:.02em}
 #tbTitle .v b{color:var(--l3)}
-/* ★ 서든데스 칸이 켜지면 제목을 비웁니다.
- *   칸이 하나 늘면서 flex:1 인 제목이 좁아져 <b>두 줄로 접혔습니다</b>
- *   (상단바는 높이 고정이라 그대로 잘렸습니다). 제목은 장식이고
- *   서든데스는 지금 벌어지는 일이라, 자리를 다투면 제목이 물러납니다.
- *   형제 선택자가 성립하는 것은 마크업에서 #tbSudden 이 #tbTitle
- *   <b>앞</b>에 있기 때문입니다 — 순서를 바꾸면 이 줄도 같이 옮기세요. */
-#tbSudden.on ~ #tbTitle{display:none}
 #vMap{font-family:var(--kr);font-size:12px;font-weight:700;color:var(--l3)}
 #vAlive{color:var(--l3)}
 #vPing.bad{color:var(--stamp)}
@@ -229,11 +207,6 @@ body.dev #devLayers{display:flex}
 .rrow.dead{opacity:.35;text-decoration:line-through}
 .rrow .lay{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.1em;opacity:.7}
 .rrow .you{font-family:var(--mono);font-size:8px;letter-spacing:.14em;background:var(--paper);color:var(--ink);padding:1px 4px}
-/* ★ 폭이 212px 뿐입니다. 이름 + YOU + 방장 + 준비상태 넷이 들어가면
- *   이름이 글자 단위로 접힙니다("김출/원"). 배지는 줄지 않게 고정하고,
- *   줄어들 곳을 이름 하나로 정해 줍니다.                          */
-.rrow > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rrow .you,.rrow .host{flex:0 0 auto;white-space:nowrap}
 
 /* --------------------------------------------------- spectator controls -- */
 #spec{
@@ -265,7 +238,7 @@ body.dev #devLayers{display:flex}
 
 /* -------------------------------------------------------------- toasts --- */
 #specBanner{
-  position:absolute;left:50%;top:var(--topbar-h);transform:translateX(-50%);display:none;
+  position:absolute;left:50%;top:52px;transform:translateX(-50%);display:none;
   background:rgba(255,45,45,.14);border:1px solid var(--stamp);
   color:var(--paper);font-size:12px;font-weight:700;letter-spacing:.02em;
   padding:7px 18px;white-space:nowrap
@@ -653,73 +626,6 @@ input[type=text]{
 #cdNum{font-family:var(--mono);font-size:150px;font-weight:700;line-height:1;color:var(--l3);text-shadow:0 0 60px rgba(0,255,204,.5)}
 #cdLabel{position:absolute;bottom:calc(50% - 118px);font-family:var(--mono);font-size:11px;letter-spacing:.36em;color:rgba(236,231,216,.55)}
 
-/* ── 대기실 패널 ──────────────────────────────────────────────────────
- * 발판 위에 서 있는 동안(대기 중)만 보입니다.
- *
- * ★ 새 화면을 만들지 않았습니다.
- *   이미 각자 자기 발판에 서 있고, 명단이 오른쪽에 있고, 시작하면
- *   발판이 갈라지며 떨어지는 연출이 있습니다. 여기가 곧 대기실이라,
- *   버튼 한 줄만 얹으면 됩니다. 별도 로비 화면을 끼우면 그 연출이
- *   한 겹 뒤로 밀립니다.
- *
- * ★ 자리는 #spec 과 같습니다(화면 아래 가운데). 둘은 동시에 뜨지
- *   않습니다 — 대기 중에는 개입할 회차가 없습니다.               */
-/* ★ #spec 과 달리 바닥에 붙이지 못합니다 — 대기 중에는 #hint(조작·타일
- *   규칙 세 줄)가 아래 가운데를 차지하고 있어서, 26px 에 두면 시작
- *   버튼이 그 글자 뒤로 들어갑니다. #hint 높이(약 75px) 위로 올립니다.
- *   관전 패널은 라운드 중에만 뜨고 그때는 #hint 가 한 줄이라 괜찮습니다. */
-#ready{
-  position:absolute;left:50%;bottom:104px;transform:translateX(-50%);
-  display:none;flex-direction:column;align-items:center;gap:9px;width:min(560px,94vw);z-index:14;
-  /* ★ #hud 는 통째로 pointer-events:none 입니다. 그 안에서 눌러야 하는
-   *   것만 하나씩 되살리는 구조라(.panel{pointer-events:auto}), 여기에
-   *   안 적으면 <b>버튼이 보이기만 하고 클릭이 그대로 통과합니다.</b>
-   *   화면에 멀쩡히 있어서 눈으로는 절대 안 드러나는 종류의 실수입니다. */
-  pointer-events:auto
-}
-#ready.show{display:flex}
-/* 대기실이 떠 있는 동안에는 토스트도 그 위로 비켜 줍니다 */
-body.lobby #toasts{bottom:232px}
-#readyState{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
-  color:rgba(236,231,216,.6);background:rgba(11,14,22,.86);border:1px solid var(--rule);
-  padding:6px 13px;text-align:center;word-break:keep-all}
-#readyState b{color:var(--l3);font-weight:700}
-#readyBtns{display:flex;gap:9px;width:100%}
-.rbtn{
-  flex:1;padding:13px;font-size:14px;font-weight:700;letter-spacing:.04em;
-  background:var(--l3);color:var(--ink);transition:.16s;font-family:var(--kr)
-}
-.rbtn:hover:not(:disabled){background:var(--paper)}
-.rbtn:disabled{background:rgba(236,231,216,.1);color:rgba(236,231,216,.38);cursor:default}
-/* 준비를 누른 뒤 — 눌렀다는 것이 보여야 하고, 다시 누르면 풀린다는 것도 */
-.rbtn.on{background:none;color:var(--l3);border:1px solid var(--l3)}
-.rbtn.on:hover{background:rgba(0,255,204,.12)}
-/* 가로 폰에서는 버튼 하나뿐이라 굳이 줄이지 않습니다 */
-/* 터치에서는 #hint 가 위로 올라가 있어(body.touch #hint{top:…}) 아래가
- * 비어 있습니다. 대신 양 엄지가 차지하므로 바닥 가까이 둡니다. */
-body.touch #ready{bottom:14px;width:min(420px,92vw)}
-body.touch.lobby #toasts{bottom:92px}
-body.touch .rbtn{padding:10px;font-size:13px}
-
-/* 명단의 준비 표시. 층 번호 자리를 대기 중에만 빌려 씁니다 —
- * 대기 중에는 모두 같은 발판 위라 층이 정보가 아닙니다.          */
-.rrow .rdy{font-family:var(--mono);font-size:9px;letter-spacing:.12em;
-  margin-left:auto;color:var(--l3)}
-.rrow .rdy.no{color:rgba(236,231,216,.3)}
-.rrow .host{font-family:var(--mono);font-size:8px;letter-spacing:.1em;
-  background:var(--gold);color:var(--ink);padding:1px 4px;margin-left:auto}
-
-/* 대기 화면의 두 갈래 참가 버튼 */
-.joinRow{display:flex;gap:9px;margin-top:22px}
-.joinRow .cta{margin-top:0;width:auto;flex:1 1 0;min-width:0}
-.joinRow .cta.alt{flex:0 0 auto;background:none;color:rgba(236,231,216,.75);
-  border:1px solid var(--rule);font-size:13px;padding-left:20px;padding-right:20px;
-  white-space:nowrap}
-.joinRow .cta.alt:hover{background:rgba(236,231,216,.08);color:var(--paper);
-  border-color:rgba(236,231,216,.34)}
-@media (max-width:560px){.joinRow{flex-direction:column}
-  .joinRow .cta.alt{flex:1 1 auto;width:auto}}
-
 #result .card{text-align:center}
 #resultRank{margin-top:20px;display:flex;flex-direction:column;gap:5px}
 .rank{display:flex;gap:12px;align-items:center;padding:9px 13px;background:rgba(236,231,216,.05);border-left:3px solid;font-size:12.5px;text-align:left}
@@ -746,12 +652,8 @@ body.touch .rbtn{padding:10px;font-size:13px}
  * ★ 나가기 버튼은 일부러 약하게 보이게 둡니다.
  *   기본 동작은 "이대로 다음 회차" 이고 나가기는 예외입니다. 둘 다
  *   같은 세기로 칠하면 결과 화면이 갈림길처럼 보입니다.            */
-/* ★ .cta 는 width:100% 입니다. flex 행에 그대로 두면 둘이 서로
- *   100% 를 요구해 한쪽이 글자 한 자 폭까지 눌립니다(실제로 "빠른
- *   참가" 가 세로로 한 글자씩 접혔습니다). 행 안에서는 폭을 flex 에
- *   맡겨야 합니다.                                                */
 .btnRow{display:flex;gap:9px;margin-top:22px}
-.btnRow .cta{margin-top:0;width:auto;flex:1 1 0;min-width:0}
+.btnRow .cta{margin-top:0}
 .cta.ghost{background:none;color:rgba(236,231,216,.72);border:1px solid var(--rule);
   font-size:13px;font-weight:600}
 .cta.ghost:hover{background:rgba(236,231,216,.08);color:var(--paper);
@@ -871,44 +773,6 @@ body.touch .rbtn{padding:10px;font-size:13px}
 .doc.accel{border-color:#ff2a1a;box-shadow:-3px 0 0 #ff2a1a,0 0 26px -6px #ff2a1a}
 .doc.accel .no{color:#ff8a7a;animation:accelPulse .62s ease-in-out infinite}
 
-/* ── 서든데스 ─────────────────────────────────────────────────────────
- * 심사 가속과 비슷하되 <b>깜빡이지 않습니다.</b> 가속은 몇 초짜리
- * 사건이라 깜빡임이 "지금 걸렸다"를 알리는 역할을 하지만, 서든데스는
- * 라운드가 끝날 때까지 이어집니다 — 그동안 화면이 계속 깜빡이면
- * 정작 봐야 할 발밑을 못 봅니다. 상태는 <b>가만히 켜져 있는 것</b>으로
- * 알립니다.
- *
- * 층을 가리지 않으므로 왼쪽 층 목록에는 표시하지 않습니다.
- * ------------------------------------------------------------------ */
-#suddenAlert{position:absolute;inset:0;display:none;pointer-events:none;z-index:13}
-#suddenAlert.on{display:block}
-#suddenAlert .vig{
-  position:absolute;inset:0;
-  background:radial-gradient(circle at 50% 54%,transparent 46%,rgba(255,38,26,.34) 100%)
-}
-#suddenAlert .bar{
-  position:absolute;left:0;right:0;height:2px;background:#ff2a1a;
-  box-shadow:0 0 18px 2px rgba(255,42,26,.7)
-}
-#suddenAlert .bar.t{top:0} #suddenAlert .bar.b{bottom:0}
-/* ★ 글자는 화면에 띄우지 않고 <b>상단바 칸</b>으로 갑니다.
- *   상단 가운데는 관전 배너(52px) · 회전 경보(88px) · 층 진입 배너
- *   (122px)가 번갈아 쓰는 자리입니다. 서든데스는 라운드가 끝날 때까지
- *   계속 떠 있으므로 거기 두면 <b>반드시 겹칩니다</b> — 실제로 관전
- *   배너와 완전히 포개졌습니다.
- *   상단바는 ROOM·생존·남은 층처럼 <b>지속되는 라운드 상태</b>를 두는
- *   곳이라 성격도 맞고, flex 행이라 자리다툼이 없습니다.          */
-/* ⚠ 상단바 높이는 53px 이어야 합니다 — 관전 배너(top:52) · 층 목록
- *   (top:96) · 터치 안내문이 전부 그 값을 전제로 자리를 잡습니다.
- *   칸 안에서 글자가 줄바꿈되면 바가 통째로 높아져 <b>관전 배너가
- *   상단바 밑에 깔립니다</b>(실제로 72px 이 되어 그랬습니다).
- *   그래서 이 칸만 줄바꿈을 막고 값 글자를 한 단 줄입니다.       */
-#tbSudden{display:none;background:rgba(38,6,4,.92);white-space:nowrap}
-#tbSudden.on{display:flex}
-#tbSudden .k{color:#ff8a7a;white-space:nowrap}
-#tbSudden .v{color:#ff5140;text-shadow:0 0 14px rgba(255,58,18,.7);
-  font-size:13px;white-space:nowrap}
-
 /* ── 어둠 경보 (층 특성) ───────────────────────────────────────────
  * 실제로 '가리는' 것은 3D 쪽(updateTiles)이 각자 자기 위치 기준으로
  * 합니다. 여기 오버레이는 화면 가장자리를 눌러 주는 분위기와 문구만
@@ -1023,18 +887,15 @@ body.touch input{-webkit-user-select:auto;user-select:auto;touch-action:auto}
 
 /* 노치·홈 인디케이터를 피합니다. viewport-fit=cover 는 이미 켜져 있어
    화면 끝까지 그리는데, 정작 HUD 가 그 밑에 깔려 있었습니다. */
-body.touch #topbar{height:calc(var(--topbar-h) + env(safe-area-inset-top));
-  padding-top:env(safe-area-inset-top);
+body.touch #topbar{padding-top:env(safe-area-inset-top);
   padding-left:calc(10px + env(safe-area-inset-left));
   padding-right:calc(10px + env(safe-area-inset-right))}
-/* 관전 배너도 노치만큼 같이 내려갑니다 */
-body.touch #specBanner{top:calc(var(--topbar-h) + env(safe-area-inset-top))}
 body.touch #topbar .opt{display:none}   /* 가로 폰에 9칸은 안 들어갑니다 */
 /* ★ 안내문을 위로 올립니다. 화면 아래 좌우는 양 엄지가 차지하고,
  *   가운데로 두어도 왼쪽 이동 영역과 실측 170px 겹쳤습니다(844px 기준).
  *   위쪽은 상단바 아래가 통째로 비어 있어 가릴 것이 없습니다.
  *   토스트는 그대로 아래 가운데입니다 — 안내(장소)는 위, 사건은 아래.  */
-body.touch #hint{top:calc(var(--topbar-h) + 5px + env(safe-area-inset-top));bottom:auto;
+body.touch #hint{top:calc(58px + env(safe-area-inset-top));bottom:auto;
   font-size:10px;max-width:min(60vw,480px);padding:5px 10px}
 body.touch #hint .rules{display:none}   /* 두 줄이면 층 안내와 겹칩니다 */
 body.touch #toasts{bottom:calc(20px + env(safe-area-inset-bottom))}
@@ -1098,11 +959,6 @@ body.touch-run #touch{display:block}
   <div class="bar t"></div><div class="bar b"></div>
   <div class="tag"><b>심사 가속</b><i id="accelSub">EXAMINATION ACCELERATION</i></div>
 </div>
-<!-- 서든데스. 시간이 다 됐는데 둘 이상 남았을 때 계속 떠 있습니다. -->
-<div id="suddenAlert">
-  <div class="vig"></div>
-  <div class="bar t"></div><div class="bar b"></div>
-</div>
 <div id="darkAlert">
   <div class="vig"></div>
   <div class="tag">
@@ -1117,8 +973,6 @@ body.touch-run #touch{display:block}
     <div class="tb panel"><span class="k">ROOM</span><span class="v" id="vRoom">—</span></div>
     <div class="tb panel opt"><span class="k">MAP</span><span class="v" id="vMap">—</span></div>
     <div class="tb panel"><span class="k">생존</span><span class="v" id="vAlive">0/0</span></div>
-    <!-- 서든데스. 발동 중에만 보입니다(applySudden). -->
-    <div class="tb panel" id="tbSudden"><span class="k">서든데스</span><span class="v" id="suddenSub">—</span></div>
     <!-- 구름바다까지 몇 층 남았는가. "떨어지면 죽는다"는 오해를 상시로
          반박하는 자리입니다 — 층이 곧 목숨이라는 걸 숫자로 보여 줍니다. -->
     <div class="tb panel"><span class="k">남은 층</span><span class="v" id="vFloors">—</span></div>
@@ -1152,14 +1006,6 @@ body.touch-run #touch{display:block}
   <div id="specBanner">관전 중 · 다음 회차에 주자로 자동 참가합니다</div>
   <div id="layerBanner"><div class="lbNo"></div><div class="lbName"></div><div class="lbMarks"></div><div class="lbSafe"></div></div>
   <div id="toasts"></div>
-
-  <!-- 대기실. 발판 위에 서 있는 동안만 보입니다(updateReadyUI). -->
-  <div id="ready">
-    <div id="readyState">출원인을 기다리는 중…</div>
-    <div id="readyBtns">
-      <button class="rbtn" id="btnReady" type="button">준비</button>
-    </div>
-  </div>
 
   <div id="spec" class="panel">
     <div id="specTargets"></div>
@@ -1247,24 +1093,11 @@ body.touch-run #touch{display:block}
     <div class="queueLine" id="joinQueue" aria-live="polite">
       <span class="dot"></span><span id="joinQueueText">대기열 확인 중…</span>
     </div>
-    <!-- ★ 두 갈래입니다.
-         빠른 참가 : 자리가 있는 방에 자동 배정(종전 동작).
-         방 만들기 : 빈 방을 일부러 엽니다 — 같이 온 사람들끼리 모일
-                     때 방 번호를 서로 불러 줄 필요가 없어집니다.
-         목록에서 방을 고르면 빠른 참가 버튼이 그 방 입장으로 바뀝니다
-         (syncJoinCta). -->
-    <div class="joinRow">
-      <button class="cta" id="btnJoin">심사 대기열 입장</button>
-      <button class="cta alt" id="btnCreate" type="button">방 만들기</button>
-    </div>
+    <button class="cta" id="btnJoin">심사 대기열 입장</button>
     <div class="keys">
       <!-- 터치 기기에서는 Touch.init 이 .kbd 를 지우고 터치용으로 갈아끼웁니다. -->
       <span class="kbd"><b>WASD</b> 이동</span><span class="kbd"><b>SPACE</b> 점프</span><span class="kbd"><b>SHIFT</b> 질주</span>
       <span class="kbd"><b>드래그</b> 시점</span><span class="kbd"><b>휠</b> 줌</span>
-      <!-- 대기실과 나가기. 화면에 버튼이 있지만 키가 있다는 것도
-           여기서 알려 줍니다 — 혼자 들어온 사람이 버튼을 찾기 전에
-           키부터 눌러 보는 일이 실제로 있었습니다. -->
-      <span class="kbd"><b>ENTER</b> 준비·시작</span><span class="kbd"><b>ESC</b> 나가기</span>
       <!-- 상단 HUD 의 소리 버튼은 참가 화면에 가려 누를 수 없습니다.
            대기 화면에서도 끌 수 있어야 하므로 여기에 하나 둡니다. -->
       <button class="sndBtn" id="btnJoinSnd" type="button" aria-pressed="false">
@@ -1565,11 +1398,9 @@ const dom = {
   resultRank: $('resultRank'), resultEyebrow: $('resultEyebrow'),
   deadFlash: $('deadFlash'), hint: $('hint'),
   leaveMenu: $('leaveMenu'),
-  ready: $('ready'), readyState: $('readyState'), btnReady: $('btnReady'),
   verdict: $('verdict'), verdictCert: $('verdictCert'), verdictSeal: $('verdictSeal'),
   accelAlert: $('accelAlert'), accelSub: $('accelSub'),
   darkAlert: $('darkAlert'), darkSub: $('darkSub'), rotAlert: $('rotAlert'),
-  suddenAlert: $('suddenAlert'), suddenSub: $('suddenSub'), tbSudden: $('tbSudden'),
   /* 층 안내문은 서버 층 수만큼 동적으로 만들어집니다.
    * buildLayerStack() 이 만든 뒤 여기를 다시 채웁니다.               */
   docs: []
@@ -1659,13 +1490,6 @@ const G = {
   pedestals: new Map(),    // 대기 발판
   pedestalsActive: true,
   seats: 4,
-  /* 대기실 — 서버 meta 가 채웁니다(applyMeta). */
-  /* 서든데스 상태. null 이면 평소입니다({level, speed, max}). */
-  sudden: null,
-  hostId: null,        // 시작 버튼을 누를 수 있는 사람
-  canStart: false,     // 지금 시작이 가능한가
-  readyCount: 0,       // 방장 포함 준비 인원
-  joinCreate: false,   // 이번 참가가 '방 만들기' 인가 (init 에서 내려놓습니다)
   /* 층 관련 상태는 전부 서버 config.LAYERS 에서 만들어집니다(buildMap).
    * 층 번호를 키로 쓰는 맵이라 층이 몇 개든, 번호가 무엇이든 따라옵니다. */
   /* 이번 라운드에 이미 안내문을 띄운 타일 종류들 (specialType 또는 kind).
@@ -9302,19 +9126,11 @@ let queueTimer = null;
  *   보조 수단으로만 두고, 목록도 채워진 정도를 가장 크게 보여 줍니다.  */
 let lobbyPick = null;
 
-/* ★ startsIn 의 뜻이 달라졌습니다.
- *   종전에는 "가만히 둬도 이때 시작" 이었고, 지금은 <b>전원 준비가
- *   끝났을 때만</b> 서버가 채웁니다(evaluateLobby). 그래서 이 값이
- *   있다는 것 자체가 "이 방은 곧 시작한다" 는 뜻입니다.
- *   준비 인원은 따로 보여 줍니다 — 들어갈 방을 고르는 근거가
- *   "몇 명 있나" 에서 "얼마나 준비됐나" 로 바뀌었기 때문입니다.  */
 function lobbyRoomLabel(r, seats) {
   if (r.phase === 'playing' || r.phase === 'ended') return ['play', '진행 중'];
   if (r.players >= seats) return ['play', '정원'];
   if (r.phase === 'countdown') return ['soon', '곧 시작'];
-  if (r.startsIn > 0) return ['soon', Math.ceil(r.startsIn / 1000) + '초 뒤'];
-  if (r.players >= 2 && r.ready >= r.players) return ['soon', '준비 완료'];
-  if (r.players >= 2) return ['wait', '준비 ' + (r.ready || 0) + '/' + r.players];
+  if (r.startsIn > 0 && r.startsIn < 12000) return ['soon', Math.ceil(r.startsIn / 1000) + '초 뒤'];
   return ['wait', '대기 중'];
 }
 
@@ -9382,9 +9198,9 @@ function renderQueue(rooms) {
     else waiting += (r.players || 0);
   }
   let msg;
-  if (waiting > 0) msg = '대기 중인 출원인 ' + waiting + '명 · 전원 준비하면 방장이 시작합니다';
+  if (waiting > 0) msg = '심사 대기열 ' + waiting + '/' + seats + ' · 정원이 차면 바로 시작';
   else if (playing > 0) msg = '진행 중인 심사 ' + playing + '회차 · 지금 들어가면 다음 회차부터';
-  else msg = '열린 심사실이 없습니다 · 방을 만들면 첫 방장이 됩니다';
+  else msg = '대기열이 비어 있습니다 · 먼저 들어가서 기다리게 됩니다';
   txt.textContent = msg;
   box.classList.toggle('live', waiting > 0 || playing > 0);
 }
@@ -9707,107 +9523,87 @@ function buildRulesText() {
     other.appendChild(ot);
   }
 
-  /* ── 2. 특수 타일 ──────────────────────────────────────────────────
-   * ★ 층 순서대로(L6 → L1) 적습니다.
-   *   종전에는 special 태그를 하나씩 찾아 적었고, <b>그 찾는 순서가 곧
-   *   화면 순서</b>였습니다. 그래서 5층(선행기술 검색)이 4층(거절이유)
-   *   아래에 붙었습니다 — 왼쪽 층 목록·게임 화면·기획서가 전부 위에서
-   *   아래로 읽히는데 규격만 순서가 달랐습니다.
-   *   지금은 LAYERS 를 돌면서 그 층이 가진 것을 답니다(LAYERS[0] 이
-   *   최상층). 층을 더하거나 순서를 바꿔도 따라옵니다.
-   *
-   * ★ 검색 타일은 trait(어둠)이 아니라 special 로 찾습니다.
-   *   둘 다 마침 같은 층이라 종전에도 결과는 맞았지만, 어둠만 다른
-   *   층으로 옮기는 순간 엉뚱한 층에 적히게 됩니다.              */
+  /* ── 2. 특수 타일 ── */
   const spSec = section('특수 타일 — 층마다 하나씩');
   const spTable = mk('div', 'rgTable');
   let spCount = 0;
 
-  for (const Lx of layers) {
-    if (Lx.special === 'accel' && cfg.DASH) {
-      row(spTable, Lx, '신속심사',
-        '밟으면 진행 방향으로 ' + cfg.DASH.tiles + '칸 튀어나갑니다.',
-        '앞이 비어 있으면 그대로 떨어집니다');
-      spCount++;
-    }
-    if (Lx.special === 'search' && cfg.SEARCH_TILE) {
-      const S = cfg.SEARCH_TILE;
-      row(spTable, Lx, '선행기술 검색',
-        '밟으면 ' + sec(S.durationMs) + ' 동안 시야가 ' + S.viewTiles + '칸까지 넓어집니다.');
-      spCount++;
-    }
-    if (Lx.special === 'reject' && cfg.REJECT_TILE) {
-      const R = cfg.REJECT_TILE;
-      row(spTable, Lx, '거절이유',
-        '평소엔 일반 타일처럼 보이다가, 밟으면 ' + sec(R.delayMin) + '~' + sec(R.delayMax) +
-        ' 뒤에 자기 자신과 이웃 타일까지 함께 터집니다.',
-        '밟기 전에는 구별할 수 없습니다');
-      spCount++;
-      /* 보정 타일은 OFFICE_SPECIAL_MIX 에서 빠지면 맵에 아예 안 깔립니다.
-       * 층만 보고 적으면 없는 타일을 설명하게 됩니다.              */
-      if (cfg.OFFICE_SPECIAL_MIX && cfg.OFFICE_SPECIAL_MIX.amend > 0) {
-        row(spTable, Lx, '보정', '밟으면 주변에서 무너진 타일 하나가 되살아납니다.');
-        spCount++;
-      }
-    }
-    if (Lx.special === 'phase' && cfg.PHASE_TILE) {
-      row(spTable, Lx, '위상',
-        sec(cfg.PHASE_TILE.onMs) + ' 실체 → ' + sec(cfg.PHASE_TILE.offMs) +
-        ' 비활성을 반복합니다. 밟아도 무너지지 않습니다.',
-        '비활성일 때 위에 있으면 떨어집니다');
-      spCount++;
-    }
-    if (Lx.special === 'jump' && cfg.JUMP_TILE) {
-      row(spTable, Lx, '점프',
-        cfg.JUMP_TILE.levels.join('층 · ') + '층 위로 쏘아 올립니다.',
-        '위에 발판이 없으면 그대로 떨어집니다');
-      spCount++;
-    }
+  const accelLayer = layers.find((L) => L.special === 'accel');
+  if (accelLayer && cfg.DASH) {
+    row(spTable, accelLayer, '신속심사',
+      '밟으면 진행 방향으로 ' + cfg.DASH.tiles + '칸 튀어나갑니다.',
+      '앞이 비어 있으면 그대로 떨어집니다');
+    spCount++;
+  }
+  const rejectLayer = layers.find((L) => L.special === 'reject');
+  if (rejectLayer && cfg.REJECT_TILE) {
+    const R = cfg.REJECT_TILE;
+    row(spTable, rejectLayer, '거절이유',
+      '평소엔 일반 타일처럼 보이다가, 밟으면 ' + sec(R.delayMin) + '~' + sec(R.delayMax) +
+      ' 뒤에 자기 자신과 이웃 타일까지 함께 터집니다.',
+      '밟기 전에는 구별할 수 없습니다');
+    spCount++;
+  }
+  /* 보정 타일은 OFFICE_SPECIAL_MIX 에서 빠지면 맵에 아예 안 깔립니다.
+   * 층만 보고 적으면 없는 타일을 설명하게 됩니다.                  */
+  if (rejectLayer && cfg.OFFICE_SPECIAL_MIX && cfg.OFFICE_SPECIAL_MIX.amend > 0) {
+    row(spTable, rejectLayer, '보정', '밟으면 주변에서 무너진 타일 하나가 되살아납니다.');
+    spCount++;
+  }
+  const darkLayer = layers.find((L) => L.trait === 'dark');
+  if (darkLayer && cfg.SEARCH_TILE) {
+    const S = cfg.SEARCH_TILE;
+    row(spTable, darkLayer, '선행기술 검색',
+      '밟으면 ' + sec(S.durationMs) + ' 동안 시야가 ' + S.viewTiles + '칸까지 넓어집니다.');
+    spCount++;
+  }
+  const phaseLayer = layers.find((L) => L.special === 'phase');
+  if (phaseLayer && cfg.PHASE_TILE) {
+    row(spTable, phaseLayer, '위상',
+      sec(cfg.PHASE_TILE.onMs) + ' 실체 → ' + sec(cfg.PHASE_TILE.offMs) +
+      ' 비활성을 반복합니다. 밟아도 무너지지 않습니다.',
+      '비활성일 때 위에 있으면 떨어집니다');
+    spCount++;
+  }
+  const jumpLayer = layers.find((L) => L.special === 'jump');
+  if (jumpLayer && cfg.JUMP_TILE) {
+    row(spTable, jumpLayer, '점프',
+      cfg.JUMP_TILE.levels.join('층 · ') + '층 위로 쏘아 올립니다.',
+      '위에 발판이 없으면 그대로 떨어집니다');
+    spCount++;
   }
   if (spCount) spSec.appendChild(spTable);
   else spSec.remove();
 
-  /* ── 3. 층 특성 — 특수 타일과 다른 축입니다(층 전체에 걸립니다) ──
-   * 여기도 층 순서대로입니다(위 주석 참고).
-   * 간격은 dev 에서 줄어든 실제 값(effectiveIntervalMs)을 씁니다.   */
+  /* ── 3. 층 특성 — 특수 타일과 다른 축입니다(층 전체에 걸립니다) ── */
   const trSec = section('층 특성 — 그 층 전체에 걸립니다');
   const trTable = mk('div', 'rgTable');
   let trCount = 0;
 
-  for (const Lx of layers) {
-    if (Lx.trait === 'accel' && cfg.ACCEL_EVENT) {
-      const A = cfg.ACCEL_EVENT;
-      /* 어둠과 같은 이유로 지속·간격을 나눠 적습니다(위 주석 참고). */
-      const aGap = A.effectiveIntervalMs || A.intervalMs;
-      row(trTable, Lx, '심사 가속',
-        sec(A.durationMs) + ' 동안 그 층 타일의 붕괴가 ' + A.speed +
-        '배로 빨라지고, ' + sec(aGap) + ' 쉬었다 다시 걸립니다 (한 바퀴 ' +
-        sec(A.durationMs + aGap) + '). 발동되면 화면이 붉게 깜빡입니다.');
-      trCount++;
-    }
-    if (Lx.trait === 'dark' && cfg.DARK_EVENT) {
-      const D = cfg.DARK_EVENT;
-      /* ★ 'N초마다 M초 동안' 은 한 바퀴가 N초로 읽힙니다. 그런데 간격은
-       *   <b>직전 종료부터</b> 세므로 한 바퀴는 지속 + 간격입니다.
-       *   기본값에서 '10초마다 8초' 는 어두운 시간 80% 로 읽히지만
-       *   실제로는 18초 중 8초, 44% 입니다. 두 배 가까이 틀린 인상을
-       *   주므로 두 값을 나눠 적고 한 바퀴를 같이 보여 줍니다.      */
-      const dGap = D.effectiveIntervalMs || D.intervalMs;
-      const dCycle = D.durationMs + dGap;
-      row(trTable, Lx, '어둠',
-        sec(D.durationMs) + ' 동안 내 주변 ' + D.clearTiles + '~' + D.viewTiles +
-        '칸 밖이 보이지 않고, ' + sec(dGap) + ' 쉬었다 다시 걸립니다 (한 바퀴 ' +
-        sec(dCycle) + ').',
-        '타일은 평소처럼 무너집니다 — 보이지 않을 뿐입니다');
-      trCount++;
-    }
-    if (Lx.trait === 'rotate' && cfg.ROTATE_EVENT) {
-      const R = cfg.ROTATE_EVENT;
-      row(trTable, Lx, '회전',
-        '층이 중심축을 기준으로 천천히 돕니다. 위에 서 있으면 함께 실려 돌고, ' +
-        sec(R.effectiveIntervalMs || R.intervalMs) + '마다 방향이 반대로 바뀝니다.');
-      trCount++;
-    }
+  const rotLayer = layers.find((L) => L.trait === 'rotate');
+  if (rotLayer && cfg.ROTATE_EVENT) {
+    const R = cfg.ROTATE_EVENT;
+    row(trTable, rotLayer, '회전',
+      '층이 중심축을 기준으로 천천히 돕니다. 위에 서 있으면 함께 실려 돌고, ' +
+      sec(R.effectiveIntervalMs || R.intervalMs) + '마다 방향이 반대로 바뀝니다.');
+    trCount++;
+  }
+  /* 간격은 dev 에서 줄어든 실제 값(effectiveIntervalMs)을 씁니다. */
+  const accelTraitLayer = layers.find((L) => L.trait === 'accel');
+  if (accelTraitLayer && cfg.ACCEL_EVENT) {
+    const A = cfg.ACCEL_EVENT;
+    row(trTable, accelTraitLayer, '심사 가속',
+      sec(A.effectiveIntervalMs || A.intervalMs) + '마다 ' + sec(A.durationMs) +
+      ' 동안 그 층 타일의 붕괴가 ' + A.speed + '배로 빨라집니다. 발동되면 화면이 붉게 깜빡입니다.');
+    trCount++;
+  }
+  if (darkLayer && cfg.DARK_EVENT) {
+    const D = cfg.DARK_EVENT;
+    row(trTable, darkLayer, '어둠',
+      sec(D.effectiveIntervalMs || D.intervalMs) + '마다 ' + sec(D.durationMs) +
+      ' 동안 내 주변 ' + D.clearTiles + '~' + D.viewTiles + '칸 밖이 보이지 않습니다.',
+      '타일은 평소처럼 무너집니다 — 보이지 않을 뿐입니다');
+    trCount++;
   }
   if (trCount) trSec.appendChild(trTable);
   else trSec.remove();
@@ -9821,30 +9617,12 @@ function buildRulesText() {
     d.append(e, mk('span', null, text));
     end.appendChild(d);
   };
-  /* ★ 2026-09-17 — 시작 조건이 바뀌었습니다.
-   *   종전 문구는 '정원이 차면' 이었는데, 지금은 정원과 무관하게
-   *   방장이 누릅니다. 규격이 실제 규칙과 다르면 규격을 읽은 사람이
-   *   오히려 더 헤맵니다.                                         */
-  endRow('neutral', '시작',
-    '모두 준비를 마치면 방장이 심사를 개시합니다. 그때 대기 발판이 사라지며 시작됩니다.');
+  endRow('neutral', '시작', '정원이 차면 대기 발판이 사라지며 시작됩니다.');
   if (layers.length) {
     endRow('lose', '탈락', '맨 아래 ' + (layers[layers.length - 1].name || '') +
       ' 층 밑으로 떨어지면 구름바다에 빠집니다.');
   }
-  /* ★ 등록결정은 <b>한 건</b>입니다. 한때 시간이 다 되면 생존자 전원을
-   *   공동 1위로 처리했는데, 대기 화면 첫 문장('단 한 사람')과 어긋났습니다. */
-  endRow('win', '등록결정', '마지막 한 명만 등록결정을 받습니다.');
-  if (cfg.SUDDEN && cfg.SUDDEN.speeds && cfg.SUDDEN.speeds.length) {
-    const SP = cfg.SUDDEN.speeds;
-    endRow('lose', '서든데스',
-      '심사 기간이 다 돼도 둘 이상 남아 있으면 끝나지 않습니다 — 바닥이 ' +
-      SP[0] + '배로 빨라지고, 그래도 안 끝나면 ' + SP[SP.length - 1] +
-      '배까지 올라갑니다. 혼자 남을 때까지입니다.');
-  }
-  /* 혼자 들어온 사람에게는 최후 1인이 성립하지 않습니다 — 그 경로에
-   * 이름이 있다는 것을 규격에서도 알려 줍니다.                    */
-  endRow('neutral', '연습',
-    '혼자면 연습 모드(단독 심사)입니다. 겨룰 상대가 아니라 기록 — 몇 개 층을 내려갔고 얼마나 버텼나 — 이 남습니다.');
+  endRow('win', '등록결정', '마지막 한 명이 등록결정을 받습니다.');
   /* 관전자 개입도 규격입니다 — 참가 방식에 '관전 + 개입'이 있는데,
    * 그게 무엇을 할 수 있는 자리인지는 어디에도 적혀 있지 않았습니다. */
   if (cfg.AMEND_LEVEL) {
@@ -10265,25 +10043,11 @@ function updateRoster() {
      *   남의 층은 스냅샷에서, 내 층은 local 에서 읽는 것이 맞습니다.   */
     const alive = isSelf ? local.alive : r.alive;
     const layer = isSelf ? local.layer : r.layer;
-    /* ★ 대기 중에는 층 번호 대신 준비 상태를 보여 줍니다.
-     *   모두 같은 발판 위라 층이 정보가 아니고, 정작 알아야 할 것은
-     *   "누구를 기다리고 있는가" 입니다.                            */
-    const waiting = G.phase === 'waiting';
-    const isHost = r.id === G.hostId;
-    /* ★ 방장 줄에는 준비 표시를 넣지 않습니다. 배지가 이미 "이 사람이
-     *   시작한다" 를 말하고 있고, 넷이 한 줄에 들어가면 212px 폭에서
-     *   이름이 글자 단위로 접힙니다.                              */
-    const tail = waiting
-      ? (isHost ? ''
-         : '<span class="rdy' + (r.ready ? '' : ' no') + '">' +
-             (r.ready ? '준비 완료' : '준비 중') + '</span>')
-      : '<span class="lay">' + (alive ? 'L' + (layer || '?') : 'OUT') + '</span>';
     rows.push(
-      '<div class="rrow' + (alive || waiting ? '' : ' dead') + '" style="border-left-color:' + (r.color || '#888') + '">' +
+      '<div class="rrow' + (alive ? '' : ' dead') + '" style="border-left-color:' + (r.color || '#888') + '">' +
       '<span>' + escapeHtml(safeName(r.name)) + '</span>' +
       (isSelf ? '<span class="you">YOU</span>' : '') +
-      (isHost ? '<span class="host">방장</span>' : '') +
-      tail +
+      '<span class="lay">' + (alive ? 'L' + (layer || '?') : 'OUT') + '</span>' +
       '</div>'
     );
   }
@@ -10373,89 +10137,6 @@ function updateActionCooldowns() {
 
 let cdVisible = false;
 let lastCountdownSec = -1;
-/* ══════════════════════════════════════════════════════════════════════
- * 대기실 — 준비 / 시작
- * ────────────────────────────────────────────────────────────────────
- * ★ 방장에게는 준비 버튼을 주지 않습니다.
- *   방장의 준비는 '심사 개시' 를 누르는 것 자체입니다. 둘 다 주면
- *   "준비를 누른 뒤 시작을 또 눌러야" 하는 두 단계가 됩니다.
- *
- * ★ 버튼이 왜 안 눌리는지를 버튼 위에 적습니다.
- *   비활성 버튼만 두면 "고장" 으로 읽힙니다. 누가 아직 준비를 안
- *   했는지까지 적어 두면 방장이 그 사람에게 말을 걸 수 있습니다.
- *
- * ★ 관전자에게는 띄우지 않습니다 — 시작시킬 자격이 없습니다.
- * ══════════════════════════════════════════════════════════════════ */
-/* ══════════════════════════════════════════════════════════════════════
- * 서든데스
- * ────────────────────────────────────────────────────────────────────
- * 시간이 다 됐는데 둘 이상 남으면 라운드를 끝내지 않고 바닥이 더 빨리
- * 무너집니다. 서버가 실제 타이밍을 정하고, 여기서는 알리기만 합니다.
- *
- * ★ 관전자에게도 보여 줍니다 — 층 특성 배너와 다른 점입니다.
- *   층 특성은 "내가 선 층"이 기준이라 관전자에게는 기준이 없지만,
- *   서든데스는 라운드 전체의 상태라 보는 사람도 알아야 합니다.
- * ══════════════════════════════════════════════════════════════════ */
-function applySudden(d) {
-  const on = !!(d && d.level);
-  G.sudden = on ? d : null;
-  const live = on && G.phase === 'playing';
-  if (dom.suddenAlert) dom.suddenAlert.classList.toggle('on', live);
-  if (dom.tbSudden) dom.tbSudden.classList.toggle('on', live);
-  if (!on) return;
-  if (dom.suddenSub) {
-    /* 상단바 칸은 좁습니다 — 배속과 단계만. "최후의 1인까지" 는
-     * 발동 토스트와 대기 화면 규격이 이미 말합니다.              */
-    dom.suddenSub.textContent = d.speed + '배' +
-      (d.max > 1 ? ' (' + d.level + '/' + d.max + ')' : '');
-  }
-}
-
-function updateReadyUI() {
-  if (!dom.ready) return;
-  const show = G.phase === 'waiting' && G.role === 'player' && !previewing;
-  dom.ready.classList.toggle('show', show);
-  /* 토스트를 대기실 패널 위로 비키게 하는 신호 (CSS body.lobby) */
-  document.body.classList.toggle('lobby', show);
-  if (!show) return;
-
-  const isHost = G.hostId === G.selfId;
-  const total = G.roster || 1;
-  const me = G.players.get(G.selfId);
-  const notReady = [...G.players.values()]
-    .filter((p) => p.id !== G.hostId && !p.ready)
-    .map((p) => safeName(p.name));
-
-  let msg;
-  if (total <= 1) {
-    msg = '혼자입니다 — 지금 시작하면 <b>연습 모드 · 단독 심사</b> 로 진행됩니다';
-  } else if (!notReady.length) {
-    msg = '<b>전원 준비 완료</b> · ' + total + '/' + G.seats +
-          (isHost ? ' — 시작하세요' : ' — 방장이 시작하기를 기다립니다');
-  } else {
-    msg = '준비 ' + (G.readyCount || 0) + '/' + total + ' · 아직 <b>' +
-          notReady.map(escapeHtml).join(', ') + '</b> 님';
-  }
-  dom.readyState.innerHTML = msg;
-
-  /* ★ 글자에 ENTER 를 같이 적습니다. 대기 화면은 버튼이 하나뿐이라
-   *   "누를 것" 을 못 찾는 사람이 키부터 눌러 보는데, 그때 눌러야 할
-   *   키가 화면에 없으면 아무 반응도 얻지 못합니다.                 */
-  const b = dom.btnReady;
-  if (isHost) {
-    b.textContent = (total <= 1 ? '연습 시작' : '심사 개시') + '   ENTER';
-    b.classList.remove('on');
-    b.disabled = !G.canStart;
-    b.dataset.act = 'start';
-  } else {
-    const on = !!(me && me.ready);
-    b.textContent = (on ? '준비 완료 — 취소' : '준비') + '   ENTER';
-    b.classList.toggle('on', on);
-    b.disabled = false;
-    b.dataset.act = 'ready';
-  }
-}
-
 function updateCountdown() {
   if (G.phase === 'countdown' && G.phaseEndsAt) {
     const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
@@ -10478,11 +10159,11 @@ function updateCountdown() {
   } else if (G.phase === 'waiting' && G.phaseEndsAt) {
     const left = Math.max(0, G.phaseEndsAt - (Date.now() + G.serverOffset));
     dom.cdNum.textContent = Math.ceil(left / 1000);
-    /* ★ 이 숫자는 이제 <b>전원 준비가 끝난 뒤</b>에만 돕니다.
-     *   종전에는 사람이 있으면 무조건 돌았고, 그래서 "준비를 눌러도
-     *   아무것도 안 바뀌는" 화면이 됐을 것입니다. 서버가 전원 준비일
-     *   때만 phaseEndsAt 을 실어 보냅니다(evaluateLobby).           */
-    dom.cdLabel.textContent = '전원 준비 완료 · 자동 시작까지';
+    /* ★ 아무 말 없이 혼자 시작되면 "왜 나 혼자지" 가 됩니다.
+     *   기다리는 동안 미리 알려 두면 같은 일이 '고장'이 아니라
+     *   '예정된 전환'으로 읽힙니다.                                */
+    dom.cdLabel.textContent = '출원인 모집 중 · ' + (G.roster || 0) + '/' + G.seats +
+      (G.solo ? ' · 아무도 오지 않으면 연습 모드' : '');
     if (!cdVisible) { dom.countdown.classList.add('show'); cdVisible = true; }
   } else if (cdVisible) {
     dom.countdown.classList.remove('show');
@@ -10533,32 +10214,16 @@ function showResult(data) {
   const yielded = data.reason === 'yield';
   const won = data.winnerId === G.selfId || (survived && me && me.alive);
 
-  /* ★ 이번 회차에 뛰지 않은 사람인가.
-   *   standings 는 그 회차의 <b>주자 명단</b>이라, 여기 없으면 관전만
-   *   한 사람입니다(순수 관전자 · 라운드 중 난입해 밀린 사람 모두).
-   *   탈락한 주자는 명단에 남아 있으므로 여기 걸리지 않습니다 —
-   *   그 사람은 실제로 거절결정을 받은 것이 맞습니다.
-   *
-   * ★ 종전에는 관전자에게도 '최종 처분 · REJECTED / 거절결정' 이
-   *   떴습니다. 뛰지도 않은 사람에게 처분을 통보하는 셈이라 사실과
-   *   다릅니다. 관전자에게 이 화면은 <b>처분서가 아니라 회차 결과</b>
-   *   입니다.                                                     */
-  const watcher = !me;
-
   /* ★ 연습 모드에서는 '전원 탈락'이라고 말하면 안 됩니다 — 그 '전원'이
    *   나 하나입니다. 실패가 아니라 기록이 남는 판이므로 말도 그렇게.
    * ★ yield 는 승패가 아닙니다(사람이 와서 양보한 회차).            */
   dom.resultEyebrow.textContent =
     yielded ? '연습 종료 · PRACTICE'
-    : watcher ? '회차 종료 · SPECTATED'
     : won ? '최종 처분 · REGISTERED'
     : solo ? '연습 종료 · PRACTICE'
     : '최종 처분 · REJECTED';
   dom.resultTitle.innerHTML =
     yielded ? '연습 종료'
-    /* 관전자에게는 <b>그 회차에 무슨 일이 있었는가</b>를 적습니다 —
-     * 누가 받았는지는 바로 아래 설명 줄이 말합니다.                */
-    : watcher ? (data.winnerName ? '등록결정' : '전원 탈락')
     : won ? '등록결정'
     : solo ? '단독 심사 종료'
     : (data.winnerName ? '거절결정' : (survived ? '심사 기간 만료' : '전원 탈락'));
@@ -10573,6 +10238,8 @@ function showResult(data) {
     dom.resultSub.textContent = '새 출원인이 도착해 연습을 마쳤습니다. 다음은 정식 심사입니다.';
   } else if (won && solo) {
     dom.resultSub.textContent = '혼자서 심사 기간을 끝까지 버텼습니다. 등록결정서가 발부되었습니다.';
+  } else if (won && survived) {
+    dom.resultSub.textContent = '심사 기간이 끝날 때까지 바닥을 지켜냈습니다. 패스트트랙 심사를 통과했습니다.';
   } else if (won) {
     dom.resultSub.textContent = '마지막까지 바닥을 지켜냈습니다. 패스트트랙 심사를 통과했습니다.';
   } else if (solo && me) {
@@ -10582,22 +10249,10 @@ function showResult(data) {
     dom.resultSub.textContent = layerCount
       ? (layerCount + '개 층 중 ' + gone + '개 층을 내려갔습니다. 다시 해 보세요.')
       : '다시 해 보세요.';
-  } else if (watcher) {
-    /* ★ 관전자에게는 결과 + <b>내 다음 차례</b>를 같이 말합니다.
-     *   G.wantsPlay 는 init 이 알려 줍니다 — 스스로 관전을 고른 사람은
-     *   승격 대상이 아니라서, 무조건 "다음 회차에 주자" 라고 하면
-     *   오지 않을 차례를 기다리게 됩니다.                          */
-    const what = data.winnerName
-      ? escapeHtml(data.winnerName) + ' 님이 등록결정을 받았습니다.'
-      : '남은 주자가 없습니다.';
-    dom.resultSub.textContent = what + (G.wantsPlay
-      ? ' 다음 회차에는 주자로 참가합니다.'
-      : ' 계속 관전하며 보정 기회를 줄 수 있습니다.');
   } else if (data.winnerName) {
     dom.resultSub.textContent = escapeHtml(data.winnerName) + ' 님이 등록결정을 받았습니다.';
-  /* ★ 여기 있던 "시간이 다 되어 남은 주자 전원이 등록결정을 받았습니다" 는
-   *   지웠습니다. 그 규칙 자체가 없어졌습니다 — 여럿이면 시간이 다 돼도
-   *   서든데스로 이어져 반드시 한 명만 남습니다.                   */
+  } else if (survived) {
+    dom.resultSub.textContent = '시간이 다 되어 남은 주자 전원이 등록결정을 받았습니다.';
   } else {
     dom.resultSub.textContent = '남은 주자가 없습니다.';
   }
@@ -10675,12 +10330,9 @@ function connect(name, mode, opts) {
   socket.on('connect', () => {
     /* 재연결 때도 같은 자격으로 다시 들어갑니다. previewing 이 중간에
      * 꺼졌다면(이미 참가함) 그때 값으로 보내야 관전으로 되돌아가지 않습니다. */
-    /* ★ create 는 G.joinCreate 가 살아 있을 때만 갑니다. init 에서
-     *   내려놓으므로 재연결에서는 빠지고, 방을 또 파지 않습니다.    */
     socket.emit('join', previewing
       ? { name: G.name, mode: 'spectator', preview: true }
-      : { name: G.name, mode: G.joinMode || mode, roomId: G.joinRoomId || undefined,
-          create: G.joinCreate || undefined });
+      : { name: G.name, mode: G.joinMode || mode, roomId: G.joinRoomId || undefined });
     // 재연결마다 인터벌이 쌓이지 않도록 기존 것을 먼저 정리
     if (G.pingTimer) clearInterval(G.pingTimer);
     G.pingTimer = setInterval(() => socket.emit('ping_probe', Date.now()), 3000);
@@ -10758,9 +10410,6 @@ function connect(name, mode, opts) {
 
     syncPlayers(d.players);
     applyMeta(d.meta);
-    /* ★ 한 번 들어갔으면 내려놓습니다. 안 내려놓으면 재연결할 때마다
-     *   빈 방이 새로 열려 로비 목록이 유령 방으로 찹니다.           */
-    G.joinCreate = false;
 
     if (d.role === 'player') {
       const me = d.players.find((p) => p.id === d.selfId);
@@ -10798,28 +10447,6 @@ function connect(name, mode, opts) {
 
   socket.on('phase', (meta) => applyMeta(meta));
 
-  /* 단계가 올라갈 때마다 옵니다. 첫 진입도 여기로 옵니다. */
-  socket.on('sudden_death', (d) => {
-    /* ★ "처음인가" 를 G.sudden 이 비었는지로 보면 안 됩니다.
-     *   서버가 startSuddenDeath 에서 broadcastPhase 를 먼저 부르는데,
-     *   그 meta 에 이미 sudden 이 실려 있어 applyMeta 가 G.sudden 을
-     *   채웁니다. 그래서 정작 sudden_death 가 왔을 때는 "이미 있음"이
-     *   되어 첫 안내가 통째로 사라지고 "붕괴 2배" 만 떴습니다.
-     *   단계 번호로 보면 도착 순서와 무관합니다.                   */
-    const first = (d.level || 1) <= 1;
-    applySudden(d);
-    if (previewing) return;
-    if (first) {
-      toast('심사 기간 만료 — 최후의 1인이 남을 때까지 바닥이 더 빨리 무너집니다', 'kill',
-            { key: 'sudden', gapMs: Infinity });
-      Sound.sfx('obstacle', { rate: 0.8, volume: 0.95 });
-    } else {
-      /* 단계가 올라간 것은 같은 사건의 연속이라 문구를 짧게 둡니다. */
-      toast('붕괴 ' + d.speed + '배', 'kill', { key: 'suddenStep', gapMs: 2000 });
-      Sound.sfx('obstacle', { rate: 1.2, volume: 0.8 });
-    }
-  });
-
   socket.on('round_start', (d) => {
     dom.result.classList.remove('show');
     /* 지난 회차 연출이 새 회차로 넘어오면 카메라가 빈 자리를 공전합니다 */
@@ -10835,8 +10462,6 @@ function connect(name, mode, opts) {
     G.phaseOn = true;
     // 회전 반전 안내는 회차당 한 번이므로 새 회차에서 다시 열어 줍니다
     G.rotFlipTold = false;
-    /* 지난 회차의 서든데스 배너가 새 회차로 넘어오지 않게 */
-    applySudden(null);
     // 지난 회차의 밀림 기록이 새 회차 사인으로 넘어오지 않게 지웁니다
     lastBump.id = null; lastBump.name = ''; lastBump.at = -Infinity;
     local.deathBy = null; local.deathByName = '';
@@ -10930,20 +10555,8 @@ function connect(name, mode, opts) {
     if (!p || !p.id || p.id === G.selfId) return;
     p.name = safeName(p.name);
     if (!G.players.has(p.id)) G.players.set(p.id, new RemoteRunner(p));
-    const rr = G.players.get(p.id); if (rr) rr.ready = !!p.ready;
     updateRoster(); updateSpectatorUI();
     toast(p.name + ' 님이 출원했습니다', '', { level: 'info' });
-  });
-
-  /* 누가 준비를 눌렀다/풀었다. 대기실 패널과 명단이 같이 갱신됩니다.
-   * ★ 토스트를 내지 않습니다 — 4인이 각자 눌렀다 풀었다 하면 그것만으로
-   *   화면이 가득 찹니다. 상태는 명단에 남아 있는 표시로 읽는 것이
-   *   맞고, 토스트는 지나가는 사건에 씁니다.                        */
-  socket.on('player_ready', (d) => {
-    if (!d || !d.id) return;
-    const r = G.players.get(d.id);
-    if (r) r.ready = !!d.ready;
-    updateRoster();
   });
 
   socket.on('player_left', (p) => {
@@ -11309,16 +10922,6 @@ function connect(name, mode, opts) {
   socket.on('action_denied', (d) => {
     /* 회차당 1회라 '재사용까지 N초' 는 더 이상 맞지 않습니다.
      * 왜 안 됐는지를 그대로 말해 줘야 합니다.                      */
-    /* 대기실 — 시작 거절. 버튼이 비활성인 이유는 패널에 이미 적혀
-     * 있지만, 마지막 사람이 준비를 푼 직후에 누르면 화면과 어긋난
-     * 순간이 생깁니다. 그때 아무 일도 안 일어나면 고장으로 읽힙니다. */
-    if (d.action === 'start') {
-      const why = d.reason === 'not_host' ? '방장만 시작할 수 있습니다'
-                : d.reason === 'not_ready' ? '아직 준비하지 않은 출원인이 있습니다'
-                : '지금은 시작할 수 없습니다';
-      toast(why, 'kill', { key: 'startDeny', gapMs: 3000 });
-      return;
-    }
     if (d.reason === 'used') { toast('보정 기회는 회차당 한 번입니다', 'kill', { key: 'amendDeny' }); return; }
     if (d.reason === 'top') { toast('이미 맨 위층입니다 — 올려보낼 곳이 없습니다', 'kill'); return; }
     if (d.reason === 'no_landing') {
@@ -11371,13 +10974,6 @@ function applyMeta(meta) {
   if (meta.theme !== undefined) applyTheme(meta.theme);
   if (meta.seats) G.seats = meta.seats;
   G.roster = meta.total;
-  /* 대기실 상태. 서버가 phase 마다 실어 보냅니다(roomSnapshotMeta). */
-  if (meta.hostId !== undefined) G.hostId = meta.hostId;
-  if (meta.canStart !== undefined) G.canStart = !!meta.canStart;
-  if (meta.ready !== undefined) G.readyCount = meta.ready;
-  /* ★ 중도 참가·재연결도 지금 서든데스인지 알아야 합니다. 안 그러면
-   *   왜 발밑이 이렇게 빨리 꺼지는지 모른 채 떨어집니다.          */
-  if (meta.sudden !== undefined) applySudden(meta.sudden);
   /* 대기 중에는 '지금 혼자인가', 회차가 시작된 뒤에는 '이 회차가
    * 연습이었나'. 결과 화면 문구가 이 값을 봅니다.                 */
   G.solo = !!meta.solo;
@@ -11394,7 +10990,6 @@ function syncPlayers(list) {
       G.players.set(p.id, Object.assign(G.players.get(p.id) || {}, {
         id: p.id, name: p.name, color: p.color, seat: p.seat,
         alive: p.alive, layer: p.layer, isSelf: true,
-        ready: !!p.ready,
         render: local.pos
       }));
       continue;
@@ -11408,7 +11003,6 @@ function syncPlayers(list) {
       r.alive = p.alive;
       r.layer = p.layer;
       r.seat = p.seat;
-      r.ready = !!p.ready;
     }
   }
   for (const [id, r] of [...G.players]) {
@@ -11806,7 +11400,6 @@ function renderFrame(dt, now) {
   /* --- HUD --- */
   updateLayerStack(local.alive ? local.layer : currentLayerOf(spectateFocus().y));
   updateCountdown();
-  updateReadyUI();
   updateActionCooldowns();
 
   fpsAccum += dt; fpsFrames++;
@@ -12153,37 +11746,6 @@ $('btnMenu').addEventListener('click', () => { Sound.sfx('click'); toggleLeaveMe
 $('btnStay').addEventListener('click', () => { Sound.sfx('click'); toggleLeaveMenu(false); });
 $('btnLeaveNow').addEventListener('click', () => { Sound.sfx('click'); leaveToLobby(); });
 $('btnLeaveResult').addEventListener('click', () => { Sound.sfx('click'); leaveToLobby(); });
-/* 대기실 버튼 하나가 두 가지 일을 합니다 — 방장이면 시작, 아니면 준비.
- * updateReadyUI 가 dataset.act 로 어느 쪽인지 적어 둡니다.          */
-function pressReady() {
-  if (!G.socket || !G.socket.connected) return;
-  if (dom.btnReady.disabled) return;
-  Sound.sfx('click');
-  if (dom.btnReady.dataset.act === 'start') {
-    G.socket.emit('start_round');
-  } else {
-    const me = G.players.get(G.selfId);
-    G.socket.emit('toggle_ready', { ready: !(me && me.ready) });
-  }
-}
-
-dom.btnReady.addEventListener('click', pressReady);
-
-/* ★ Enter 로도 됩니다.
-   *   혼자 들어온 사람은 화면에 자기 이름 하나뿐이라 버튼을 찾기 전에
-   *   키부터 눌러 봅니다. 실제로 "아무 키를 눌러도 시작이 안 된다" 는
-   *   보고가 있었습니다.
-   * ★ Space 는 쓰지 않습니다 — 점프라서, 발판 위에서 뛰다가 라운드가
-   *   시작되는 일이 생깁니다.                                       */
-window.addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' || e.repeat) return;
-  const el = document.activeElement;
-  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
-  if (!dom.ready || !dom.ready.classList.contains('show')) return;
-  e.preventDefault();
-  pressReady();
-});
-
 $('btnStayNext').addEventListener('click', () => {
   Sound.sfx('click');
   /* 다음 회차는 어차피 서버가 시작합니다. 여기서는 결과 카드만 걷어
@@ -12407,9 +11969,7 @@ dom.btnJoin.addEventListener('click', () => {
   G.role = joinMode;
   G.name = name;
   G.joinMode = joinMode;
-  /* 방 만들기면 고른 방을 무시합니다 — 둘 다 보내면 서버가 roomId 를
-   * 먼저 보므로 새 방이 안 열립니다.                               */
-  G.joinRoomId = G.joinCreate ? undefined : (lobbyPick || undefined);
+  G.joinRoomId = lobbyPick || undefined;
 
   /* ★ 이미 미리보기로 붙어 있으면 소켓을 새로 만들지 않고 다시 join 합니다.
    *   새로 연결하면 (1) 붙는 동안 화면이 한 번 끊기고 (2) 방금까지 보던
@@ -12419,8 +11979,7 @@ dom.btnJoin.addEventListener('click', () => {
     previewing = false;
     G.socket.emit('join', {
       name: name, mode: joinMode,
-      roomId: G.joinRoomId,
-      create: G.joinCreate || undefined
+      roomId: lobbyPick || undefined
     });
   } else {
     connect(name, joinMode);
@@ -12436,22 +11995,6 @@ dom.btnJoin.addEventListener('click', () => {
       toast('서버 응답이 없습니다 — 좌하단 진단 패널을 확인하세요', 'kill');
     }
   }, 5000);
-});
-
-/* ── 방 만들기 ────────────────────────────────────────────────────────
- * 참가 흐름은 btnJoin 하나뿐이라, 여기서는 <b>깃발만 세우고</b> 같은
- * 흐름을 탑니다. 참가 절차(오디오 해제·전체화면·대기 화면 접기·
- * 미리보기 소켓 재사용)가 전부 그 핸들러에 있어서, 두 번째 경로를
- * 따로 만들면 그 절차를 통째로 베껴야 합니다.
- *
- * ★ 관전 모드였으면 주자로 되돌립니다. 아무도 없는 새 방을 관전하겠다는
- *   것은 뜻이 안 되고, 그 방은 빈 채로 목록만 채웁니다.           */
-$('btnCreate').addEventListener('click', () => {
-  G.joinCreate = true;
-  lobbyPick = null;
-  const pm = document.querySelector('.mode[data-mode="player"]');
-  if (pm && !pm.classList.contains('sel')) pm.click();
-  dom.btnJoin.click();
 });
 
 dom.nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') dom.btnJoin.click(); });
