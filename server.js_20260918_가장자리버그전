@@ -165,12 +165,7 @@ const TICK_MS = 1000 / TICK_HZ;
  * ------------------------------------------------------------------ */
 const READY_AUTO_MS  = parseInt(process.env.READY_AUTO_MS, 10)  || 15000;
 const LOBBY_STALL_MS = parseInt(process.env.LOBBY_STALL_MS, 10) || 90000;
-/* 2026-09-18 — 5000 → 3000. "준비를 누른 뒤 시작까지 너무 길다"는 의견.
- * 종전 5초는 '아무도 안 눌러도 언젠가 시작되던' 시절의 값이라 마음을
- * 다잡을 시간이 필요했는데, 지금은 방장이 직접 눌러 시작하므로 이미
- * 각오가 된 상태입니다. 3초면 발판이 갈라지는 연출을 보고 자세를
- * 잡기에 충분합니다.                                                */
-const COUNTDOWN_MS = 3000;      // "심사 착수" countdown before the run
+const COUNTDOWN_MS = 5000;      // "심사 착수" countdown before the run
 /* 한 라운드 상한. 5분 → 6분.
  * 일반 타일(밟고 0.7~1.0초)을 없애고 강화 타일 하나로 바닥을 깔면서,
  * 층이 죽는 속도가 통째로 느려졌습니다. 종전 5분은 '한 번 밟으면 1초 뒤

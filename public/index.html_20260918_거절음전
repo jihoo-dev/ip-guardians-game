@@ -4732,7 +4732,7 @@ const SFX = {
   start:     { src: 'assets/audio/sfx_start.mp3',     volume: 0.9 },
   tick:      { src: 'assets/audio/sfx_tick.mp3',      volume: 0.6 },
   step:      { src: 'assets/audio/sfx_step.mp3',      volume: 0.5 },
-
+  crack:     { src: 'assets/audio/sfx_crack.mp3',     volume: 0.7 },
   jump:      { src: 'assets/audio/sfx_jump.mp3',      volume: 0.6 },
   land:      { src: 'assets/audio/sfx_land.mp3',      volume: 0.5 },
   death:     { src: 'assets/audio/sfx_death.mp3',     volume: 0.9 },
@@ -4741,7 +4741,7 @@ const SFX = {
   obstacle:  { src: 'assets/audio/sfx_obstacle.mp3',  volume: 0.7 },
   impact:    { src: 'assets/audio/sfx_impact.mp3',    volume: 0.8 },
   win:       { src: 'assets/audio/sfx_win.mp3',       volume: 1.0 },
-
+  lose:      { src: 'assets/audio/sfx_lose.mp3',      volume: 0.9 },
   /* 점프 타일 — 올라가는 층수마다 다릅니다(JUMP_TILE.levels). 파일이
    * 없으면 버퍼가 안 생기므로 applyJumpImpulse 가 기본 점프 소리로
    * 받쳐 줍니다.                                                    */
@@ -7417,14 +7417,11 @@ function showVerdict(kind, opts) {
    * CSS 애니메이션 지연(승리 0.5s)과 숫자를 맞춰야 합니다. */
   const hitMs = win ? 500 : 0;
   setTimeout(() => {
-    /* solo: 최종 처분 소리가 나는 동안에는 배경음을 내립니다.
-     * 등록결정이든 거절결정이든 <b>그 회차의 마지막 한 마디</b>라,
-     * 배경음과 겹치면 뭉개집니다.
-     * ⚠ 거절 쪽에는 소리가 없습니다(2026-09-18). 거절 도장이 찍히는 것은
-     *   구름바다에 빠진 <b>직후</b>라, 그 순간의 death 소리가 아직 울리고
-     *   있습니다 — 여기에 하나 더 얹으면 겹칩니다. sfx_crack.mp3 를
-     *   만들지 않기로 한 이유이기도 합니다.                        */
-    if (win) Sound.sfx('win', { rate: 1, volume: 1, solo: true });
+    /* solo: 등록결정 소리가 나는 동안에는 배경음을 내립니다.
+     * 둘이 겹쳐 들린다는 의견이 있었고, 이 소리는 회차에 한 번뿐인
+     * 마무리라 <b>혼자 들리는 편</b>이 맞습니다. 거절(crack)은 그대로
+     * 둡니다 — 짧고, 탈락할 때마다 나서 매번 음악이 끊기면 거슬립니다. */
+    Sound.sfx(win ? 'win' : 'crack', { rate: win ? 1 : 0.6, volume: 1, solo: win });
     addCamShake(win ? 34 : 26);
   }, hitMs + 330);
 
@@ -7468,10 +7465,7 @@ function beginFallOut() {
   const th = THEMES[currentTheme] || THEMES[0];
   spawnSeaSplash(local.pos.x, local.pos.z, th.seaTop);
   spawnPaperBurst(local.pos.x, local.pos.y, local.pos.z);
-  /* solo: 등록결정과 같은 이유로 배경음을 내립니다 — 내 회차가 끝나는
-   * 순간이라 소리 하나만 들리는 편이 맞습니다. 2.0초짜리라 라운드가
-   * 이어지는 동안 음악이 오래 비지는 않습니다.                    */
-  Sound.sfx('death', { solo: true });
+  Sound.sfx('death');
   dom.deadFlash.classList.add('on');
 }
 
@@ -11644,9 +11638,7 @@ function connect(name, mode, opts) {
     const rec = G.tiles.get(d.tileId);
     if (!rec) return;
     startReject(rec, d.delay);
-    /* 2026-09-18 — 여기 있던 crack 소리를 뺐습니다(sfx_crack.mp3 는
-     * 만들지 않기로 했습니다). 밟는 소리는 tile1/tile2 가 이미 내고,
-     * 이 타일의 진짜 사건은 <b>잠시 뒤의 폭발</b>이라 bomb 이 맡습니다. */
+    Sound.sfx('crack', { pos: rec, rate: 1.25 });
     if (d.by === G.selfId) {
       /* 이건 목숨이 걸린 경고라 회차당 한 번으로 묶지 않습니다.
        * 다만 연달아 밟았을 때 같은 줄이 쌓이지는 않게 합니다.       */
@@ -11670,10 +11662,14 @@ function connect(name, mode, opts) {
       breakTile(rec, id === d.tileId ? 2.4 : 1.6);
     }
     if (center) {
-      /* 2026-09-18 — crack+death 를 겹쳐 흉내 내던 폴백을 뺐습니다.
-       * bomb 파일이 실제로 있고, 없앤 crack 은 만들지 않기로 했습니다.
-       * bomb 이 없으면 그냥 조용합니다 — 흉내 낸 소리보다 낫습니다. */
-      Sound.sfx('bomb', { pos: center });
+      /* 폭탄 소리가 있으면 그것 하나로 갑니다 — 없을 때만 종전처럼
+       * 두 소리를 겹쳐 대신합니다.                                  */
+      if (Sound.buffers.bomb) {
+        Sound.sfx('bomb', { pos: center });
+      } else {
+        Sound.sfx('crack', { pos: center, rate: 0.72 });
+        Sound.sfx('death', { pos: center, volume: 0.5 });
+      }
     }
   });
 
@@ -11702,9 +11698,7 @@ function connect(name, mode, opts) {
   socket.on('tile_break', (d) => {
     const rec = G.tiles.get(d.tileId);
     breakTile(rec);
-    /* 2026-09-18 — 무너질 때마다 내던 crack 소리를 뺐습니다.
-     * 한 라운드에 수백 번 나는 자리라, 파일을 넣었다면 오히려
-     * 시끄러웠을 것입니다. 밟는 순간은 tile1/tile2 가 알려 줍니다. */
+    if (rec) Sound.sfx('crack', { pos: rec, rate: 0.9 + Math.random() * 0.2 });
   });
 
   /* 보정 기회가 발동했습니다. 실제 이동은 player_impulse 가 처리하고
@@ -11768,7 +11762,7 @@ function connect(name, mode, opts) {
       dom.deadFlash.classList.add('on');
       setTimeout(() => dom.deadFlash.classList.remove('on'), 900);
       G.role = 'spectator';
-      Sound.sfx('death', { solo: true });   // 위와 같은 이유
+      Sound.sfx('death');
       toast(d.cause === 'afk'
         ? '연결이 끊긴 것으로 처리되어 탈락했습니다'
         : '통신이 끊겨 탈락 처리되었습니다 — 이제 관전자로 개입할 수 있습니다', 'kill');
@@ -11790,12 +11784,10 @@ function connect(name, mode, opts) {
     } else {
       showResult(d);
     }
-    /* 이긴 쪽·진 쪽 모두 solo — 배경음을 내리고 그 소리만 들려줍니다
-     * (showVerdict 의 같은 소리도 solo 라, 겹쳐 나도 셈으로 관리됩니다).
-     * ⚠ 진 쪽에는 소리를 내지 않습니다(2026-09-18, sfx_lose.mp3 제거).
-     *   진 사람은 이미 탈락할 때 death 를 들었습니다 — 결과 화면에서
-     *   한 번 더 알릴 일이 아닙니다.                              */
+    /* 이긴 사람에게만 solo — 배경음을 내리고 등록결정 소리만 들려줍니다
+     * (showVerdict 의 같은 소리도 solo 라, 겹쳐 나도 셈으로 관리됩니다). */
     if (d.winnerId === G.selfId) Sound.sfx('win', { solo: true });
+    else Sound.sfx('lose');
   });
 
   /* ★ 페이지를 열면 바로 관전으로 붙는 구조라, 아직 참가 버튼을 누르지도

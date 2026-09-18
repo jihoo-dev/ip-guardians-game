@@ -12,12 +12,8 @@
      fonts.css 는 max-age=31536000,immutable 로 나가므로 이미 받은 브라우저는
      1년 동안 옛 서브셋을 씁니다 — 새로 쓴 UI 문구의 글자만 맑은 고딕으로
      빠지는데, 새로 접속하는 사람에게는 멀쩡해 보여 발견이 늦습니다.
-     v=2: 2026-09-18 대기 화면 문구 교체 (woff2 37 → 42개)
-     v=3: 2026-09-18 참가 버튼 문구 교체 (woff2 42 → 43개)
-     v=4: 2026-09-18 '주자' → '출원인' 통일 (파일 수는 같지만 서브셋 내용이 바뀜
-          — 개수만 보고 건너뛰지 마세요)
-     v=5: 2026-09-18 회전 알림 문구 교체 (woff2 43 → 44개) -->
-<link href="vendor/fonts.css?v=5" rel="stylesheet">
+     v=2: 2026-09-18 대기 화면 문구 교체 (woff2 37 → 42개) -->
+<link href="vendor/fonts.css?v=2" rel="stylesheet">
 <style>
 /* ===========================================================================
    Design tokens — "심사서류 × 네온 서바이벌"
@@ -336,6 +332,11 @@ body.dev #devLayers{display:flex}
   gap:0 8px;text-align:left;font-size:15px;line-height:1.4;color:#e6ecf6}
 #layerBanner .lbMark i{font-style:normal;font-size:16px;color:var(--layer-c);text-align:center}
 #layerBanner .lbMark.none{color:#9aa6b8;font-size:14px}
+#layerBanner .lbSafe{
+  margin-top:8px;font-size:12px;letter-spacing:.1em;color:#9fb0c6;
+  border-top:1px solid rgba(255,255,255,.12);padding-top:9px
+}
+#layerBanner .lbSafe b{color:var(--layer-c);font-weight:600}
 @keyframes lbin{from{opacity:0;transform:translateX(-50%) translateY(-14px)}
                 to{opacity:1;transform:translateX(-50%) translateY(0)}}
 /* ── 사건 메시지 (#toasts) ────────────────────────────────────────────
@@ -423,7 +424,7 @@ body.dev #devLayers{display:flex}
   #joinScreen.folding,#joinScreen.folding .card{animation-duration:.01s}}
 
 /* ── 로비 (방 목록) ──────────────────────────────────────────────────
- * ★ '바로 출원 시작'(자동 배정)이 기본이고 방 선택은 보조입니다.
+ * ★ '빠른 참가' 가 기본이고 방 선택은 보조입니다.
  *   방을 자유롭게 고르게 두면 인원이 흩어져 어느 방도 정원이 안 차는
  *   일이 생깁니다(12명이 6개 방에 2명씩). 그래서 목록은 '채워진 정도'를
  *   가장 크게 보여 주고, 아무것도 안 고르면 서버가 알아서 몰아 줍니다. */
@@ -726,13 +727,8 @@ input[type=text]{
  *   규칙 세 줄)가 아래 가운데를 차지하고 있어서, 26px 에 두면 시작
  *   버튼이 그 글자 뒤로 들어갑니다. #hint 높이(약 75px) 위로 올립니다.
  *   관전 패널은 라운드 중에만 뜨고 그때는 #hint 가 한 줄이라 괜찮습니다. */
-/* ★ 2026-09-18 — 104 → 152. 대기 중에는 #hint 를 키우므로(body.lobby
- *   #hint) 안내 상자가 71 → 119px 로 높아집니다. 104 그대로 두면
- *   시작 버튼이 안내 글자 위로 <b>35px 겹칩니다</b>(실측).
- *   이 값은 항상 "#hint 높이 + 여백" 이어야 합니다 — 글자 크기를
- *   또 만지면 여기도 같이 재세요.                                */
 #ready{
-  position:absolute;left:50%;bottom:152px;transform:translateX(-50%);
+  position:absolute;left:50%;bottom:104px;transform:translateX(-50%);
   display:none;flex-direction:column;align-items:center;gap:9px;width:min(560px,94vw);z-index:14;
   /* ★ #hud 는 통째로 pointer-events:none 입니다. 그 안에서 눌러야 하는
    *   것만 하나씩 되살리는 구조라(.panel{pointer-events:auto}), 여기에
@@ -741,9 +737,8 @@ input[type=text]{
   pointer-events:auto
 }
 #ready.show{display:flex}
-/* 대기실이 떠 있는 동안에는 토스트도 그 위로 비켜 줍니다
- * (#ready 가 152 로 올라간 만큼 같이 올립니다)                    */
-body.lobby #toasts{bottom:280px}
+/* 대기실이 떠 있는 동안에는 토스트도 그 위로 비켜 줍니다 */
+body.lobby #toasts{bottom:232px}
 #readyState{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
   color:rgba(236,231,216,.6);background:rgba(11,14,22,.86);border:1px solid var(--rule);
   padding:6px 13px;text-align:center;word-break:keep-all}
@@ -1077,39 +1072,6 @@ body.touch .rbtn{padding:10px;font-size:13px}
   background:rgba(5,6,10,.72);backdrop-filter:blur(6px)}
 #hint .rules{display:block;margin-top:2px;font-size:10px;color:rgba(236,231,216,.6)}
 #hint.hide{display:none}
-/* ── 대기 중에는 조작법을 크게 ────────────────────────────────────────
- * 2026-09-18 — 조작을 배울 시간은 <b>시작 전</b>뿐입니다. 라운드가
- * 시작되면 발밑을 보느라 아무도 화면 아래를 안 읽습니다. 그런데 정작
- * 그때까지 이 안내가 본문과 같은 11px 이라 눈에 띄지 않았습니다.
- *
- * ★ body.lobby(준비 패널이 떠 있는 동안 = 대기 중)에만 키웁니다.
- *   라운드가 시작되면 클래스가 빠지면서 저절로 원래 크기로 돌아갑니다.
- * ★ transform 으로 키우지 않고 font-size·padding 을 바꿉니다 —
- *   transform:scale 은 글자를 흐리게 만들고, 상자 크기가 그대로라
- *   위의 준비 패널과 간격 계산이 어긋납니다.
- * ★ 커진 만큼 위로 올라오므로 준비 패널(bottom:104px)과 겹치지 않게
- *   bottom 도 함께 봅니다.
- * ★ 터치에서는 키우지 않습니다(:not(.touch)). 거기서는 #hint 가 위로
- *   올라가 있어 상단바·관전 배너와 경쟁하고, 가로 폰의 세로 폭이
- *   390~430px 뿐이라 키울 여유가 없습니다.                        */
-body.lobby:not(.touch) #hint{
-  font-size:14px;letter-spacing:.14em;line-height:1.75;
-  padding:11px 20px;border-color:rgba(236,231,216,.20);
-  background:rgba(5,6,10,.86);
-  box-shadow:0 6px 24px rgba(0,0,0,.35);
-  /* ★ 커진 글자를 좁은 상자에 그대로 두면 <b>단어 중간에서</b> 끊깁니다
-   *   (실측: "마우스 드 / 래그로"). 한국어는 낱말 안에서 자르지 않게
-   *   keep-all 을 겁니다.
-   * ★ <b>max-width 만 올리면 소용이 없습니다.</b> 이 상자는 left:50% 로
-   *   놓여 있어서, 레이아웃이 쓸 수 있는 폭이 <b>화면의 오른쪽 절반</b>
-   *   뿐입니다(실측 837px 화면에서 419px 고정). 가운데로 보이는 것은
-   *   transform 이라 폭 계산에는 안 들어갑니다. width:max-content 로
-   *   글자가 필요한 만큼 먼저 잡고, max-width 로 상한만 겁니다.   */
-  width:max-content;max-width:min(94vw,880px);word-break:keep-all
-}
-body.lobby:not(.touch) #hint .rules{font-size:12px;margin-top:4px;color:rgba(236,231,216,.72)}
-/* 글자가 커지는 것 자체를 눈에 띄게 — 대기로 들어설 때만 한 번 */
-#hint{transition:font-size .25s ease,padding .25s ease}
 
 @media (max-width:900px){
   #layerStack{width:150px;top:88px;left:12px} #roster{width:160px;top:88px;right:12px}
@@ -1216,7 +1178,7 @@ body.touch-run #touch{display:block}
     <i id="darkSub">PRIOR ART SEARCH</i>
   </div>
 </div>
-<div id="rotAlert"><span class="ico">⚠️</span><span>심사관 검토 방향 변경 — 층이 반대로 돕니다</span></div>
+<div id="rotAlert"><span class="ico">⚠️</span><span>거절이유 발생, 심사관 검토 방향 변경</span></div>
 
 <div id="hud">
   <div id="topbar">
@@ -1255,8 +1217,8 @@ body.touch-run #touch{display:block}
 
   <div id="roster"><div class="rname">출원인 명단</div><div id="rosterList"></div></div>
 
-  <div id="specBanner">관전 중 · 다음 회차에 출원인으로 자동 참가합니다</div>
-  <div id="layerBanner"><div class="lbNo"></div><div class="lbName"></div><div class="lbMarks"></div></div>
+  <div id="specBanner">관전 중 · 다음 회차에 주자로 자동 참가합니다</div>
+  <div id="layerBanner"><div class="lbNo"></div><div class="lbName"></div><div class="lbMarks"></div><div class="lbSafe"></div></div>
   <div id="toasts"></div>
 
   <!-- 대기실. 발판 위에 서 있는 동안만 보입니다(updateReadyUI). -->
@@ -1341,7 +1303,7 @@ body.touch-run #touch{display:block}
     <div class="field">
       <label>참가 방식</label>
       <div class="modes">
-        <button class="mode sel" data-mode="player">출원인으로 참가 (최대 4인)</button>
+        <button class="mode sel" data-mode="player">주자로 참가 (최대 4인)</button>
         <button class="mode" data-mode="spectator">관전 + 개입</button>
       </div>
     </div>
@@ -1354,15 +1316,13 @@ body.touch-run #touch{display:block}
       <span class="dot"></span><span id="joinQueueText">대기열 확인 중…</span>
     </div>
     <!-- ★ 두 갈래입니다.
-         바로 출원 시작 : 자리가 있는 방에 자동 배정(종전 '빠른 참가').
-         방 만들기      : 빈 방을 일부러 엽니다 — 같이 온 사람들끼리 모일
-                          때 방 번호를 서로 불러 줄 필요가 없어집니다.
-         목록에서 방을 고르면 왼쪽 버튼이 그 방 입장으로 바뀝니다
-         (syncJoinCta 가 문구의 유일한 주인입니다 — 아래 기본값은
-          그 함수가 처음 돌기 전 한순간만 보입니다. 다르게 적으면
-          입장 화면이 열리자마자 글자가 바뀌는 것으로 보입니다). -->
+         빠른 참가 : 자리가 있는 방에 자동 배정(종전 동작).
+         방 만들기 : 빈 방을 일부러 엽니다 — 같이 온 사람들끼리 모일
+                     때 방 번호를 서로 불러 줄 필요가 없어집니다.
+         목록에서 방을 고르면 빠른 참가 버튼이 그 방 입장으로 바뀝니다
+         (syncJoinCta). -->
     <div class="joinRow">
-      <button class="cta" id="btnJoin">바로 출원 시작</button>
+      <button class="cta" id="btnJoin">심사 대기열 입장</button>
       <button class="cta alt" id="btnCreate" type="button">방 만들기</button>
     </div>
     <div class="keys">
@@ -1463,8 +1423,7 @@ if (typeof THREE === 'undefined') {
  *
  * ★ assets/ 안의 파일을 갈아끼웠다면 이 숫자를 올리세요. 안 올리면
  *   이미 받은 사람은 1년 동안 옛 파일을 씁니다.                        */
-const ASSET_VER = '8';   // 2026-09-18 sfx_win 길이 단축(8.57 → 5.85초)
-// 7: 2026-09-17 보정 기회 효과음 추가 · 배경음 128kbps 재인코딩
+const ASSET_VER = '7';   // 2026-09-17 보정 기회 효과음 추가   // 2026-09-17 배경음 128kbps 재인코딩
 const assetUrl = (p) => p + (p.indexOf('?') >= 0 ? '&' : '?') + 'v=' + ASSET_VER;
 
 /* ============================ 0. constants ============================== */
@@ -3734,20 +3693,6 @@ function markDevLayerButton(layerIndex) {
  * 줌 범위도 넓혔습니다 (종전 20 / 10~46 / 높이 3.2).
  * 캐릭터 크기는 그대로이므로 높이는 오히려 살짝 낮춥니다.              */
 const CAM = { DIST: 24, MIN: 12, MAX: 58, HEIGHT: 3.0 };
-/* ── 대기 중 카메라 후퇴 ─────────────────────────────────────────────
- * 2026-09-18 — 발판 겹침을 고치면서 발판 무리 반경이 10.5 → 최대 17.7 로
- * 넓어졌습니다. 넷 다 화면에는 들어오지만, <b>카메라에 가장 가까운 한
- * 명</b>이 화면 아래로 내려가 준비 패널에 몸이 가렸습니다.
- *
- * 시선을 더 내리는 대신 <b>거리를 늘립니다</b>. 시선을 내리면 무리 전체가
- * 위로 밀려 이번에는 뒤쪽 사람이 상단바에 닿습니다 — 화각을 넓히는 쪽이
- * 양쪽 끝을 같이 살립니다.
- *
- * ⚠ cam.targetDist(사용자 휠 줌)를 건드리지 않습니다. 거기에 더하면
- *   대기 중에 줌한 값이 라운드까지 따라가고, 되돌릴 방법이 없습니다.
- *   <b>그릴 때만</b> 더하는 별도 값입니다.                          */
-const LOBBY_PULL = 9;              // 유닛. 실측 기준은 아래 주석 참고
-const LOBBY_PULL_K = 6;            // 붙고 떨어지는 속도(smoothK)
 /* 이 기준값이 어떤 타일 크기를 전제로 잡힌 값인지. 서버가 다른 크기를
  * 내려주면 그 비율만큼 카메라가 따라 움직입니다 (지금은 1.0).          */
 const HEX_SIZE_BASE = 3.2 / 1.5;
@@ -4732,7 +4677,7 @@ const SFX = {
   start:     { src: 'assets/audio/sfx_start.mp3',     volume: 0.9 },
   tick:      { src: 'assets/audio/sfx_tick.mp3',      volume: 0.6 },
   step:      { src: 'assets/audio/sfx_step.mp3',      volume: 0.5 },
-
+  crack:     { src: 'assets/audio/sfx_crack.mp3',     volume: 0.7 },
   jump:      { src: 'assets/audio/sfx_jump.mp3',      volume: 0.6 },
   land:      { src: 'assets/audio/sfx_land.mp3',      volume: 0.5 },
   death:     { src: 'assets/audio/sfx_death.mp3',     volume: 0.9 },
@@ -4741,7 +4686,7 @@ const SFX = {
   obstacle:  { src: 'assets/audio/sfx_obstacle.mp3',  volume: 0.7 },
   impact:    { src: 'assets/audio/sfx_impact.mp3',    volume: 0.8 },
   win:       { src: 'assets/audio/sfx_win.mp3',       volume: 1.0 },
-
+  lose:      { src: 'assets/audio/sfx_lose.mp3',      volume: 0.9 },
   /* 점프 타일 — 올라가는 층수마다 다릅니다(JUMP_TILE.levels). 파일이
    * 없으면 버퍼가 안 생기므로 applyJumpImpulse 가 기본 점프 소리로
    * 받쳐 줍니다.                                                    */
@@ -4783,17 +4728,6 @@ const Sound = {
   unlocked: false,
   muted: false,
   vol: { master: 0.8, bgm: 0.45, sfx: 0.85 },
-  /* ── 배경음 일시 낮춤(더킹) ─────────────────────────────────────
-   * 등록결정 효과음처럼 <b>혼자 들려야 하는 소리</b>가 나는 동안 배경음을
-   * 0 으로 내렸다가, 끝나면 되돌립니다. 소리를 끄는 것이 아니라 음량만
-   * 곱하는 값이라, 중간에 페이즈가 바뀌어 곡이 갈려도 그대로 따라옵니다.
-   *   duckK  : 0(완전히 내림) ~ 1(원래대로). 모든 배경음 음량에 곱합니다.
-   *   soloN  : 지금 '혼자 들려야 하는' 소리가 몇 개인가. 두 곳에서
-   *            같은 소리를 낼 수 있어(게임 종료 · 도장 연출) 셈으로 둡니다.
-   *            0 이 되는 순간에만 배경음을 되돌립니다.              */
-  duckK: 1,
-  soloN: 0,
-  duckTimer: null,
   fadeTimer: null,
 
   /* 설정 저장/복원 (실패해도 무시) */
@@ -4836,39 +4770,12 @@ const Sound = {
     for (const key of Object.keys(SFX)) this.preload(key);
   },
 
-  /** 지금 배경음이 가져야 할 음량. 뮤트·설정 음량·더킹을 한 곳에서 곱합니다. */
-  bgmTarget() {
-    return this.muted ? 0 : Math.min(1, this.vol.master * this.vol.bgm * this.duckK);
-  },
-
   applyVolume() {
     const m = this.muted ? 0 : this.vol.master;
     if (this.master) this.master.gain.value = m;
     if (this.sfxGain) this.sfxGain.gain.value = this.vol.sfx;
-    /* ★ 크로스페이드가 도는 중에는 건드리지 않습니다 — 그쪽이 40ms 마다
-     *   같은 요소의 음량을 쓰고 있어서, 둘이 서로 덮으면 소리가 끊깁니다.
-     *   크로스페이드도 매 틱 bgmTarget() 을 다시 읽으므로 뮤트와 더킹이
-     *   그대로 반영됩니다.                                          */
-    if (this.fadeTimer) return;
-    if (this.el) this.el.volume = this.bgmTarget();
+    if (this.el) this.el.volume = Math.min(1, m * this.vol.bgm);
     if (this.elNext) this.elNext.volume = 0;
-  },
-
-  /* 효과음 하나만 들리게 배경음을 내렸다(on) 되돌립니다(off).
-   * ★ 내릴 때는 빠르게, 되돌릴 때는 천천히 — 되돌리는 쪽이 빠르면
-   *   효과음 꼬리와 겹쳐 '툭' 하고 배경음이 튀어나옵니다.          */
-  soloDuck(on) {
-    this.soloN = Math.max(0, this.soloN + (on ? 1 : -1));
-    const want = this.soloN > 0 ? 0 : 1;
-    if (this.duckK === want) return;
-    if (this.duckTimer) clearInterval(this.duckTimer);
-    const from = this.duckK, ms = on ? 220 : 800, t0 = performance.now();
-    this.duckTimer = setInterval(() => {
-      const k = Math.min(1, (performance.now() - t0) / ms);
-      this.duckK = from + (want - from) * k;
-      this.applyVolume();
-      if (k >= 1) { clearInterval(this.duckTimer); this.duckTimer = null; }
-    }, 40);
   },
 
   setVolume(kind, value) {
@@ -4991,12 +4898,9 @@ const Sound = {
   crossfade(ms) {
     if (this.fadeTimer) clearInterval(this.fadeTimer);
     const from = this.el, to = this.elNext;
+    const target = this.muted ? 0 : this.vol.master * this.vol.bgm;
     const t0 = performance.now();
     this.fadeTimer = setInterval(() => {
-      /* ★ 목표 음량을 <b>매 틱</b> 다시 읽습니다. 시작할 때 한 번만 읽으면
-       *   페이드가 도는 0.9초 동안 뮤트도 더킹도 먹지 않습니다 —
-       *   등록결정 효과음이 하필 곡이 바뀌는 순간에 납니다.        */
-      const target = this.bgmTarget();
       const k = Math.min(1, (performance.now() - t0) / ms);
       if (to) { try { to.volume = target * k; } catch (e) {} }
       if (from) { try { from.volume = target * (1 - k); } catch (e) {} }
@@ -5056,25 +4960,12 @@ const Sound = {
     try {
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
-      const rate = (opts && opts.rate) || 1;
-      src.playbackRate.value = rate;
+      src.playbackRate.value = (opts && opts.rate) || 1;
       const g = this.ctx.createGain();
       g.gain.value = vol;
       src.connect(g);
       g.connect(this.sfxGain);
       src.start(0);
-      /* opts.solo — 이 소리가 나는 동안 배경음을 내립니다(soloDuck).
-       * ★ 되돌리는 것을 onended 하나에만 맡기지 않습니다. 탭이 뒤로
-       *   가거나 오디오 컨텍스트가 멈추면 onended 가 영영 안 올 수
-       *   있는데, 그러면 <b>배경음이 영영 꺼진 채로</b> 남습니다.
-       *   길이를 알고 있으므로 타이머로 한 번 더 받칩니다.         */
-      if (opts && opts.solo) {
-        this.soloDuck(true);
-        let released = false;
-        const release = () => { if (released) return; released = true; this.soloDuck(false); };
-        src.onended = release;
-        setTimeout(release, (buf.duration / rate) * 1000 + 600);
-      }
     } catch (e) { /* 재생 실패는 무시 */ }
   }
 };
@@ -6267,36 +6158,7 @@ const Input = {
   }
 };
 
-/* ── Ctrl / Alt 는 게임 중에 막습니다 ─────────────────────────────────
- * 2026-09-18 — "게임 도중에 밖으로 나가진다"는 의견의 실체입니다.
- *
- * 이 게임은 Ctrl 도 Alt 도 쓰지 않는데, 달리면서 새끼손가락이 스치면
- * 브라우저 단축키가 먹습니다. 특히 <b>Alt + ← 는 뒤로 가기</b>라
- * 한 번에 게임 밖으로 나갑니다. Ctrl+S(저장)·Ctrl+P(인쇄)·Ctrl+F(찾기)
- * 는 창을 띄워 그 순간 화면을 덮습니다.
- *
- * ★ 브라우저가 먼저 삼키는 것(Alt+Tab · Ctrl+W · Ctrl+T · Alt+F4)은
- *   페이지에서 막을 수 없습니다. 그건 <b>창 포커스가 빠지는</b> 문제라
- *   아래 blur 핸들러가 키를 털어 주는 것으로 대응합니다.
- *
- * ★ 입력칸(이름·채팅)에서는 막지 않습니다 — Ctrl+C/V 를 뺏으면
- *   이름을 붙여넣을 수 없습니다.
- * ★ 조합키가 눌린 keydown 은 <b>keys[] 에 넣지도 않습니다.</b> 넣으면
- *   Alt 를 떼는 순간 keyup 이 안 와서(창이 메뉴로 포커스를 옮김)
- *   그 방향으로 계속 달립니다.
- * ------------------------------------------------------------------ */
-function typingNow() {
-  const el = document.activeElement;
-  return !!(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'));
-}
-
 window.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.altKey || e.metaKey) && !typingNow()) {
-    /* 조합키 자체(Control/Alt/Meta)도 여기로 옵니다 — 같이 막습니다.
-     * F 키는 조합이 아니면 여기 안 걸리므로 F2 진단은 그대로입니다. */
-    e.preventDefault();
-    return;
-  }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
   if (e.code === 'Space') { Input.src = 'key'; Input.jump(); }
@@ -6314,10 +6176,7 @@ const cam = {
    * 끊김은 아니지만 라운드 시작마다 화면이 미세하게 흘러내립니다. */
   yaw: 0, pitch: 0.5, dist: CAM.DIST, targetDist: CAM.DIST, height: CAM.HEIGHT,
   minDist: CAM.MIN, maxDist: CAM.MAX, scale: 1, userZoomed: false,
-  dragging: false, lx: 0, ly: 0,
-  /* 대기 중에만 더해지는 거리(LOBBY_PULL 주석). 0 에서 시작해 lerp 로
-   * 오가므로 라운드가 시작될 때 화면이 튀지 않습니다.              */
-  lobbyPull: 0
+  dragging: false, lx: 0, ly: 0
 };
 
 /* ── 시점 조작 ──────────────────────────────────────────────────────
@@ -7084,24 +6943,6 @@ function stepPhysics(dt) {
   const nextY = local.pos.y + local.vel.y * dt;
 
   // ---- ground resolution ----
-  /* ★ 2026-09-18 — <b>발밑을 잃으면 groundTile 도 같이 비웁니다.</b>
-   *
-   *   종전에는 이 값을 <b>대입만</b> 하고 비우지 않았습니다. 그래서 발이
-   *   떨어져도(grounded=false) 옛 타일을 계속 가리켰고, 아래 "발이
-   *   떨어졌습니다" 줄(`if (!local.groundTile) contactTile = null`)이
-   *   <b>한 번도 발동하지 않았습니다.</b>
-   *
-   *   증상은 "타일 가장자리에 서 있으면 타일이 안 깨진다" 였습니다.
-   *   가장자리에서는 중심이 타일 경계를 오가며 발밑 판정이 한두 프레임
-   *   깜빡이는데, 그때마다 <b>같은 타일로 돌아오면서 tile_step 이 안
-   *   나갑니다</b>(onSteppedOn 이 contactTile 로 걸러 냅니다). 서버는
-   *   마지막 tile_step 을 '지금 서 있는 타일' 로 쓰므로(STAND_ROT_MS),
-   *   두 번째 밟기도 머무름 시계도 영영 걸리지 않습니다.
-   *
-   *   점프 경로에는 이미 `local.groundTile = null` 이 있습니다 — 그래서
-   *   뛰어서 제자리에 내려앉는 것은 멀쩡히 동작했고, 미끄러질 때만
-   *   드러났습니다. 빠진 곳을 마저 채운 것입니다.
-   *   (실측: 공중 1프레임 뒤 복귀 시 tile_step 0건 → 고친 뒤 1건)     */
   local.grounded = false;
   if (local.vel.y <= 0) {
     const hit = findLanding(local.pos.x, local.pos.z, prevY, nextY);
@@ -7122,16 +6963,14 @@ function stepPhysics(dt) {
       if (hit.tile) onSteppedOn(hit.tile);
     } else {
       local.pos.y = nextY;
-      local.groundTile = null;      // 발밑이 없습니다 (위 ★ 주석)
     }
   } else {
     local.pos.y = nextY;
-    local.groundTile = null;        // 솟는 중 — 발밑이 없습니다
   }
 
   if (local.grounded) {
     const sup = supportAt(local.pos.x, local.pos.z, local.pos.y);
-    if (!sup) { local.grounded = false; local.groundTile = null; }
+    if (!sup) { local.grounded = false; }
     else {
       local.layer = sup.layer;
       local.groundTile = sup.tile;
@@ -7417,14 +7256,7 @@ function showVerdict(kind, opts) {
    * CSS 애니메이션 지연(승리 0.5s)과 숫자를 맞춰야 합니다. */
   const hitMs = win ? 500 : 0;
   setTimeout(() => {
-    /* solo: 최종 처분 소리가 나는 동안에는 배경음을 내립니다.
-     * 등록결정이든 거절결정이든 <b>그 회차의 마지막 한 마디</b>라,
-     * 배경음과 겹치면 뭉개집니다.
-     * ⚠ 거절 쪽에는 소리가 없습니다(2026-09-18). 거절 도장이 찍히는 것은
-     *   구름바다에 빠진 <b>직후</b>라, 그 순간의 death 소리가 아직 울리고
-     *   있습니다 — 여기에 하나 더 얹으면 겹칩니다. sfx_crack.mp3 를
-     *   만들지 않기로 한 이유이기도 합니다.                        */
-    if (win) Sound.sfx('win', { rate: 1, volume: 1, solo: true });
+    Sound.sfx(win ? 'win' : 'crack', { rate: win ? 1 : 0.6, volume: 1 });
     addCamShake(win ? 34 : 26);
   }, hitMs + 330);
 
@@ -7468,10 +7300,7 @@ function beginFallOut() {
   const th = THEMES[currentTheme] || THEMES[0];
   spawnSeaSplash(local.pos.x, local.pos.z, th.seaTop);
   spawnPaperBurst(local.pos.x, local.pos.y, local.pos.z);
-  /* solo: 등록결정과 같은 이유로 배경음을 내립니다 — 내 회차가 끝나는
-   * 순간이라 소리 하나만 들리는 편이 맞습니다. 2.0초짜리라 라운드가
-   * 이어지는 동안 음악이 오래 비지는 않습니다.                    */
-  Sound.sfx('death', { solo: true });
+  Sound.sfx('death');
   dom.deadFlash.classList.add('on');
 }
 
@@ -9234,16 +9063,11 @@ function updateCamera(dt) {
   }
 
   cam.dist += (cam.targetDist - cam.dist) * smoothK(5, dt);
-  /* 대기 중에만 뒤로 물러납니다(LOBBY_PULL 주석). 목표값을 0 ↔ LOBBY_PULL
-   * 로 두고 lerp 로 따라가므로, 발판이 치워지는 순간 툭 끊기지 않고
-   * 라운드 시작 낙하와 함께 자연스럽게 제자리로 돌아옵니다.         */
-  cam.lobbyPull += ((lobbyAim ? LOBBY_PULL * cam.scale : 0) - cam.lobbyPull) * smoothK(LOBBY_PULL_K, dt);
-  const useDist = cam.dist + cam.lobbyPull;
 
-  const horiz = Math.cos(cam.pitch) * useDist;
+  const horiz = Math.cos(cam.pitch) * cam.dist;
   camDesired.set(
     camTarget.x + Math.sin(cam.yaw) * horiz,
-    camTarget.y + Math.sin(cam.pitch) * useDist,
+    camTarget.y + Math.sin(cam.pitch) * cam.dist,
     camTarget.z + Math.cos(cam.yaw) * horiz
   );
 
@@ -9734,7 +9558,7 @@ function stopStackLoop() {
 let queueTimer = null;
 
 /* ── 로비 ─────────────────────────────────────────────────────────────
- * 선택한 방. null 이면 '바로 출원 시작'(서버가 알아서 몰아 줍니다).
+ * 선택한 방. null 이면 '빠른 참가'(서버가 알아서 몰아 줍니다).
  *
  * ★ 왜 기본이 '아무것도 안 고름' 인가
  *   방을 자유롭게 고르게 두면 인원이 흩어져 <b>어느 방도 정원이 안 차는</b>
@@ -9838,7 +9662,7 @@ function syncJoinCta() {
   if (!dom.btnJoin) return;
   dom.btnJoin.textContent = lobbyPick
     ? lobbyPick + ' 심사실로 입장'
-    : (joinMode === 'spectator' ? '관전으로 입장' : '바로 출원 시작');
+    : (joinMode === 'spectator' ? '관전으로 입장' : '빠른 참가 — 심사 대기열');
 }
 
 function renderQueue(rooms) {
@@ -10064,7 +9888,7 @@ function buildRulesText() {
   /* 좌석 수도 config 파생으로. 종전에는 '최대 4인'이 마크업에 박혀 있어
    * MAX_PLAYERS 를 바꾸면 버튼만 거짓말을 했습니다. */
   const pm = document.querySelector('.mode[data-mode="player"]');
-  if (pm && cfg.MAX_PLAYERS) pm.textContent = '출원인으로 참가 (최대 ' + cfg.MAX_PLAYERS + '인)';
+  if (pm && cfg.MAX_PLAYERS) pm.textContent = '주자로 참가 (최대 ' + cfg.MAX_PLAYERS + '인)';
 
   const eb = document.getElementById('joinEyebrow');
   if (eb) eb.textContent = 'KIPO SURVIVAL PROTOCOL · ' + (layers.length || '?') + '-LAYER';
@@ -10314,7 +10138,7 @@ function buildRulesText() {
   /* 관전자 개입도 규격입니다 — 참가 방식에 '관전 + 개입'이 있는데,
    * 그게 무엇을 할 수 있는 자리인지는 어디에도 적혀 있지 않았습니다. */
   if (cfg.AMEND_LEVEL) {
-    endRow('neutral', '관전', '이번 회차에 뛰지 않는 관전자는 한 번, 출원인 한 명을 ' +
+    endRow('neutral', '관전', '이번 회차에 뛰지 않는 관전자는 한 번, 주자 한 명을 ' +
       cfg.AMEND_LEVEL + '층 위로 올려보낼 수 있습니다.');
   }
   endSec.appendChild(end);
@@ -10550,13 +10374,7 @@ function applyLayerEvent(d) {
       netStats.rotFlips++;
       if (!G.rotFlipTold && onTraitLayer('rotate')) {
         G.rotFlipTold = true;
-        /* 2026-09-18 — '거절이유 발생' 이라고 부르지 않습니다.
-         * 이 사건은 <b>층 회전 방향 반전</b>이고, 같은 층의 거절이유
-         * 타일(밟으면 주변까지 터짐)과는 다른 일입니다. 둘 다 '거절이유'
-         * 로 시작하니 플레이어에게는 같은 안내의 두 판본처럼 보였고,
-         * 실제로 "안내가 통일이 안 됐다"는 의견을 받았습니다.
-         * 층 배너·층 목록도 이 회전을 '회전' 이라고 부르므로 맞췄습니다. */
-        toast('⚠️ 심사관 검토 방향 변경 — 층이 반대로 돕니다', 'kill');
+        toast('⚠️ 거절이유 발생, 심사관 검토 방향 변경', 'kill');
         Sound.sfx('obstacle', { rate: 0.9, volume: 0.85 });
         if (dom.rotAlert) {
           dom.rotAlert.classList.add('on');
@@ -10635,9 +10453,9 @@ let layerBannerT1 = 0, layerBannerT2 = 0;
  * ★ 상한을 둡니다. 층 구성을 바꿔 항목이 많아져도 배너가 화면을
  *   오래 덮지 않게 합니다.
  * ------------------------------------------------------------------ */
-const LAYER_BANNER_BASE_MS = 4200;   // 층 번호 + 이름 + 마지막 안내 한 줄 (2026-09-18: 3600 → 4200)
+const LAYER_BANNER_BASE_MS = 3600;   // 층 번호 + 이름 + 마지막 안내 한 줄
 const LAYER_BANNER_MARK_MS = 700;    // 기믹 항목 한 줄당 더 주는 시간
-const LAYER_BANNER_MAX_MS  = 7000;   // 상한도 같이 올립니다 — 안 올리면 기믹 2개 층이 상한에 걸려 안 늘어납니다
+const LAYER_BANNER_MAX_MS  = 6000;
 
 function layerBannerMs(markCount) {
   return Math.min(LAYER_BANNER_MAX_MS,
@@ -10672,14 +10490,16 @@ function showLayerBanner(layerIndex, dir) {
     '<i>' + escapeHtml(m.i || '·') + '</i>' +
     '<span>' + escapeHtml(m.t || '') + '</span></div>').join('');
 
-  /* 2026-09-18 — 배너 맨 밑의 '아직 살아 있습니다 · 구름바다까지 N층' 한 줄을
-   * 뺐습니다. 네 갈래(마지막 층 / 내려옴 / 올라옴 / 제자리) 전부입니다.
-   *
-   * 없애도 답은 남습니다 — 위 주석이 말하는 '상시 : 상단 HUD 의 남은 층'
-   * 쪽은 그대로입니다. 배너는 층에 <b>도착한 순간</b>에만 뜨는데, 정작
-   * '내가 죽었나' 가 궁금한 것은 떨어지는 <b>도중</b>이고 그때는 배너가
-   * 없습니다. 층마다 같은 문장이 반복되는 값에 비해 배너만 길어졌습니다.
-   * ⚠ 되살릴 일이 있으면 HUD '남은 층' 과 <b>중복</b>이라는 점을 먼저 보세요. */
+  const safe = el.querySelector('.lbSafe');
+  if (left <= 0) {
+    safe.innerHTML = '<b>마지막 층</b>입니다 — 여기서 더 떨어지면 탈락입니다';
+  } else if (dir < 0) {
+    safe.innerHTML = '아직 살아 있습니다 · 구름바다까지 <b>' + left + '층</b> 남았습니다';
+  } else if (dir > 0) {
+    safe.innerHTML = '한 층 올라왔습니다 · 구름바다까지 <b>' + left + '층</b>';
+  } else {
+    safe.innerHTML = '한 층 떨어져도 탈락이 아닙니다 · 아래로 <b>' + left + '층</b> 더 있습니다';
+  }
 
   const holdMs = layerBannerMs(marks.length);
 
@@ -10804,9 +10624,9 @@ function updateSpectatorUI() {
      *   서버가 init 으로 내려주는 값을 그대로 씁니다.               */
     banner.innerHTML = G.wantsPlay
       ? ((G.phase === 'playing')
-          ? '<b>관전 중</b>진행 중인 회차라 관전으로 참가했습니다 · 다음 회차에 자동으로 출원인이 됩니다'
-          : '<b>관전 중</b>내 캐릭터는 표시되지 않습니다 · 다음 회차에 출원인으로 올라갑니다')
-      : '<b>관전 + 개입</b>출원인으로 뛰지 않습니다 · <b>이번 회차에 한 번</b> 보정 기회를 줄 수 있습니다';
+          ? '<b>관전 중</b>진행 중인 회차라 관전으로 참가했습니다 · 다음 회차에 자동으로 주자가 됩니다'
+          : '<b>관전 중</b>내 캐릭터는 표시되지 않습니다 · 다음 회차에 주자로 올라갑니다')
+      : '<b>관전 + 개입</b>주자로 뛰지 않습니다 · <b>이번 회차에 한 번</b> 보정 기회를 줄 수 있습니다';
   }
   if (!isSpec) return;
 
@@ -10825,7 +10645,7 @@ function updateSpectatorUI() {
     ? alive.map((p) =>
         '<button class="tgt' + (p.id === G.specTarget ? ' sel' : '') + '" data-id="' + p.id + '">' +
         escapeHtml(safeName(p.name)) + '</button>').join('')
-    : '<span style="font-size:11px;opacity:.5">출원인이 없습니다</span>';
+    : '<span style="font-size:11px;opacity:.5">주자가 없습니다</span>';
 }
 
 dom.specTargets.addEventListener('click', (e) => {
@@ -11079,9 +10899,9 @@ function showResult(data) {
      *   오지 않을 차례를 기다리게 됩니다.                          */
     const what = data.winnerName
       ? escapeHtml(data.winnerName) + ' 님이 등록결정을 받았습니다.'
-      : '남은 출원인이 없습니다.';
+      : '남은 주자가 없습니다.';
     dom.resultSub.textContent = what + (G.wantsPlay
-      ? ' 다음 회차에는 출원인으로 참가합니다.'
+      ? ' 다음 회차에는 주자로 참가합니다.'
       : ' 계속 관전하며 보정 기회를 줄 수 있습니다.');
   } else if (data.winnerName) {
     dom.resultSub.textContent = escapeHtml(data.winnerName) + ' 님이 등록결정을 받았습니다.';
@@ -11089,7 +10909,7 @@ function showResult(data) {
    *   지웠습니다. 그 규칙 자체가 없어졌습니다 — 여럿이면 시간이 다 돼도
    *   서든데스로 이어져 반드시 한 명만 남습니다.                   */
   } else {
-    dom.resultSub.textContent = '남은 출원인이 없습니다.';
+    dom.resultSub.textContent = '남은 주자가 없습니다.';
   }
 
   /* 내 기록 한 줄. 살아남았으면 라운드 전체 시간이 곧 내 기록입니다. */
@@ -11356,11 +11176,7 @@ function connect(name, mode, opts) {
     }
     updateSpectatorUI();
     Sound.sfx('start');
-    /* 2026-09-18 — '심사 개시 — 바닥이 무너집니다' 를 뺐습니다.
-     * 발판이 열리는 같은 순간에 '접수 게이트 개방 — 최상층으로 낙하합니다'
-     * 가 함께 떠서 토스트 두 줄이 겹쳤습니다. 지금 일어나는 일을 말하는
-     * 것은 게이트 쪽이고, 바닥이 무너진다는 것은 대기 화면 규격과
-     * #hint 가 이미 말합니다.                                     */
+    toast('심사 개시 — 바닥이 무너집니다', 'obstacle');
   });
 
   /* 새 회차 = 기회 하나 복구. 서버도 startRound 에서 같은 일을 합니다. */
@@ -11644,9 +11460,7 @@ function connect(name, mode, opts) {
     const rec = G.tiles.get(d.tileId);
     if (!rec) return;
     startReject(rec, d.delay);
-    /* 2026-09-18 — 여기 있던 crack 소리를 뺐습니다(sfx_crack.mp3 는
-     * 만들지 않기로 했습니다). 밟는 소리는 tile1/tile2 가 이미 내고,
-     * 이 타일의 진짜 사건은 <b>잠시 뒤의 폭발</b>이라 bomb 이 맡습니다. */
+    Sound.sfx('crack', { pos: rec, rate: 1.25 });
     if (d.by === G.selfId) {
       /* 이건 목숨이 걸린 경고라 회차당 한 번으로 묶지 않습니다.
        * 다만 연달아 밟았을 때 같은 줄이 쌓이지는 않게 합니다.       */
@@ -11670,10 +11484,14 @@ function connect(name, mode, opts) {
       breakTile(rec, id === d.tileId ? 2.4 : 1.6);
     }
     if (center) {
-      /* 2026-09-18 — crack+death 를 겹쳐 흉내 내던 폴백을 뺐습니다.
-       * bomb 파일이 실제로 있고, 없앤 crack 은 만들지 않기로 했습니다.
-       * bomb 이 없으면 그냥 조용합니다 — 흉내 낸 소리보다 낫습니다. */
-      Sound.sfx('bomb', { pos: center });
+      /* 폭탄 소리가 있으면 그것 하나로 갑니다 — 없을 때만 종전처럼
+       * 두 소리를 겹쳐 대신합니다.                                  */
+      if (Sound.buffers.bomb) {
+        Sound.sfx('bomb', { pos: center });
+      } else {
+        Sound.sfx('crack', { pos: center, rate: 0.72 });
+        Sound.sfx('death', { pos: center, volume: 0.5 });
+      }
     }
   });
 
@@ -11702,9 +11520,7 @@ function connect(name, mode, opts) {
   socket.on('tile_break', (d) => {
     const rec = G.tiles.get(d.tileId);
     breakTile(rec);
-    /* 2026-09-18 — 무너질 때마다 내던 crack 소리를 뺐습니다.
-     * 한 라운드에 수백 번 나는 자리라, 파일을 넣었다면 오히려
-     * 시끄러웠을 것입니다. 밟는 순간은 tile1/tile2 가 알려 줍니다. */
+    if (rec) Sound.sfx('crack', { pos: rec, rate: 0.9 + Math.random() * 0.2 });
   });
 
   /* 보정 기회가 발동했습니다. 실제 이동은 player_impulse 가 처리하고
@@ -11768,7 +11584,7 @@ function connect(name, mode, opts) {
       dom.deadFlash.classList.add('on');
       setTimeout(() => dom.deadFlash.classList.remove('on'), 900);
       G.role = 'spectator';
-      Sound.sfx('death', { solo: true });   // 위와 같은 이유
+      Sound.sfx('death');
       toast(d.cause === 'afk'
         ? '연결이 끊긴 것으로 처리되어 탈락했습니다'
         : '통신이 끊겨 탈락 처리되었습니다 — 이제 관전자로 개입할 수 있습니다', 'kill');
@@ -11790,12 +11606,7 @@ function connect(name, mode, opts) {
     } else {
       showResult(d);
     }
-    /* 이긴 쪽·진 쪽 모두 solo — 배경음을 내리고 그 소리만 들려줍니다
-     * (showVerdict 의 같은 소리도 solo 라, 겹쳐 나도 셈으로 관리됩니다).
-     * ⚠ 진 쪽에는 소리를 내지 않습니다(2026-09-18, sfx_lose.mp3 제거).
-     *   진 사람은 이미 탈락할 때 death 를 들었습니다 — 결과 화면에서
-     *   한 번 더 알릴 일이 아닙니다.                              */
-    if (d.winnerId === G.selfId) Sound.sfx('win', { solo: true });
+    Sound.sfx(d.winnerId === G.selfId ? 'win' : 'lose');
   });
 
   /* ★ 페이지를 열면 바로 관전으로 붙는 구조라, 아직 참가 버튼을 누르지도
@@ -12509,7 +12320,7 @@ function renderDiag() {
             k.slice(0, 4) + ' ' + G.kindCount[k] + '(' +
             Math.round(G.kindCount[k] / G.tiles.size * 100) + '%)').join(' ')
         : '—') +
-    row('출원인', null, G.players.size + '명') +
+    row('주자', null, G.players.size + '명') +
     row('phase', null, G.phase) +
     row('내 아바타', !!local.avatar,
         local.avatar ? '생성됨' : (G.role === 'spectator' ? '없음 (관전자)' : '없음')) +
@@ -12528,7 +12339,7 @@ function renderDiag() {
      * server.js 의 VALIDATE 한계가 너무 빡빡하거나 네트워크가 나쁜 것입니다. */
     row('이동보정', netStats.corrections === 0,
         netStats.corrections + '회' + (G.cfg && G.cfg.VALIDATE_ON === false ? ' (검증 꺼짐)' : '')) +
-    row('출원인 충돌', null, 'BUMP ' + (BUMP.PUSH_OFF_EDGE ? '켜짐 · 밀려서 떨어짐' : '켜짐 · 가장자리 보호')) +
+    row('주자충돌', null, 'BUMP ' + (BUMP.PUSH_OFF_EDGE ? '켜짐 · 밀려서 떨어짐' : '켜짐 · 가장자리 보호')) +
     row('DEV', DEV.on ? null : true,
         (DEV.on ? '켜짐 — ' + devFlagSummary() : '꺼짐 (정상 게임)') +
         (DEV.serverOn && !DEV.on ? ' · 서버는 dev (?dev=1 로 켜기)' : '')) +
@@ -12726,45 +12537,13 @@ document.querySelectorAll('.mode').forEach((b) => {
     document.querySelectorAll('.mode').forEach((x) => x.classList.remove('sel'));
     b.classList.add('sel');
     joinMode = b.dataset.mode;
-    /* ★ 2026-09-18 — 이 한 줄이 빠져 있었습니다. 관전을 골라도 아래 버튼은
-     *   주자용 문구 그대로였습니다(누르면 관전으로는 제대로 들어갔습니다 —
-     *   <b>글자만</b> 거짓말을 했습니다). 종전 '빠른 참가' 는 두루뭉술해
-     *   티가 안 났는데, '바로 출원 시작' 으로 바꾸고 나니 관전을 고른
-     *   사람에게 정면으로 어긋납니다.                                  */
-    syncJoinCta();
   });
 });
 
-/* ── 출원인 이름 ──────────────────────────────────────────────────────
- * ★ 한 번 적은 이름은 다음 회차에도 그대로 둡니다(2026-09-18).
- *   '나가기'(leaveToLobby)가 소켓을 끊고 <b>페이지를 다시 엽니다</b> —
- *   부분 초기화는 빠뜨린 곳이 다음 판 중간에 터지기 때문입니다. 그래서
- *   자바스크립트 변수로는 이름이 남을 수가 없고, 판이 끝날 때마다
- *   `출원인123` 같은 무작위 이름으로 되돌아갔습니다. 행사장에서는 한
- *   사람이 여러 판을 도는데, 매번 이름을 다시 적어야 했습니다.
- *
- * ★ 심사를 '받는' 쪽이 플레이어입니다. 발밑을 무너뜨리는 것이 심사관이고
+/* ★ 심사를 '받는' 쪽이 플레이어입니다. 발밑을 무너뜨리는 것이 심사관이고
  *   그 위에서 버티는 것이 출원인이라, 기본 이름이 심사관이면 역할이
- *   거꾸로 읽힙니다. 명단·입력칸 라벨은 이미 '출원인'이었습니다.
- *
- * ⚠ 저장은 <b>참가를 누른 순간</b>에만 합니다(startJoin). 입력할 때마다
- *   저장하면 지우다 만 중간 글자('김출'…)가 남습니다.
- * ⚠ localStorage 는 사생활 모드·정책에 따라 통째로 던집니다. 이름 하나
- *   때문에 게임이 안 뜨면 안 되므로 읽기·쓰기 모두 try 로 감쌉니다.  */
-const NAME_KEY = 'ipg.name';
-function savedName() {
-  try {
-    const v = (localStorage.getItem(NAME_KEY) || '').trim();
-    /* 저장해 둔 값도 입력칸과 같은 한도로 자릅니다 — maxlength 를 줄이는
-     * 변경이 있어도 옛 값이 그 한도를 넘겨 들어오지 않게. */
-    if (v) return v.slice(0, dom.nameInput.maxLength > 0 ? dom.nameInput.maxLength : 14);
-  } catch (e) {}
-  return '';
-}
-function rememberName(n) {
-  try { localStorage.setItem(NAME_KEY, n); } catch (e) {}
-}
-dom.nameInput.value = savedName() || ('출원인' + Math.floor(Math.random() * 900 + 100));
+ *   거꾸로 읽힙니다. 명단·입력칸 라벨은 이미 '출원인'이었습니다.    */
+dom.nameInput.value = '출원인' + Math.floor(Math.random() * 900 + 100);
 
 /* assets/character.glb 가 있으면 절차적 캐릭터를 대체합니다 */
 loadCharacterModel();
@@ -12811,7 +12590,7 @@ function startPreview() {
 setTimeout(startPreview, 400);
 
 
-/* 방 선택. 같은 방을 다시 누르면 선택 해제 = 자동 배정으로 돌아갑니다. */
+/* 방 선택. 같은 방을 다시 누르면 선택 해제 = 빠른 참가로 돌아갑니다. */
 if (dom.lbList) {
   dom.lbList.addEventListener('click', (e) => {
     const row = e.target.closest ? e.target.closest('.lbRow') : null;
@@ -12911,11 +12690,6 @@ dom.btnJoin.addEventListener('click', () => {
     return;
   }
   const name = (dom.nameInput.value || '').trim() || '익명출원인';
-  /* 다음 판에도 같은 이름으로 들어올 수 있게 남깁니다(NAME_KEY 주석).
-   * 비워 두고 눌러 '익명출원인' 이 된 경우는 저장하지 않습니다 — 그건
-   * 본인이 고른 이름이 아니라 폴백이라, 저장하면 다음에 지울 수 없는
-   * 이름이 박힌 것처럼 보입니다.                                    */
-  if ((dom.nameInput.value || '').trim()) rememberName(name);
   // 브라우저 자동재생 정책상 여기(첫 클릭)에서 오디오를 열어야 합니다
   Sound.unlock();
   /* ★ 전체화면도 '사용자 제스처 안에서만' 허용되므로 같은 자리입니다.

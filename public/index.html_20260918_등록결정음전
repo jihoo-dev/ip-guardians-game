@@ -1463,8 +1463,7 @@ if (typeof THREE === 'undefined') {
  *
  * ★ assets/ 안의 파일을 갈아끼웠다면 이 숫자를 올리세요. 안 올리면
  *   이미 받은 사람은 1년 동안 옛 파일을 씁니다.                        */
-const ASSET_VER = '8';   // 2026-09-18 sfx_win 길이 단축(8.57 → 5.85초)
-// 7: 2026-09-17 보정 기회 효과음 추가 · 배경음 128kbps 재인코딩
+const ASSET_VER = '7';   // 2026-09-17 보정 기회 효과음 추가   // 2026-09-17 배경음 128kbps 재인코딩
 const assetUrl = (p) => p + (p.indexOf('?') >= 0 ? '&' : '?') + 'v=' + ASSET_VER;
 
 /* ============================ 0. constants ============================== */
@@ -4732,7 +4731,7 @@ const SFX = {
   start:     { src: 'assets/audio/sfx_start.mp3',     volume: 0.9 },
   tick:      { src: 'assets/audio/sfx_tick.mp3',      volume: 0.6 },
   step:      { src: 'assets/audio/sfx_step.mp3',      volume: 0.5 },
-
+  crack:     { src: 'assets/audio/sfx_crack.mp3',     volume: 0.7 },
   jump:      { src: 'assets/audio/sfx_jump.mp3',      volume: 0.6 },
   land:      { src: 'assets/audio/sfx_land.mp3',      volume: 0.5 },
   death:     { src: 'assets/audio/sfx_death.mp3',     volume: 0.9 },
@@ -4741,7 +4740,7 @@ const SFX = {
   obstacle:  { src: 'assets/audio/sfx_obstacle.mp3',  volume: 0.7 },
   impact:    { src: 'assets/audio/sfx_impact.mp3',    volume: 0.8 },
   win:       { src: 'assets/audio/sfx_win.mp3',       volume: 1.0 },
-
+  lose:      { src: 'assets/audio/sfx_lose.mp3',      volume: 0.9 },
   /* 점프 타일 — 올라가는 층수마다 다릅니다(JUMP_TILE.levels). 파일이
    * 없으면 버퍼가 안 생기므로 applyJumpImpulse 가 기본 점프 소리로
    * 받쳐 줍니다.                                                    */
@@ -4783,17 +4782,6 @@ const Sound = {
   unlocked: false,
   muted: false,
   vol: { master: 0.8, bgm: 0.45, sfx: 0.85 },
-  /* ── 배경음 일시 낮춤(더킹) ─────────────────────────────────────
-   * 등록결정 효과음처럼 <b>혼자 들려야 하는 소리</b>가 나는 동안 배경음을
-   * 0 으로 내렸다가, 끝나면 되돌립니다. 소리를 끄는 것이 아니라 음량만
-   * 곱하는 값이라, 중간에 페이즈가 바뀌어 곡이 갈려도 그대로 따라옵니다.
-   *   duckK  : 0(완전히 내림) ~ 1(원래대로). 모든 배경음 음량에 곱합니다.
-   *   soloN  : 지금 '혼자 들려야 하는' 소리가 몇 개인가. 두 곳에서
-   *            같은 소리를 낼 수 있어(게임 종료 · 도장 연출) 셈으로 둡니다.
-   *            0 이 되는 순간에만 배경음을 되돌립니다.              */
-  duckK: 1,
-  soloN: 0,
-  duckTimer: null,
   fadeTimer: null,
 
   /* 설정 저장/복원 (실패해도 무시) */
@@ -4836,39 +4824,12 @@ const Sound = {
     for (const key of Object.keys(SFX)) this.preload(key);
   },
 
-  /** 지금 배경음이 가져야 할 음량. 뮤트·설정 음량·더킹을 한 곳에서 곱합니다. */
-  bgmTarget() {
-    return this.muted ? 0 : Math.min(1, this.vol.master * this.vol.bgm * this.duckK);
-  },
-
   applyVolume() {
     const m = this.muted ? 0 : this.vol.master;
     if (this.master) this.master.gain.value = m;
     if (this.sfxGain) this.sfxGain.gain.value = this.vol.sfx;
-    /* ★ 크로스페이드가 도는 중에는 건드리지 않습니다 — 그쪽이 40ms 마다
-     *   같은 요소의 음량을 쓰고 있어서, 둘이 서로 덮으면 소리가 끊깁니다.
-     *   크로스페이드도 매 틱 bgmTarget() 을 다시 읽으므로 뮤트와 더킹이
-     *   그대로 반영됩니다.                                          */
-    if (this.fadeTimer) return;
-    if (this.el) this.el.volume = this.bgmTarget();
+    if (this.el) this.el.volume = Math.min(1, m * this.vol.bgm);
     if (this.elNext) this.elNext.volume = 0;
-  },
-
-  /* 효과음 하나만 들리게 배경음을 내렸다(on) 되돌립니다(off).
-   * ★ 내릴 때는 빠르게, 되돌릴 때는 천천히 — 되돌리는 쪽이 빠르면
-   *   효과음 꼬리와 겹쳐 '툭' 하고 배경음이 튀어나옵니다.          */
-  soloDuck(on) {
-    this.soloN = Math.max(0, this.soloN + (on ? 1 : -1));
-    const want = this.soloN > 0 ? 0 : 1;
-    if (this.duckK === want) return;
-    if (this.duckTimer) clearInterval(this.duckTimer);
-    const from = this.duckK, ms = on ? 220 : 800, t0 = performance.now();
-    this.duckTimer = setInterval(() => {
-      const k = Math.min(1, (performance.now() - t0) / ms);
-      this.duckK = from + (want - from) * k;
-      this.applyVolume();
-      if (k >= 1) { clearInterval(this.duckTimer); this.duckTimer = null; }
-    }, 40);
   },
 
   setVolume(kind, value) {
@@ -4991,12 +4952,9 @@ const Sound = {
   crossfade(ms) {
     if (this.fadeTimer) clearInterval(this.fadeTimer);
     const from = this.el, to = this.elNext;
+    const target = this.muted ? 0 : this.vol.master * this.vol.bgm;
     const t0 = performance.now();
     this.fadeTimer = setInterval(() => {
-      /* ★ 목표 음량을 <b>매 틱</b> 다시 읽습니다. 시작할 때 한 번만 읽으면
-       *   페이드가 도는 0.9초 동안 뮤트도 더킹도 먹지 않습니다 —
-       *   등록결정 효과음이 하필 곡이 바뀌는 순간에 납니다.        */
-      const target = this.bgmTarget();
       const k = Math.min(1, (performance.now() - t0) / ms);
       if (to) { try { to.volume = target * k; } catch (e) {} }
       if (from) { try { from.volume = target * (1 - k); } catch (e) {} }
@@ -5056,25 +5014,12 @@ const Sound = {
     try {
       const src = this.ctx.createBufferSource();
       src.buffer = buf;
-      const rate = (opts && opts.rate) || 1;
-      src.playbackRate.value = rate;
+      src.playbackRate.value = (opts && opts.rate) || 1;
       const g = this.ctx.createGain();
       g.gain.value = vol;
       src.connect(g);
       g.connect(this.sfxGain);
       src.start(0);
-      /* opts.solo — 이 소리가 나는 동안 배경음을 내립니다(soloDuck).
-       * ★ 되돌리는 것을 onended 하나에만 맡기지 않습니다. 탭이 뒤로
-       *   가거나 오디오 컨텍스트가 멈추면 onended 가 영영 안 올 수
-       *   있는데, 그러면 <b>배경음이 영영 꺼진 채로</b> 남습니다.
-       *   길이를 알고 있으므로 타이머로 한 번 더 받칩니다.         */
-      if (opts && opts.solo) {
-        this.soloDuck(true);
-        let released = false;
-        const release = () => { if (released) return; released = true; this.soloDuck(false); };
-        src.onended = release;
-        setTimeout(release, (buf.duration / rate) * 1000 + 600);
-      }
     } catch (e) { /* 재생 실패는 무시 */ }
   }
 };
@@ -7417,14 +7362,7 @@ function showVerdict(kind, opts) {
    * CSS 애니메이션 지연(승리 0.5s)과 숫자를 맞춰야 합니다. */
   const hitMs = win ? 500 : 0;
   setTimeout(() => {
-    /* solo: 최종 처분 소리가 나는 동안에는 배경음을 내립니다.
-     * 등록결정이든 거절결정이든 <b>그 회차의 마지막 한 마디</b>라,
-     * 배경음과 겹치면 뭉개집니다.
-     * ⚠ 거절 쪽에는 소리가 없습니다(2026-09-18). 거절 도장이 찍히는 것은
-     *   구름바다에 빠진 <b>직후</b>라, 그 순간의 death 소리가 아직 울리고
-     *   있습니다 — 여기에 하나 더 얹으면 겹칩니다. sfx_crack.mp3 를
-     *   만들지 않기로 한 이유이기도 합니다.                        */
-    if (win) Sound.sfx('win', { rate: 1, volume: 1, solo: true });
+    Sound.sfx(win ? 'win' : 'crack', { rate: win ? 1 : 0.6, volume: 1 });
     addCamShake(win ? 34 : 26);
   }, hitMs + 330);
 
@@ -7468,10 +7406,7 @@ function beginFallOut() {
   const th = THEMES[currentTheme] || THEMES[0];
   spawnSeaSplash(local.pos.x, local.pos.z, th.seaTop);
   spawnPaperBurst(local.pos.x, local.pos.y, local.pos.z);
-  /* solo: 등록결정과 같은 이유로 배경음을 내립니다 — 내 회차가 끝나는
-   * 순간이라 소리 하나만 들리는 편이 맞습니다. 2.0초짜리라 라운드가
-   * 이어지는 동안 음악이 오래 비지는 않습니다.                    */
-  Sound.sfx('death', { solo: true });
+  Sound.sfx('death');
   dom.deadFlash.classList.add('on');
 }
 
@@ -11644,9 +11579,7 @@ function connect(name, mode, opts) {
     const rec = G.tiles.get(d.tileId);
     if (!rec) return;
     startReject(rec, d.delay);
-    /* 2026-09-18 — 여기 있던 crack 소리를 뺐습니다(sfx_crack.mp3 는
-     * 만들지 않기로 했습니다). 밟는 소리는 tile1/tile2 가 이미 내고,
-     * 이 타일의 진짜 사건은 <b>잠시 뒤의 폭발</b>이라 bomb 이 맡습니다. */
+    Sound.sfx('crack', { pos: rec, rate: 1.25 });
     if (d.by === G.selfId) {
       /* 이건 목숨이 걸린 경고라 회차당 한 번으로 묶지 않습니다.
        * 다만 연달아 밟았을 때 같은 줄이 쌓이지는 않게 합니다.       */
@@ -11670,10 +11603,14 @@ function connect(name, mode, opts) {
       breakTile(rec, id === d.tileId ? 2.4 : 1.6);
     }
     if (center) {
-      /* 2026-09-18 — crack+death 를 겹쳐 흉내 내던 폴백을 뺐습니다.
-       * bomb 파일이 실제로 있고, 없앤 crack 은 만들지 않기로 했습니다.
-       * bomb 이 없으면 그냥 조용합니다 — 흉내 낸 소리보다 낫습니다. */
-      Sound.sfx('bomb', { pos: center });
+      /* 폭탄 소리가 있으면 그것 하나로 갑니다 — 없을 때만 종전처럼
+       * 두 소리를 겹쳐 대신합니다.                                  */
+      if (Sound.buffers.bomb) {
+        Sound.sfx('bomb', { pos: center });
+      } else {
+        Sound.sfx('crack', { pos: center, rate: 0.72 });
+        Sound.sfx('death', { pos: center, volume: 0.5 });
+      }
     }
   });
 
@@ -11702,9 +11639,7 @@ function connect(name, mode, opts) {
   socket.on('tile_break', (d) => {
     const rec = G.tiles.get(d.tileId);
     breakTile(rec);
-    /* 2026-09-18 — 무너질 때마다 내던 crack 소리를 뺐습니다.
-     * 한 라운드에 수백 번 나는 자리라, 파일을 넣었다면 오히려
-     * 시끄러웠을 것입니다. 밟는 순간은 tile1/tile2 가 알려 줍니다. */
+    if (rec) Sound.sfx('crack', { pos: rec, rate: 0.9 + Math.random() * 0.2 });
   });
 
   /* 보정 기회가 발동했습니다. 실제 이동은 player_impulse 가 처리하고
@@ -11768,7 +11703,7 @@ function connect(name, mode, opts) {
       dom.deadFlash.classList.add('on');
       setTimeout(() => dom.deadFlash.classList.remove('on'), 900);
       G.role = 'spectator';
-      Sound.sfx('death', { solo: true });   // 위와 같은 이유
+      Sound.sfx('death');
       toast(d.cause === 'afk'
         ? '연결이 끊긴 것으로 처리되어 탈락했습니다'
         : '통신이 끊겨 탈락 처리되었습니다 — 이제 관전자로 개입할 수 있습니다', 'kill');
@@ -11790,12 +11725,7 @@ function connect(name, mode, opts) {
     } else {
       showResult(d);
     }
-    /* 이긴 쪽·진 쪽 모두 solo — 배경음을 내리고 그 소리만 들려줍니다
-     * (showVerdict 의 같은 소리도 solo 라, 겹쳐 나도 셈으로 관리됩니다).
-     * ⚠ 진 쪽에는 소리를 내지 않습니다(2026-09-18, sfx_lose.mp3 제거).
-     *   진 사람은 이미 탈락할 때 death 를 들었습니다 — 결과 화면에서
-     *   한 번 더 알릴 일이 아닙니다.                              */
-    if (d.winnerId === G.selfId) Sound.sfx('win', { solo: true });
+    Sound.sfx(d.winnerId === G.selfId ? 'win' : 'lose');
   });
 
   /* ★ 페이지를 열면 바로 관전으로 붙는 구조라, 아직 참가 버튼을 누르지도

@@ -1471,11 +1471,9 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
       비지 않습니다. 타일에 금이 가는 소리처럼 <b>한 걸음마다 나는 소리</b>에는
       걸지 않았습니다.
       <br><br>
-      <code>sfx_crack.mp3</code>·<code>sfx_lose.mp3</code> 는 <b>만들지 않기로 하고
-      코드에서도 지웠습니다.</b> <code>crack</code> 은 <b>타일이 무너질 때마다</b>
-      울리는 자리라 한 라운드에 수백 번이었고, <code>lose</code> 는 결과 화면에서
-      진 사람에게 울릴 소리였는데 그 사람은 <b>이미 탈락할 때</b> 들었습니다.
-      거절 도장도 찍히는 시점이 구름바다에 빠진 <b>직후</b>입니다.
+      <code>sfx_crack.mp3</code>·<code>sfx_lose.mp3</code> 에도 걸어 두었지만
+      <b>파일이 없어 지금은 조용</b>합니다 — 넣는 순간 같이 살아납니다.
+      실제로 들리는 거절 소리는 <b>구름바다에 빠질 때</b> 하나뿐입니다.
     </div>
   </div>
   <h3>버그 — 가장자리에 서면 바닥이 버텼습니다</h3>
