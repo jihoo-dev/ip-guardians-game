@@ -638,33 +638,7 @@ const ACCEL_SPEED = Math.max(1, +ACCEL_EVENT.speed || 1);
  * ★ 환경변수로 당일 조정할 수 있습니다 — 코드를 고치지 않아도 됩니다.
  *       DARK_INTERVAL_MS=12000 DARK_DURATION_MS=4000 npm start
  * ------------------------------------------------------------------ */
-/* ── 2026-09-18 — 주기형에서 <b>한 번 걸리면 끝까지</b>로 바꿨습니다 ──
- *
- * 종전에는 10초 간격으로 8초씩 껐다 켜기를 반복했습니다. 그런데 이 층의
- * 성격은 "보이지 않는 것과 싸운다" 인데, 껐다 켜지면 <b>밝아질 때까지
- * 기다리는</b> 것이 최선의 수가 됩니다 — 층 특성이 장애물이 아니라
- * 대기 시간이 됩니다.
- *
- * 지금은 <b>누군가 이 층에 처음 내려서면</b> 예고(warnMs)를 띄우고,
- * 그 뒤로는 라운드가 끝날 때까지 어둡습니다.
- *
- * ★ 난이도가 과하지 않은 이유: 이 층에는 <b>선행기술 검색 타일</b>이
- *   있고(특수 타일의 100%), 밟으면 시야가 3 → 8칸으로 2초간 넓어집니다.
- *   즉 "가만히 기다리기" 대신 "찾아 밟기" 가 답이 됩니다 — 층 이름
- *   (실체심사/선행기술조사)이 말하는 바로 그 행동입니다.
- *
- * ★ 예고는 <b>방 전체에 한 번</b>입니다. 뒤늦게 내려온 사람은 이미
- *   어두우므로 예고가 필요 없습니다 — 눈으로 보입니다.
- *
- * ⚠ permanent 가 켜지면 intervalMs·durationMs 는 쓰이지 않습니다.
- *   되돌리려면 permanent 를 false 로 두면 종전 주기형으로 돌아갑니다.
- * ------------------------------------------------------------------ */
 const DARK_EVENT = {
-  /* 한 번 걸리면 끝까지 유지 */
-  permanent: process.env.DARK_PERMANENT !== '0',
-  /* 첫 진입을 알아챈 뒤 실제로 어두워지기까지 — 마음의 준비 시간 */
-  warnMs: parseInt(process.env.DARK_WARN_MS, 10) || 2500,
-  /* permanent 가 false 일 때만 쓰는 종전 주기 값 */
   intervalMs: parseInt(process.env.DARK_INTERVAL_MS, 10) || 10000,
   durationMs: parseInt(process.env.DARK_DURATION_MS, 10) || 8000,
   viewTiles: 3,
@@ -758,8 +732,6 @@ const EVENT_SCHEDULE = { warmupMs: 25000, gapMs: 8000, retryMs: 1000 };
  * 밀리기만 합니다. 조용히 밀리면 화면·기획서에 적은 주기가 거짓이 되므로
  * 시작할 때 한 번 알려 줍니다.                                        */
 function checkDarkSchedule() {
-  /* 끝이 없는 방식에서는 간격 자체를 안 씁니다 — 경고할 것이 없습니다. */
-  if (DARK_EVENT.permanent) return;
   if (DARK_EVENT.intervalMs >= EVENT_SCHEDULE.gapMs) return;
   const sec = (ms) => (ms / 1000).toFixed(1);
   console.warn('[경고] 암전 간격 ' + sec(DARK_EVENT.intervalMs) +
@@ -1236,9 +1208,9 @@ const LAYER_DEFS = [
    *   3F 하나만 남습니다. 너무 빡빡하면 여기를 먼저 되돌리세요.   */
   { key: 'exam',      name: '실체심사/선행기술조사', short: 'EXAMINATION',
     color: '#7c5cff', special: 'search', trait: 'dark',
-    tip: '내려서면 곧 암전되고 끝까지 이어집니다 — 밝게 빛나는 타일을 밟으면 잠시 멀리까지 보입니다',
+    tip: '주기적으로 암전됩니다 — 밝게 빛나는 타일을 밟으면 잠시 멀리까지 보입니다',
     marks: [
-      { i: '◐', t: '내려서면 암전 · 주변 2~3칸 밖이 안 보임' },
+      { i: '◐', t: '주기적 암전 · 주변 2~3칸 밖이 안 보임' },
       { i: '◎', t: '선행기술 검색 타일 = 2초 동안 시야 8칸' }
     ] },
   { key: 'office',    name: '의견제출통지',       short: 'OFFICE ACTION',
@@ -2646,12 +2618,7 @@ function makeTraitState(startAt) {
   for (const t of ACTIVE_TRAITS) {
     /* 첫 발동은 '자기 간격'과 '예열 시간' 중 늦은 쪽입니다.
      * 간격이 예열보다 짧은 특성(회전 반전 15초)도 예열이 끝나야 나옵니다. */
-    /* ★ 끝이 없는 특성(어둠)은 시계로 시작하지 않습니다 — 사람이 그 층에
-     *   내려서면 그때 무장합니다(tickLayerEvents). nextAt 을 미리 넣어
-     *   두면 아무도 없는 층이 먼저 어두워집니다.                     */
-    const s = LAYER_TRAITS[t].permanent
-      ? { active: false, endsAt: 0, nextAt: 0, armedAt: 0 }
-      : {
+    const s = {
       active: false,
       endsAt: 0,
       nextAt: startAt
@@ -2831,11 +2798,8 @@ function traitSnapshot(room, trait) {
     pulse: !!spec.pulse,
     endsAt: s.endsAt || 0,          // 남은 시간 표시용 (끄는 것은 서버가 지시)
     nextAt: s.nextAt || 0,
-    durationMs: spec.permanent ? 0 : (spec.durationMs || 0),
+    durationMs: spec.durationMs || 0,
     intervalMs: eventInterval(spec.intervalMs),
-    /* 끝이 없는 특성이라는 표시 — 클라이언트가 "곧 밝아진다" 로
-     * 읽지 않게 합니다.                                            */
-    permanent: !!spec.permanent,
     at: now
   };
   return hook && hook.extra ? Object.assign(out, hook.extra(room, now)) : out;
@@ -2845,10 +2809,7 @@ function traitSnapshot(room, trait) {
 function startTraitEvent(room, trait, now) {
   const s = room.traits[trait];
   s.active = true;
-  /* endsAt 0 = 라운드가 끝날 때까지. tickLayerEvents 가 끄지 않습니다. */
-  s.endsAt = LAYER_TRAITS[trait].permanent
-    ? 0
-    : now + LAYER_TRAITS[trait].durationMs;
+  s.endsAt = now + LAYER_TRAITS[trait].durationMs;
   s.nextAt = 0;                   // 끝날 때 endTraitEvent 가 다시 잡습니다
 
   const payload = traitSnapshot(room, trait);
@@ -2911,19 +2872,6 @@ function clearTraitEvents(room) {
  * 특성끼리는 서로 독립입니다. 심사 가속과 어둠이 겹쳐 발동할 수 있고,
  * 그건 의도된 동작입니다 (빨리 무너지는데 보이지도 않는 구간).
  */
-/** 그 특성이 걸린 층에 <b>살아 있는 주자</b>가 있는가.
- *  p.layer 는 클라이언트가 보고하는 값이라 'player_state' 에서 이미
- *  층 범위로 막아 두었습니다(BOTTOM~TOP). 여기서는 그대로 씁니다.     */
-function anyRunnerOnTraitLayer(room, trait) {
-  const layers = traitLayersOf(trait);
-  if (!layers.length) return false;
-  for (const p of room.players.values()) {
-    if (!p.alive) continue;
-    if (layers.indexOf(p.layer) >= 0) return true;
-  }
-  return false;
-}
-
 function tickLayerEvents(room, now) {
   if (room.phase !== 'playing') return;
   if (!room.traits) return;
@@ -2951,18 +2899,7 @@ function tickLayerEvents(room, now) {
     }
 
     if (s.active) {
-      /* endsAt 0 = 끝이 없는 특성(어둠의 permanent). 끄지 않습니다. */
-      if (s.endsAt && now >= s.endsAt) endTraitEvent(room, trait, now);
-      continue;
-    }
-    /* ★ 끝이 없는 특성은 시계가 아니라 <b>사람이 그 층에 내려서는 것</b>이
-     *   방아쇠입니다. 아무도 안 왔는데 미리 어두워지면, 정작 도착했을
-     *   때는 예고를 이미 놓친 뒤가 됩니다.                          */
-    if (LAYER_TRAITS[trait].permanent) {
-      if (s.armedAt) continue;                 // 이미 켜졌습니다
-      if (!anyRunnerOnTraitLayer(room, trait)) continue;
-      s.armedAt = now;
-      startTraitEvent(room, trait, now);
+      if (now >= s.endsAt) endTraitEvent(room, trait, now);
       continue;
     }
     if (s.nextAt && now >= s.nextAt) {
@@ -3517,9 +3454,6 @@ function publicConfig() {
     },
     /* 어둠. 시야 반경(칸)을 클라이언트가 하드코딩하지 않도록 내려줍니다. */
     DARK_EVENT: {
-      /* 대기 화면 규격이 이 둘로 갈립니다 — 없으면 옛 주기형 문구가 나갑니다 */
-      permanent: !!DARK_EVENT.permanent,
-      warnMs: DARK_EVENT.warnMs,
       intervalMs: DARK_EVENT.intervalMs,
       durationMs: DARK_EVENT.durationMs,
       viewTiles: DARK_EVENT.viewTiles,

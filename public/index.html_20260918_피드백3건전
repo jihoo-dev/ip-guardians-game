@@ -103,10 +103,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
 #layerStack.scroll{overflow-y:auto;pointer-events:auto;scrollbar-width:thin}
 #layerStack.compact{gap:5px}
 #layerStack.compact .doc{padding:6px 10px 7px}
-/* ⚠ 층이 4개 이상이면 .compact 가 붙습니다 — 이 게임은 늘 6층이라
- *   <b>실제로 보이는 크기는 언제나 이 줄</b>입니다. 위 .doc .nm 만 고치면
- *   아무것도 안 바뀝니다(특정도가 여기가 더 높습니다). 한 번 당했습니다. */
-#layerStack.compact .doc .nm{font-size:15px;margin-top:3px;line-height:1.22}
+#layerStack.compact .doc .nm{font-size:11px;margin-top:2px;line-height:1.25}
+#layerStack.compact .doc .alt{margin-top:2px}
 #layerStack.compact .doc.on{transform:translateX(6px)}
 #layerStack.compact .doc.on::before{top:6px;right:10px}
 /* ── 층 목록 ──────────────────────────────────────────────────────────
@@ -140,15 +138,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
   background:var(--rule);clip-path:polygon(0 100%,100% 0,100% 100%);
 }
 .doc .no{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.78)}
-/* 2026-09-18 — 층 이름을 키웠습니다(12.5 → 15px). 달리면서 곁눈으로
- * 읽는 자리라 본문 크기로는 작았습니다. 자리는 바로 아래 영문명을
- * 뺀 만큼에서 나왔습니다 — 폭(214px)도 높이도 그대로입니다.      */
-/* ★ keep-all — 키우고 나니 "우선심사 패스트트 / 랙" 처럼 <b>낱말 중간</b>이
- *   끊겼습니다. 한국어는 낱말 안에서 자르지 않게 해야 읽힙니다.
- *   (슬래시가 든 이름은 슬래시 뒤에서 끊깁니다 — 그건 낱말 경계라 맞습니다.) */
-.doc .nm{font-size:15px;font-weight:700;margin-top:4px;line-height:1.25;word-break:keep-all}
-/* .alt(영문명)은 더 이상 만들지 않습니다(buildLayerStack). 규칙만 남겨
- * 두면 다음 사람이 "왜 안 보이지" 하고 CSS 부터 뒤지므로 같이 지웠습니다. */
+.doc .nm{font-size:12.5px;font-weight:700;margin-top:3px;line-height:1.3}
+.doc .alt{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:rgba(236,231,216,.62);margin-top:3px}
 
 /* ── 현재 층의 기믹 (상시) ────────────────────────────────────────────
  * ★ 층 진입 배너는 2.6초 뒤 사라집니다.
@@ -689,19 +680,7 @@ h1 em{font-style:normal;color:var(--l3)}
 @keyframes avSlide{0%{margin-left:-38%}100%{margin-left:100%}}
 
 .field{margin-top:22px}
-/* 2026-09-18 — 9px 은 <b>라벨이라기보다 흔적</b>이었습니다. 이름을 적고
- * 참가 방식을 고르는 두 칸이 이 화면에서 실제로 <b>해야 하는 일</b>인데
- * 정작 그 안내가 가장 작았습니다. 12px 로 키우고 밝기도 올립니다.
- *
- * ★ 앞에 점을 답니다 — 아래 대기열 줄(.queueLine)과 같은 표식이라,
- *   "이 화면에서 눈으로 따라갈 것"이 같은 모양으로 이어집니다.
- *   크기(5px)·색·간격(7px)을 그쪽과 <b>같은 값</b>으로 맞췄습니다 —
- *   달라지면 같은 표식으로 안 읽힙니다.                          */
-.field label{display:flex;align-items:center;gap:7px;
-  font-family:var(--mono);font-size:12px;letter-spacing:.18em;
-  color:rgba(236,231,216,.72);margin-bottom:9px}
-.field label::before{content:'';width:5px;height:5px;border-radius:50%;
-  background:rgba(236,231,216,.3);flex:0 0 auto}
+.field label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.45);margin-bottom:6px}
 input[type=text]{
   width:100%;padding:12px 14px;background:rgba(236,231,216,.06);border:1px solid var(--rule);
   color:var(--paper);font-family:var(--kr);font-size:15px
@@ -1134,7 +1113,7 @@ body.lobby:not(.touch) #hint .rules{font-size:12px;margin-top:4px;color:rgba(236
 
 @media (max-width:900px){
   #layerStack{width:150px;top:88px;left:12px} #roster{width:160px;top:88px;right:12px}
-  .doc .nm{font-size:13px} h1{font-size:23px}
+  .doc .nm{font-size:11px} h1{font-size:23px}
 }
 /* ══════════════════════════════════════════════════════════════════
  * 터치 조작 (가로 전용)
@@ -1165,19 +1144,6 @@ body.touch #hint{top:calc(var(--topbar-h) + 5px + env(safe-area-inset-top));bott
   font-size:10px;max-width:min(60vw,480px);padding:5px 10px}
 body.touch #hint .rules{display:none}   /* 두 줄이면 층 안내와 겹칩니다 */
 body.touch #toasts{bottom:calc(20px + env(safe-area-inset-bottom))}
-/* ── 관전 중에는 토스트를 관전 패널 위로 ──────────────────────────
- * 2026-09-18 — 관전으로 들어가 라운드가 시작되면 화면 아래 가운데에
- * 출원인 목록(#specTargets)이 뜨는데, 그 자리로 알림이 내려와
- * <b>겹쳐 보였습니다</b>(실측 20px).
- *
- * 관전 패널은 주자용 조작 안내(#hint)가 숨은 자리를 그대로 씁니다
- * — 그래서 #hint 기준으로 잡아 둔 92px 로는 모자랍니다. 패널
- * 전체(높이 86px + 아래 여백 26px) 위로 올립니다.
- *
- * ★ 이 규칙은 body.touch 보다 <b>뒤에</b> 와야 합니다 — 특정도가 같아서
- *   순서로 갈립니다. 폰에서도 같은 자리에 같은 패널이 뜨므로 겹침도
- *   똑같이 일어납니다.                                            */
-body.spectating #toasts{bottom:132px}
 body.touch #layerStack{transform:scale(.82);transform-origin:top left;top:70px}
 body.touch #roster{transform:scale(.82);transform-origin:top right;top:70px}
 
@@ -1871,13 +1837,6 @@ const G = {
    * 회차당 한 번만 알리고, 그 뒤로는 층 목록의 방향 표시로만 읽습니다. */
   rotFlipTold: false,
 
-  /* ── 어둠 예고 (내 도착 기준) ─────────────────────────────────────
-   * told   : 이번 회차에 예고를 이미 받았는가 (회차당 한 번)
-   * until  : 이 시각까지는 나에게만 밝습니다
-   * landed : 실제로 어두워지는 순간의 안내를 이미 냈는가
-   * 자세한 것은 updateDarkGrace 주석.                              */
-  darkGrace: { told: false, until: 0, landed: false },
-
   /* ── 내 시야 (어둠 + 선행기술 검색) ───────────────────────────────
    * 어둠을 실제로 '가리는' 일은 각 클라이언트가 자기 위치 기준으로 합니다.
    * 서버는 언제부터 언제까지인지만 알려줍니다(DARK_EVENT 주석 참고).
@@ -1972,30 +1931,6 @@ const MAX_PIXEL_RATIO = IS_TOUCH ? 1.5 : 2;
 
 /* 0=정상 GPU · 1=약한 내장그래픽 · 2=소프트웨어 렌더러(드라이버 없음) */
 function probeGpuTier() {
-  /* ── 저사양 PC 흉내 (?gpu=) ────────────────────────────────────────
-   * 2026-09-18 — 행사 전에 <b>약한 PC 에서 어떻게 보이는지</b> 확인할
-   * 방법이 없었습니다. 실제로 느린 PC 를 구해 오는 수밖에 없었는데,
-   * 그건 대개 행사 당일에야 만납니다.
-   *
-   *   ?gpu=0  정상   · ?gpu=1  약함 · ?gpu=2  소프트웨어 렌더러
-   *
-   * 기기 등급은 <b>시작 화질·그림자·구름 세밀도</b>를 한꺼번에 가릅니다.
-   * 그래서 이것 하나만 강제하면 약한 PC 의 첫인상을 그대로 재현합니다.
-   * ?touch=1 과 같은 방식이고, 같은 이유(행사 전 점검)로 있습니다.
-   *
-   * ⚠ 흉내 내는 것은 <b>설정</b>이지 하드웨어가 아닙니다. "이 화질에서
-   *   화면이 어떻게 보이나 · 조작이 되나" 는 그대로 확인되지만,
-   *   "느린 GPU 에서 몇 fps 인가" 는 이걸로 알 수 없습니다.
-   * ------------------------------------------------------------------ */
-  try {
-    const forced = new URLSearchParams(location.search).get('gpu');
-    if (forced !== null) {
-      const t = Math.max(0, Math.min(2, parseInt(forced, 10) || 0));
-      console.log('[IPG] 기기 등급을 ' + t + ' 로 강제합니다 (?gpu=' + forced + ')');
-      return t;
-    }
-  } catch (e) {}
-
   let name = '';
   try {
     /* 진짜 렌더러를 만들기 전에 알아야 합니다 — antialias 는 컨텍스트를
@@ -8367,54 +8302,12 @@ function updateDebris(dt) {
  * ------------------------------------------------------------------ */
 const darkPass = { on: false, x: 0, z: 0, inner: 0, outer: 0 };
 
-/* ── 내가 이 층에 처음 내려선 순간의 예고 ────────────────────────────
- * 2026-09-18 — 어둠이 <b>라운드 끝까지</b>로 바뀌면서 생긴 문제를 고칩니다.
- *
- * 종전에는 예고도 안내도 <b>방 전체가 어두워지는 순간</b>에만 나갔습니다.
- * 그래서 <b>나중에 내려온 사람은 아무것도 못 받았습니다</b> — 예고가
- * 없는 정도가 아니라 "검색 타일을 밟으라" 는 대처법조차 못 듣고,
- * 착지하자마자 캄캄해집니다. 처음 하는 사람에게는 고장으로 보입니다.
- *
- * ★ 어둠은 원래 <b>각자 자기 위치 기준</b>으로 그립니다(darkPass).
- *   그래서 "언제부터 어둡게 그릴지" 도 각자 정할 수 있습니다 —
- *   방 전체 시계가 아니라 <b>내가 이 층에 발을 디딘 시각</b>부터
- *   warnMs 동안은 나에게만 밝게 둡니다. 서버 판정은 하나도 안 건드립니다.
- *   덕분에 먼저 온 사람도 나중에 온 사람도 <b>똑같이</b> 예고를 받습니다.
- *
- * ★ 회차당 한 번입니다. 점프 타일로 올라갔다 다시 내려와도 다시 주지
- *   않습니다 — 주면 "올라갔다 내려오기" 가 시야를 얻는 수가 됩니다.
- * ------------------------------------------------------------------ */
-function updateDarkGrace(st) {
-  if (!st.active || !onTraitLayer('dark')) return;
-  const now = performance.now();
-  if (!G.darkGrace.told) {
-    G.darkGrace.told = true;
-    G.darkGrace.until = now + (G.cfg && G.cfg.DARK_EVENT && G.cfg.DARK_EVENT.warnMs || 2500);
-    const secLeft = Math.max(1, Math.round((G.darkGrace.until - now) / 1000));
-    toast('잠시 뒤 어두워집니다 — ' + secLeft + '초 뒤부터 주변 ' +
-          (st.viewTiles || 3) + '칸 밖이 보이지 않습니다', 'kill');
-    Sound.sfx('obstacle', { rate: 0.8, volume: 0.6 });
-  }
-  /* 예고가 끝나는 순간 — 대처법을 한 번 알려 줍니다. 여기서 말해야
-   * <b>실제로 어두워지는 그 순간</b>에 읽힙니다.                    */
-  if (!G.darkGrace.landed && now >= G.darkGrace.until) {
-    G.darkGrace.landed = true;
-    toast('어둠 — 이 층은 계속 어둡습니다. 밝게 빛나는 검색 타일을 밟으세요', 'obstacle');
-    if (Sound.buffers.powerDown) Sound.sfx('powerDown');
-    else Sound.sfx('obstacle', { rate: 0.55, volume: 0.7 });
-  }
-}
-
 function beginDarkPass() {
   const st = G.traits.dark;
   darkPass.on = false;
   if (!st || !st.active) return;
   // 내 위치가 기준입니다. 주자가 아니거나 죽었으면 가리지 않습니다.
   if (G.role !== 'player' || !local.alive) return;
-
-  updateDarkGrace(st);
-  // 내 예고 시간 동안은 나에게만 밝습니다 (updateDarkGrace 주석)
-  if (performance.now() < G.darkGrace.until) return;
 
   const step = tileStepUnit();
   const clear = st.clearTiles !== undefined ? st.clearTiles : 2;
@@ -10360,25 +10253,18 @@ function buildRulesText() {
     }
     if (Lx.trait === 'dark' && cfg.DARK_EVENT) {
       const D = cfg.DARK_EVENT;
-      /* 2026-09-18 — 주기형에서 <b>한 번 걸리면 끝까지</b>로 바뀌었습니다.
-       * 종전 문구('N초마다 M초')는 더 이상 사실이 아닙니다. permanent
-       * 를 꺼서 주기형으로 되돌리면 옛 문구가 그대로 살아납니다.    */
-      if (D.permanent) {
-        row(trTable, Lx, '어둠',
-          '이 층에 내려서면 ' + sec(D.warnMs || 2500) + ' 뒤 어두워지고, 그 뒤로는 내 주변 ' + D.clearTiles + '~' + D.viewTiles + '칸 밖이 계속 보이지 않습니다.',
-          '밝게 빛나는 검색 타일을 밟으면 잠시 멀리까지 보입니다');
-      } else {
-        /* ★ 'N초마다 M초 동안' 은 한 바퀴가 N초로 읽힙니다. 그런데 간격은
-         *   <b>직전 종료부터</b> 세므로 한 바퀴는 지속 + 간격입니다.
-         *   두 값을 나눠 적고 한 바퀴를 같이 보여 줍니다.          */
-        const dGap = D.effectiveIntervalMs || D.intervalMs;
-        const dCycle = D.durationMs + dGap;
-        row(trTable, Lx, '어둠',
-          sec(D.durationMs) + ' 동안 내 주변 ' + D.clearTiles + '~' + D.viewTiles +
-          '칸 밖이 보이지 않고, ' + sec(dGap) + ' 쉬었다 다시 걸립니다 (한 바퀴 ' +
-          sec(dCycle) + ').',
-          '타일은 평소처럼 무너집니다 — 보이지 않을 뿐입니다');
-      }
+      /* ★ 'N초마다 M초 동안' 은 한 바퀴가 N초로 읽힙니다. 그런데 간격은
+       *   <b>직전 종료부터</b> 세므로 한 바퀴는 지속 + 간격입니다.
+       *   기본값에서 '10초마다 8초' 는 어두운 시간 80% 로 읽히지만
+       *   실제로는 18초 중 8초, 44% 입니다. 두 배 가까이 틀린 인상을
+       *   주므로 두 값을 나눠 적고 한 바퀴를 같이 보여 줍니다.      */
+      const dGap = D.effectiveIntervalMs || D.intervalMs;
+      const dCycle = D.durationMs + dGap;
+      row(trTable, Lx, '어둠',
+        sec(D.durationMs) + ' 동안 내 주변 ' + D.clearTiles + '~' + D.viewTiles +
+        '칸 밖이 보이지 않고, ' + sec(dGap) + ' 쉬었다 다시 걸립니다 (한 바퀴 ' +
+        sec(dCycle) + ').',
+        '타일은 평소처럼 무너집니다 — 보이지 않을 뿐입니다');
       trCount++;
     }
     if (Lx.trait === 'rotate' && cfg.ROTATE_EVENT) {
@@ -10482,10 +10368,9 @@ function buildLayerStack() {
     const nm = document.createElement('div');
     nm.className = 'nm';
     nm.textContent = L.name || '';
-    /* 2026-09-18 — 영문명(L.short)을 더 이상 그리지 않습니다.
-     * 층을 가리키는 것은 번호와 한글 이름이고, 영문은 장식이었습니다.
-     * 뺀 자리만큼 한글 이름을 키웠습니다(12.5 → 15px).
-     * ⚠ L.short 자체는 남겨 둡니다 — 층 배너가 씁니다.           */
+    const alt = document.createElement('div');
+    alt.className = 'alt';
+    alt.textContent = L.short || '';
 
 
     /* 이 층의 기믹. 층 배너와 <b>같은 데이터(L.marks)</b>를 씁니다 —
@@ -10501,7 +10386,7 @@ function buildLayerStack() {
       '<i>' + escapeHtml(m.i || '·') + '</i>' +
       '<span>' + escapeHtml(m.t || '') + '</span></div>').join('');
 
-    d.appendChild(no); d.appendChild(nm);
+    d.appendChild(no); d.appendChild(nm); d.appendChild(alt);
     d.appendChild(mk);
     box.appendChild(d);
   }
@@ -10579,7 +10464,7 @@ function applyLayerEvent(d) {
    *   rotate : epoch · baseAngle · dir · speed  ← 각도 타임라인 자체
    * 회전은 '각도'가 아니라 '각도를 만드는 값들'을 받는 것이 핵심입니다. */
   for (const k of ['speed', 'viewTiles', 'clearTiles', 'durationMs',
-                   'epoch', 'baseAngle', 'dir', 'intervalMs', 'permanent']) {
+                   'epoch', 'baseAngle', 'dir', 'intervalMs']) {
     if (d[k] !== undefined) st[k] = d[k];
   }
   if (trait === 'rotate') {
@@ -10635,16 +10520,20 @@ function applyLayerEvent(d) {
      *   소리로 못 박아 두면 "언제 끝나는지"를 기다릴 수 있습니다.
      * ★ 내가 그 층에 있을 때만입니다 — 다른 층에서 남의 층 사정까지
      *   들리면 무슨 일인지 알 수 없는 소리가 됩니다.               */
-
-    /* ★ 2026-09-18 — 안내를 <b>이 순간에 내지 않습니다.</b>
-     *   여기는 "방 전체가 어두워진 순간" 이라, 그때 그 층에 있던
-     *   사람에게만 들립니다. 어둠이 라운드 끝까지 이어지게 되면서
-     *   <b>나중에 내려온 사람은 아무 안내도 못 받게</b> 됐습니다 —
-     *   예고는커녕 대처법(검색 타일)조차 못 듣고 캄캄해집니다.
-     *   지금은 <b>각자 그 층에 발을 디딘 순간</b>에 알립니다
-     *   (updateDarkGrace). 주기형으로 되돌려도 그쪽이 맞습니다.   */
-    if (st.active && !wasActive) netStats.darks++;
-    else if (!st.active && wasActive) {
+    if (st.active && !wasActive) {
+      netStats.darks++;
+      if (onTraitLayer('dark')) {
+        /* ★ 회차당 한 번입니다(gapMs: Infinity).
+         *   어둠이 켜져 있는 동안 전면 배너가 계속 떠 있으므로 "지금
+         *   어둡다" 는 토스트 없이도 읽힙니다. 토스트가 할 일은
+         *   "검색 타일을 찾으라" 는 <b>대처법</b>을 처음 한 번 알려
+         *   주는 것뿐이고, 그건 두 번 말할 필요가 없습니다.        */
+        toast('어둠 — 주변 ' + (st.viewTiles || 3) + '칸 밖은 보이지 않습니다. 검색 타일을 찾으세요', 'obstacle',
+              { key: 'dark', gapMs: Infinity });
+        if (Sound.buffers.powerDown) Sound.sfx('powerDown');
+        else Sound.sfx('obstacle', { rate: 0.55, volume: 0.7 });
+      }
+    } else if (!st.active && wasActive) {
       if (onTraitLayer('dark')) Sound.sfx('powerUp');
     }
   } else if (trait === 'rotate') {
@@ -10898,9 +10787,6 @@ function updateSpectatorUI() {
    *   참가 화면이 이미 화면을 덮고 있기도 합니다.                    */
   const isSpec = G.role === 'spectator' && !previewing;
   dom.spec.classList.toggle('show', isSpec);
-  /* 알림이 관전 패널을 피해 가도록 알리는 신호 (CSS body.spectating).
-   * #hint 의 body.lobby 와 같은 방식입니다.                        */
-  document.body.classList.toggle('spectating', isSpec);
   /* 명단을 눌러 시점을 옮길 수 있다는 것을 커서로도 알립니다 */
   const rosterEl = document.getElementById('roster');
   if (rosterEl) rosterEl.classList.toggle('watchable', isSpec);
@@ -11439,8 +11325,6 @@ function connect(name, mode, opts) {
     G.phaseOn = true;
     // 회전 반전 안내는 회차당 한 번이므로 새 회차에서 다시 열어 줍니다
     G.rotFlipTold = false;
-    // 어둠 예고도 회차당 한 번입니다 (updateDarkGrace 주석)
-    G.darkGrace.told = false; G.darkGrace.until = 0; G.darkGrace.landed = false;
     G.specFree = false;          // 새 회차는 대상 시점에서 시작
     /* 지난 회차의 서든데스 배너가 새 회차로 넘어오지 않게 */
     applySudden(null);
@@ -12595,8 +12479,7 @@ function renderDiag() {
     /* 어둠 + 지금 내 시야. "제때 뜨는지"와 "검색으로 넓어졌는지"를
      * 숫자로 바로 볼 수 있어야 합니다. 시야는 내 기준이라 탭마다 다릅니다. */
     row('어둠', true,
-        (G.traits.dark.active ? (G.traits.dark.permanent ? '상시' : '발동 중') : '대기')
-          + ' · ' + netStats.darks + '회' +
+        (G.traits.dark.active ? '발동 중' : '대기') + ' · ' + netStats.darks + '회' +
         (G.traits.dark.active && G.traits.dark.endsAt
           ? ' · 남은 ' + Math.max(0,
               Math.round((G.traits.dark.endsAt - (Date.now() + G.serverOffset)) / 100) / 10) + 's'

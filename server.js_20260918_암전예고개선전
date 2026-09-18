@@ -2958,11 +2958,15 @@ function tickLayerEvents(room, now) {
     /* ★ 끝이 없는 특성은 시계가 아니라 <b>사람이 그 층에 내려서는 것</b>이
      *   방아쇠입니다. 아무도 안 왔는데 미리 어두워지면, 정작 도착했을
      *   때는 예고를 이미 놓친 뒤가 됩니다.                          */
-    if (LAYER_TRAITS[trait].permanent) {
-      if (s.armedAt) continue;                 // 이미 켜졌습니다
+    if (LAYER_TRAITS[trait].permanent && !s.armedAt) {
       if (!anyRunnerOnTraitLayer(room, trait)) continue;
       s.armedAt = now;
-      startTraitEvent(room, trait, now);
+      s.nextAt = now + (LAYER_TRAITS[trait].warnMs || 2500);
+      /* 예고를 방 전체에 한 번 보냅니다. active 는 아직 false 이고,
+       * warnUntil 이 있는 패킷을 클라이언트가 예고로 읽습니다.      */
+      const warn = traitSnapshot(room, trait);
+      warn.warnUntil = s.nextAt;
+      io.to(room.id).emit('layer_event', warn);
       continue;
     }
     if (s.nextAt && now >= s.nextAt) {
