@@ -253,19 +253,7 @@ body.dev #devLayers{display:flex}
   scrollbar-width:thin;scrollbar-color:rgba(236,231,216,.25) transparent}
 #rosterList::-webkit-scrollbar{width:4px}
 #rosterList::-webkit-scrollbar-thumb{background:rgba(236,231,216,.25)}
-/* ★ 2026-09-18 — 배경에 따라 안 보였습니다.
- *   좌측 층 목록에 어두운 판을 깐 것과 같은 문제입니다(.doc 주석) —
- *   알파 0.4 짜리 글자는 <b>순백 구름</b>이 뒤에 오면 사라집니다.
- *   같은 처방을 씁니다: 어두운 판 + 글자 그림자 + 밝기 상향.
- *   판을 글자 폭에만 깔아야(width:max-content) 명단 줄과 어긋나 보이지
- *   않습니다.                                                       */
-.rname{
-  font-family:var(--mono);font-size:9px;letter-spacing:.2em;
-  color:rgba(236,231,216,.82);margin-bottom:2px;
-  width:max-content;margin-left:auto;padding:3px 8px;
-  background:rgba(5,6,10,.76);border:1px solid rgba(236,231,216,.18);
-  text-shadow:0 1px 3px rgba(0,0,0,.85)
-}
+.rname{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:rgba(236,231,216,.4);margin-bottom:2px}
 .rrow{
   display:flex;align-items:center;gap:8px;padding:7px 10px;
   background:rgba(11,14,22,.8);border:1px solid var(--rule);border-left-width:3px;font-size:12px;
@@ -1029,19 +1017,9 @@ body.touch .rbtn{padding:10px;font-size:13px}
 }
 #darkAlert.on .vig{opacity:1}
 /* 문구는 어둠 자체가 아니라 안내라, 0.18초만 두어 툭 튀지 않게 합니다 */
-/* ★ 2026-09-18 — 좌우 패널과 겹치던 것을 고쳤습니다.
- *   문구가 410px 인데, 좁은 화면에서는 <b>좌측 층 목록과 우측 명단 사이</b>
- *   공간이 그보다 좁습니다(837px 화면에서 381px). 가운데 정렬은 맞았고
- *   <b>폭이 공간보다 넓은 것</b>이 원인이라, 자리를 옮기는 대신 공간에
- *   맞춰 접히게 했습니다 — 옮기면 이번엔 다른 것과 겹칩니다.
- *   좌우로 240px 씩 비워 둡니다(층 목록 226 · 명단 230 기준).
- * ★ 한국어는 낱말 안에서 자르지 않습니다(keep-all). 접혀도 읽힙니다.
- * ★ 층 목록의 펼쳐진 카드가 아래로 길어지므로 위쪽에 두는 것은 그대로
- *   둡니다 — 내리면 경기장 한가운데를 덮습니다.                    */
 #darkAlert .tag{
   position:absolute;top:88px;left:50%;transform:translateX(-50%);
   display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;
-  max-width:min(560px,max(240px,calc(100vw - 500px)));word-break:keep-all;
   opacity:0;transition:opacity .18s ease
 }
 #darkAlert.on .tag{opacity:1}
@@ -1200,29 +1178,7 @@ body.touch #toasts{bottom:calc(20px + env(safe-area-inset-bottom))}
  *   순서로 갈립니다. 폰에서도 같은 자리에 같은 패널이 뜨므로 겹침도
  *   똑같이 일어납니다.                                            */
 body.spectating #toasts{bottom:132px}
-/* ── 모바일에서 층 목록이 스크롤되던 문제 ────────────────────────────
- * 2026-09-18 — 가로 폰에서 왼쪽 층 목록에 <b>스크롤이 생겨</b> 6개 층을
- * 한눈에 못 봤습니다.
- *
- * ★ 원인은 <b>축소(transform)와 높이 제한(max-height)이 서로 다른 것을
- *   재고 있던 것</b>입니다. transform 은 그리기만 줄이고 <b>레이아웃
- *   상자 크기는 그대로</b>인데, max-height 는 그 줄어들기 전 상자에
- *   걸립니다. 실측(세로 390px 폰): 내용 351px · 제한 200px → 151px 넘침.
- *   그런데 정작 <b>화면에 그려지는 높이는 288px</b> 로, 쓸 수 있는 공간
- *   312px 안에 <b>이미 들어갑니다</b> — 보이지도 않는 이유로 스크롤이
- *   생기고 있었습니다.
- *
- * ★ 그래서 제한을 <b>배율로 나눠</b> 겁니다. 화면에서 쓸 수 있는 높이를
- *   기준으로 잡되, 상자는 그보다 1/배율 만큼 커도 됩니다.
- * ★ 배율을 0.82 → 0.78 로 조금 더 내렸습니다. 0.82 는 세로 360px 짜리
- *   폰에서 6px 모자랐습니다(390px 이상은 여유). 가장 작은 가로 폰까지
- *   덮는 값입니다.
- * ⚠ 이 둘은 <b>같이</b> 움직여야 합니다 — 배율만 바꾸고 제한을 그대로
- *   두면 다시 어긋납니다.                                          */
-body.touch #layerStack{
-  transform:scale(.78);transform-origin:top left;top:70px;
-  max-height:calc((100vh - 78px) / .78)
-}
+body.touch #layerStack{transform:scale(.82);transform-origin:top left;top:70px}
 body.touch #roster{transform:scale(.82);transform-origin:top right;top:70px}
 
 /* ★ 스틱은 고정 위치가 아니라 엄지를 댄 자리에 생깁니다.
@@ -1291,7 +1247,7 @@ body.touch-run #touch{display:block}
   <div class="vig"></div>
   <div class="tag">
     <b>선행기술이 있는지 알 수 없다. 조사하고 판단해야 한다.</b>
-
+    <i id="darkSub">PRIOR ART SEARCH</i>
   </div>
 </div>
 <div id="rotAlert"><span class="ico">⚠️</span><span>심사관 검토 방향 변경 — 층이 반대로 돕니다</span></div>
@@ -2176,10 +2132,7 @@ const Quality = {
      * 다만 매번 띄우면 시끄러우므로 내려갈 때 한 번만 알립니다.     */
     if (down && !this.told) {
       this.told = true;
-      /* 2026-09-18 — 화질을 낮췄다는 알림을 없앴습니다.
-       * 플레이어가 할 수 있는 일이 없는 알림입니다. 게다가 이 줄이 뜨는
-       * 순간은 화면이 이미 버거운 때라, 읽을 것을 하나 더 얹는 셈이었습니다.
-       * 무엇으로 정착했는지는 F2 진단 패널의 '화질' 줄에 남습니다.     */
+      toast('화면이 버거워 화질을 낮췄습니다 (' + QLEVELS[lv].name + ')', 'warn');
     }
     /* 화질이 바뀐 이유를 콘솔에 남깁니다. 몇 번 안 일어나고,
      * '왜 흐려졌지'를 확인할 유일한 단서입니다.                       */
@@ -10345,11 +10298,9 @@ function buildRulesText() {
 
   for (const Lx of layers) {
     if (Lx.special === 'accel' && cfg.DASH) {
-      /* 2026-09-18 — '앞이 비어 있으면 그대로 떨어집니다' 를 뺐습니다.
-       * 겁을 주는 만큼 알려 주는 것이 없었습니다 — 두 칸 튀어나간다는
-       * 것을 알면 앞이 비었는지 보는 것은 당연한 판단입니다.        */
       row(spTable, Lx, '신속심사',
-        '밟으면 진행 방향으로 ' + cfg.DASH.tiles + '칸 튀어나갑니다.');
+        '밟으면 진행 방향으로 ' + cfg.DASH.tiles + '칸 튀어나갑니다.',
+        '앞이 비어 있으면 그대로 떨어집니다');
       spCount++;
     }
     if (Lx.special === 'search' && cfg.SEARCH_TILE) {
@@ -10593,17 +10544,6 @@ function refitLayerStack() {
  * 관전자에게는 큰 배너를 띄우지 않습니다 — 기준이 되는 '내 위치'가 없고,
  * 관전 화면은 층 목록과 토스트로 충분히 읽힙니다.
  * ------------------------------------------------------------------ */
-/** 내가 지금 <b>위상 타일이 있는 층</b>에 서 있는가.
- *  층 구성은 서버 config 가 유일한 출처라 special 태그로 찾습니다 —
- *  층 번호를 박아 두면 층을 옮길 때 조용히 틀립니다.                */
-function onPhaseLayer() {
-  const layers = (G.cfg && G.cfg.LAYERS) || [];
-  for (const Lx of layers) {
-    if (Lx.special === 'phase') return Lx.index === local.layer;
-  }
-  return false;
-}
-
 function onTraitLayer(trait) {
   const st = G.traits[trait];
   if (!st || G.role !== 'player') return false;
@@ -10614,9 +10554,6 @@ function onTraitLayer(trait) {
  * 이벤트 발동 시점에 한 번만 정하면, 어둠이 켜진 뒤 내가 그 층으로
  * 내려가도 배너가 안 뜹니다(반대로 올라가도 안 꺼집니다).            */
 function refreshTraitBanners() {
-  /* 회전 층을 떠나면 글 설명을 다시 열어 둡니다 — 다시 내려오면
-   * 그때는 처음 보는 사람일 수 있습니다(applyLayerEvent 주석).     */
-  if (!onTraitLayer('rotate')) G.rotFlipTold = false;
   const a = G.traits.accel, dk = G.traits.dark;
   if (dom.accelAlert) {
     dom.accelAlert.classList.toggle('on', !!(a && a.active) && onTraitLayer('accel'));
@@ -10687,10 +10624,11 @@ function applyLayerEvent(d) {
       }
     }
   } else if (trait === 'dark') {
-    /* 2026-09-18 — 작은 부제('… 층 시야 2~3칸')를 없앴습니다.
-     * 층 이름은 왼쪽 층 목록이 이미 짚어 주고, 시야 칸 수는 대기 화면
-     * 심사 규격에 있습니다. 어두워진 순간에 읽을 글이 아니고, 큰 문구
-     * 바로 밑이라 <b>겹쳐 보인다</b>는 의견의 절반이 이 줄이었습니다. */
+    if (dom.darkSub) {
+      dom.darkSub.textContent = names.length
+        ? names.join(' · ') + ' 층 시야 ' + (st.clearTiles || 2) + '~' + (st.viewTiles || 3) + '칸'
+        : 'PRIOR ART SEARCH';
+    }
     /* ★ 켜질 때와 꺼질 때 모두 소리를 냅니다.
      *   어둠은 <b>화면이 어두워지는 것</b>으로만 알리는데, 시야가
      *   좁아지는 순간에는 오히려 화면을 덜 보게 됩니다. 시작과 끝을
@@ -10719,34 +10657,22 @@ function applyLayerEvent(d) {
      *
      * 반전은 15초마다 반복되므로 회차당 한 번만, 그것도 그 층에 실제로
      * 서 있는 사람에게만 알립니다. 그 뒤로는 층 목록의 ↻/↺ 로만 읽습니다. */
-    /* ── 방향이 뒤집힌 순간 ─────────────────────────────────────────
-     * 2026-09-18 — 종전에는 <b>회차당 한 번</b>만 알렸습니다(rotFlipTold).
-     * 그런데 첫 반전이 일어날 때 내가 다른 층에 있었으면 <b>그 회차 내내
-     * 아무것도 못 봅니다</b> — "회전 알림이 한 번밖에 안 보인다"는 의견의
-     * 실체가 이것이었습니다. 어둠 예고와 같은 실수였습니다: 알림을
-     * <b>방 전체의 사건 시점</b>에 묶어 두면 그때 그 자리에 없던 사람은
-     * 영영 못 받습니다.
-     *
-     * 지금은 둘로 나눕니다.
-     *   배너·소리 : 내가 그 층에 있는 <b>동안 반전될 때마다</b>.
-     *               2.2초짜리이고, 실제로 몸이 반대로 실리는 순간이라
-     *               매번 알려 주는 것이 맞습니다.
-     *   글 설명   : 그 층에 <b>머무는 동안 한 번</b>. 7초마다 같은 문장이
-     *               쌓이면 읽지 않게 됩니다. 층을 떠나면 다시 열립니다
-     *               (refreshTraitBanners 에서 해제).
-     * ------------------------------------------------------------- */
     if (d.fired) {
       netStats.rotFlips++;
-      if (onTraitLayer('rotate')) {
+      if (!G.rotFlipTold && onTraitLayer('rotate')) {
+        G.rotFlipTold = true;
+        /* 2026-09-18 — '거절이유 발생' 이라고 부르지 않습니다.
+         * 이 사건은 <b>층 회전 방향 반전</b>이고, 같은 층의 거절이유
+         * 타일(밟으면 주변까지 터짐)과는 다른 일입니다. 둘 다 '거절이유'
+         * 로 시작하니 플레이어에게는 같은 안내의 두 판본처럼 보였고,
+         * 실제로 "안내가 통일이 안 됐다"는 의견을 받았습니다.
+         * 층 배너·층 목록도 이 회전을 '회전' 이라고 부르므로 맞췄습니다. */
+        toast('⚠️ 심사관 검토 방향 변경 — 층이 반대로 돕니다', 'kill');
+        Sound.sfx('obstacle', { rate: 0.9, volume: 0.85 });
         if (dom.rotAlert) {
           dom.rotAlert.classList.add('on');
           clearTimeout(rotAlertTimer);
           rotAlertTimer = setTimeout(() => dom.rotAlert.classList.remove('on'), 2200);
-        }
-        Sound.sfx('obstacle', { rate: 0.9, volume: 0.85 });
-        if (!G.rotFlipTold) {
-          G.rotFlipTold = true;
-          toast('⚠️ 심사관 검토 방향 변경 — 층이 반대로 돕니다', 'kill');
         }
       }
     }
@@ -10945,7 +10871,7 @@ function updateRoster() {
         (r.id === G.specTarget ? ' watch' : '') +
         '" data-id="' + r.id + '" style="border-left-color:' + (r.color || '#888') + '">' +
       '<span>' + escapeHtml(safeName(r.name)) + '</span>' +
-      (isSelf ? '<span class="you">ME</span>' : '') +
+      (isSelf ? '<span class="you">YOU</span>' : '') +
       (isHost ? '<span class="host">방장</span>' : '') +
       tail +
       '</div>'
@@ -11985,14 +11911,7 @@ function connect(name, mode, opts) {
      * ⚠ 진 쪽에는 소리를 내지 않습니다(2026-09-18, sfx_lose.mp3 제거).
      *   진 사람은 이미 탈락할 때 death 를 들었습니다 — 결과 화면에서
      *   한 번 더 알릴 일이 아닙니다.                              */
-    /* ★ 2026-09-18 — 여기서는 등록결정 소리를 내지 않습니다.
-     *   같은 소리를 도장 연출(showVerdict)에서도 내고 있어서 <b>두 번
-     *   겹쳐</b> 들렸습니다. 등록결정서는 먼저 <b>도장이 찍히는 연출</b>로
-     *   나오고 나중에 결과 화면에도 뜨는데, 소리는 <b>한 곳</b>에서만
-     *   나야 합니다.
-     *   남긴 쪽은 <b>도장</b>입니다 — 소리가 그 순간의 연출(도장이
-     *   박히는 타이밍, 화면 흔들림)과 맞춰져 있습니다. 여기서 내면
-     *   피날레가 시작되는 시점이라 화면에는 아직 아무것도 없습니다. */
+    if (d.winnerId === G.selfId) Sound.sfx('win', { solo: true });
   });
 
   /* ★ 페이지를 열면 바로 관전으로 붙는 구조라, 아직 참가 버튼을 누르지도
@@ -12147,25 +12066,7 @@ function simulate(dt, now) {
   if (G.phaseTrust) {
     const on = phaseTilesNow();
     if (on !== G.phaseOn) {
-      const wasOn = G.phaseOn;
       G.phaseOn = on;
-      /* ── 꺼지는 순간 소리 ─────────────────────────────────────────
-       * 2026-09-18 — 위상 타일은 <b>발밑이 사라지는</b> 장치인데 지금까지
-       * 소리가 없었습니다. 색과 윤곽선만으로 알리는데, 정작 그 순간에는
-       * 다음 칸을 보고 있어 화면 아래를 안 봅니다.
-       *
-       * ★ <b>꺼질 때만</b> 냅니다. 켜질 때는 발판이 생기는 것이라 급할
-       *   일이 없고, 3초마다 두 번씩 울리면 그냥 소음이 됩니다.
-       * ★ <b>내가 그 층에 있을 때만</b> 냅니다. 위상 타일은 청구항 층에만
-       *   있는데, 다른 층에서 남의 층 사정이 들리면 무슨 소리인지 알 수
-       *   없습니다(어둠 소리와 같은 규칙).
-       * ★ 관전자에게는 내지 않습니다 — 기준이 되는 내 위치가 없습니다.
-       *
-       * 파일은 암전 종료에 쓰던 sfx_power_up.mp3 입니다. 암전이 라운드
-       * 끝까지 이어지게 되면서 그쪽에서는 울릴 일이 없어졌습니다.     */
-      if (wasOn && !on && G.role === 'player' && local.alive && onPhaseLayer()) {
-        Sound.sfx('powerUp', { volume: 0.55 });
-      }
       /* 두 클라이언트의 전환 시각을 맞대 보려면 이 로그를 비교하세요.
        * 서버 시각 기준이라 기기 시계가 달라도 같은 값이 나와야 합니다. */
       if (DEV.on) {
@@ -13080,30 +12981,7 @@ function syncJoinSnd() {
   dom.joinSndTxt.textContent = off ? '소리 꺼짐' : (lobbyAudioArmed ? '소리 켜짐' : '소리 켜기');
 }
 
-/* ── 제스처가 올 때마다 잠긴 소리를 되살립니다 ───────────────────────
- * 2026-09-18 — 처음 한 번 여는 것만으로는 부족합니다.
- *
- * ★ AudioContext 는 <b>제스처 없이 만들면 suspended</b> 로 남습니다.
- *   unlock() 은 한 번만 도므로(unlocked) 그대로 두면 "열렸다고 표시되는데
- *   무음" 이 영영 이어집니다.
- * ★ 배경음 요소의 첫 play() 가 <b>거절</b>되면(자동재생 차단) 다시 트는
- *   곳이 없어 그대로 멈춰 있습니다 — 실제로 그랬습니다(paused=true).
- *
- * 둘 다 <b>제스처가 올 때마다</b> 확인합니다. 이미 돌고 있으면 아무 일도
- * 하지 않으므로 비용이 없습니다.                                    */
-function resumeAudioIfStuck() {
-  if (Sound.ctx && Sound.ctx.state === 'suspended') {
-    try { Sound.ctx.resume(); } catch (e) {}
-  }
-  const el = Sound.el;
-  if (el && el.paused && !Sound.muted && Sound.unlocked) {
-    const p = el.play();
-    if (p && p.catch) p.catch(() => {});      // 아직 이르면 다음 제스처에서
-  }
-}
-
 function armLobbyAudio() {
-  resumeAudioIfStuck();
   if (lobbyAudioArmed) return;
   lobbyAudioArmed = true;
   Sound.unlock();
@@ -13121,17 +12999,8 @@ if (dom.joinScreen) {
    *   실제로 클릭했는데도 소리가 안 열리는 상황을 만들었습니다.
    *   armLobbyAudio 는 한 번만 동작하므로(lobbyAudioArmed) 중복으로
    *   걸어 두는 비용이 없습니다. */
-  /* ★ 2026-09-18 — 참가 화면이 아니라 <b>문서 전체</b>에 겁니다.
-   *   종전에는 참가 화면 안을 건드려야만 열렸습니다. 그런데 처음 들어온
-   *   사람이 가장 먼저 하는 동작은 대개 <b>뒤쪽 3D 화면을 드래그해 보는
-   *   것</b>이거나 키를 눌러 보는 것입니다 — 그때는 소리가 안 열려서,
-   *   한참 뒤 참가 버튼을 누르고서야 음악이 시작됐습니다.
-   *   "게임에 들어가면 바로 소리가 난다" 가 되려면 <b>무엇을 건드리든</b>
-   *   그 순간 열려야 합니다.
-   * ★ capture 로 답니다 — 중간에서 이벤트를 멈추는 요소가 있어도
-   *   먼저 받습니다.                                                */
-  for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'click', 'keydown', 'wheel']) {
-    document.addEventListener(ev, armLobbyAudio, { capture: true, passive: true });
+  for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'click', 'keydown']) {
+    dom.joinScreen.addEventListener(ev, armLobbyAudio);
   }
 }
 
