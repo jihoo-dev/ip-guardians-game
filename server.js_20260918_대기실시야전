@@ -1535,30 +1535,13 @@ function buildMap(seed) {
     }
   }
 
-  /* ── 대기 발판 ────────────────────────────────────────────────────
-   * 최상층 위 공중에 띄웁니다. 서로 충분히 떨어지도록 배치하되,
-   * 인원이 많아 자리가 모자라면 간격을 좁혀 가며 재시도합니다.
-   *
-   * ★ 2026-09-18 — <b>아레나 전체가 아니라 안쪽에서만</b> 고릅니다.
-   *   종전에는 그리드 전체에 흩뿌렸습니다. 그래서 4인 기준 발판이
-   *   반경 44.6 까지 벌어졌는데, 대기 화면 카메라는 자기 발판을 거리
-   *   33.9 에서 보므로 <b>다른 사람이 화면 밖으로 나갑니다.</b>
-   *   실측(3인): 한 명은 화면 밖(x=-360), 한 명은 왼쪽 층 목록 뒤 —
-   *   즉 <b>대기실에서 아무도 서로를 볼 수 없었습니다.</b>
-   *   "누가 와 있나"는 대기실의 존재 이유라 이건 배치 문제입니다.
-   *
-   * ★ 스폰 위치가 곧 발판 위치입니다(아래 spawns).
-   *   즉 라운드도 가운데 근처에서 <b>다 같이</b> 시작합니다. 아레나
-   *   반지름의 30% 안쪽이라 서로 밟는 일은 없고(간격 검사는 그대로),
-   *   발판이 갈라지며 한 무리가 같이 떨어지는 연출도 이쪽이 낫습니다.
-   *   흩어뜨리고 싶으면 PEDESTAL_SPREAD 를 1 로 되돌리면 됩니다.
-   * ---------------------------------------------------------------- */
-  const PEDESTAL_SPREAD = 0.24;          // 그리드 반경 대비 발판이 놓이는 범위
-  const pedR = Math.max(1, Math.round(GRID_RADIUS * PEDESTAL_SPREAD));
+  /* 대기 발판을 최상층 위 공중에 흩뿌립니다.
+   * 서로 충분히 떨어지도록 배치하되, 인원이 많아 자리가 모자라면
+   * 간격을 조금씩 좁혀 가며 재시도합니다.                              */
   const cells = [];
-  for (let q = -pedR; q <= pedR; q++) {
-    const rMin = Math.max(-pedR, -q - pedR);
-    const rMax = Math.min(pedR, -q + pedR);
+  for (let q = -GRID_RADIUS; q <= GRID_RADIUS; q++) {
+    const rMin = Math.max(-GRID_RADIUS, -q - GRID_RADIUS);
+    const rMax = Math.min(GRID_RADIUS, -q + GRID_RADIUS);
     for (let r = rMin; r <= rMax; r++) {
       const { x, z } = axialToWorld(q, r);
       cells.push({ q, r, x, z });
@@ -1570,11 +1553,7 @@ function buildMap(seed) {
   }
 
   const pedestals = [];
-  /* ★ 범위를 좁혔으므로 간격 기준도 같이 내립니다. 4.6 을 그대로 두면
-   *   아래 재시도 루프가 14번 도는 동안 계속 실패해 결국 "남은 칸을
-   *   순서대로" 폴백으로 빠집니다 — 그러면 발판이 <b>딱 붙어서</b>
-   *   나옵니다. 간격 검사가 실제로 일하도록 범위에 맞춰 잡습니다.  */
-  let minGap = HEX_SIZE * 2.9;
+  let minGap = HEX_SIZE * 4.6;
   for (let attempt = 0; attempt < 14 && pedestals.length < MAX_PLAYERS; attempt++) {
     pedestals.length = 0;
     for (const c of cells) {
@@ -1733,12 +1712,6 @@ function makePlayer(id, name, seat, room) {
     pos: { x: spawn.x, y: spawn.y, z: spawn.z },
     vel: { x: 0, y: 0, z: 0 },
     ry: 0,
-    /* 그 사람이 <b>화면을 어느 쪽으로 보고 있는가</b>(카메라 yaw/pitch).
-     * 몸 방향(ry)과 다릅니다 — 몸은 달리는 쪽을 보고 시점은 마우스로
-     * 따로 돕니다. 관전자가 "그 사람이 보는 화면"을 그대로 보려면
-     * 이 둘이 필요합니다. 중계만 하고 검증에는 쓰지 않습니다.      */
-    cy: 0,
-    cp: 0.5,
     /* 접지 여부. 클라이언트 추측 항법이 "중력을 더할지" 판단하는 근거입니다.
      * 공중이면 낙하 가속을 적분하고, 접지 상태면 수평 등속으로만 밉니다.   */
     grounded: true,
@@ -3461,20 +3434,6 @@ app.get('/api/rooms', (_req, res) => {
     /* 로비 목록이 "이 방은 곧 시작하나" 를 보여 주는 근거 */
     ready: [...r.players.values()].filter((p) => p.id === r.hostId || p.ready).length,
     hostName: (r.players.get(r.hostId) || {}).name || '',
-    /* ★ 로비에서 방을 고를 때 <b>누가 있는지</b> 보여 주기 위한 명단입니다.
-     *   정원이 4명이라 방당 최대 4개, 목록 전체로도 수십 개 수준이라
-     *   1.5초마다 받아도 부담이 없습니다.
-     * ★ 좌석 순서로 보냅니다 — 클라이언트가 좌석 색을 그 순서로
-     *   칠하므로, 목록에서 본 색이 게임에 들어가서도 같습니다.    */
-    members: [...r.players.values()]
-      .sort((a, b) => a.seat - b.seat)
-      .map((p) => ({
-        name: p.name,
-        seat: p.seat,
-        host: p.id === r.hostId,
-        ready: p.id === r.hostId || !!p.ready,
-        alive: !!p.alive
-      })),
     spectators: r.spectators.size,
     // 이동 검증이 얼마나 개입했는지. 평상시 0 이어야 정상입니다.
     corrections: [...r.players.values()].reduce((n, p) => n + (p.corrections || 0), 0)
@@ -3737,10 +3696,6 @@ io.on('connection', (socket) => {
     /* 층 번호는 위가 큽니다(6F=6). 가장 작은 값이 가장 깊이 내려간 것. */
     if (p.layer < p.deepest) p.deepest = p.layer;
     p.anim = typeof s.anim === 'string' ? s.anim.slice(0, 12) : 'idle';
-    /* 카메라 각도는 그리기 전용이라 그대로 받습니다(검증 없음).
-     * 이상한 값이 와도 남의 화면 각도가 잠깐 이상해질 뿐입니다.   */
-    if (Number.isFinite(+s.cy)) p.cy = +s.cy;
-    if (Number.isFinite(+s.cp)) p.cp = +s.cp;
     // 접지 여부(g). 구 클라이언트는 이 필드를 안 보내므로, 없으면 종전처럼 공중으로 봅니다.
     p.grounded = s.g === undefined ? false : !!s.g;
     // lastInput 은 이 핸들러 맨 위에서 이미 찍었습니다 (검증 거절 경로에서도 찍히도록)
@@ -4114,7 +4069,6 @@ setInterval(() => {
         p: [r3(p.pos.x), r3(p.pos.y), r3(p.pos.z)],
         v: [r3(p.vel.x), r3(p.vel.y), r3(p.vel.z)],
         ry: r3(p.ry),
-        cy: r3(p.cy), cp: r3(p.cp),   // 그 사람의 시점 각도 (관전용)
         l: p.layer,
         a: p.anim,
         al: p.alive ? 1 : 0,

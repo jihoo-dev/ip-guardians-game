@@ -968,25 +968,16 @@ body.touch .rbtn{padding:10px;font-size:13px}
  * accelAlert(13) 와 같은 층위에 두되 그 아래로 깔립니다.            */
 #darkAlert{position:absolute;inset:0;display:none;pointer-events:none;z-index:13}
 #darkAlert.on{display:block}
-/* ★ 2026-09-18 — 페이드를 없앴습니다.
- *   타일은 발동하는 순간 곧바로 검어지는데 이 화면 비네트만 0.8초에
- *   걸쳐 짙어졌습니다. 그래서 "부분 암전으로 시작해서 완전 암전으로
- *   바뀐다" 로 보였습니다 — 실제로는 같은 사건의 두 부분이 속도가
- *   달랐던 것입니다. 암전은 <b>걸리는 순간 전부</b>여야 규칙이
- *   분명합니다.
- *   (끌 때는 .on 이 빠지면서 display:none 이 되므로 어차피 전환이
- *    보이지 않습니다 — 지워도 잃는 것이 없습니다.)               */
 #darkAlert .vig{
   position:absolute;inset:0;
   background:radial-gradient(circle at 50% 56%,transparent 26%,rgba(2,3,8,.72) 78%);
-  opacity:0
+  opacity:0;transition:opacity .8s ease
 }
 #darkAlert.on .vig{opacity:1}
-/* 문구는 어둠 자체가 아니라 안내라, 0.18초만 두어 툭 튀지 않게 합니다 */
 #darkAlert .tag{
   position:absolute;top:88px;left:50%;transform:translateX(-50%);
   display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;
-  opacity:0;transition:opacity .18s ease
+  opacity:0;transition:opacity .5s ease .1s
 }
 #darkAlert.on .tag{opacity:1}
 #darkAlert .tag b{
@@ -1798,9 +1789,6 @@ const G = {
   serverOffset: 0,
   rtt: 0,
   specTarget: null,
-  /* 관전자가 직접 시점을 돌렸는가. true 면 대상 각도를 따라가지
-   * 않습니다 — 명단에서 다시 고르면 false 로 돌아옵니다.        */
-  specFree: false,
   /* 관전자의 '보정 기회' 를 이번 회차에 썼는가. 쿨다운이 아니라 1회입니다. */
   amendUsed: false,
   bumpReadyAt: 0,          // 이 시각 전에는 주자간 충돌을 끕니다 (라운드 시작 낙하 구간)
@@ -6141,14 +6129,6 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   camPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (camPts.size === 1) {
     cam.dragging = true; cam.lx = e.clientX; cam.ly = e.clientY;
-    /* ★ 관전 중 직접 시점을 돌리면 그 순간부터 자유 시점입니다.
-     *   안 그러면 돌리자마자 대상 각도가 도로 끌어당겨 <b>시점이
-     *   말을 안 듣습니다.</b> 명단에서 다시 고르면 돌아옵니다.    */
-    if (G.role !== 'player' && !G.specFree) {
-      G.specFree = true;
-      toast('자유 시점 — 명단에서 이름을 누르면 그 사람 시점으로 돌아갑니다', 'cheer',
-            { key: 'specFree', gapMs: 8000 });
-    }
   } else if (camPts.size === 2) {
     /* 두 손가락은 회전이 아니라 줌입니다. 여기서 회전을 끊지 않으면
      * 핀치하는 동안 화면이 같이 빙빙 돕니다.                       */
@@ -8087,41 +8067,6 @@ function beginDarkPass() {
   darkPass.outer = Math.max(clear + 0.5, view) * step; // 여기부터 완전한 검정
 }
 
-/* ── 무너진 자리도 검게 ───────────────────────────────────────────────
- * 2026-09-18 — 어둠 속에서 <b>구멍만 보였습니다.</b>
- *
- * 타일은 검게 눌러 가리는데, 무너진 자리는 메시를 숨기므로 그 너머
- * (아래층·하늘)가 그대로 비쳤습니다. 결과적으로 어둠 속에서 <b>어디가
- * 뚫렸는지만 또렷하게</b> 보였습니다 — 정작 그게 가장 중요한 정보라,
- * 어둠이 난이도를 올리기는커녕 지도를 그려 주고 있었습니다.
- *
- * 그래서 무너진 자리에 <b>검은 유령 타일</b>을 그립니다. 완전히 어두운
- * 구역에서는 진짜 타일도 검정이므로 둘이 구별되지 않습니다.
- *
- * ★ 투명도를 어둠 세기에 맞춥니다(alpha = 1 − 밝기). 내 주변
- *   밝은 구역에서는 0 이 되어 구멍이 그대로 보입니다 — 발밑은
- *   보여야 합니다. 가려지는 것은 <b>멀어서 어차피 안 보이는 곳</b>뿐입니다.
- *
- * ★ 물리에는 영향이 없습니다. 착지·지지 판정은 전부 rec.state 를 보고,
- *   mesh.visible 은 그리기 스위치일 뿐입니다(TileInst.sync).
- * ------------------------------------------------------------------ */
-function applyDarkGhost(rec, mesh) {
-  if (!darkPass.on || !rec.darkTrait) { mesh.visible = false; return; }
-  const a = 1 - darkFactorFor(rec);
-  if (a <= 0.02) { mesh.visible = false; return; }
-  mesh.visible = true;
-  /* x·z 는 만들 때 정해진 그대로 둡니다 — 회전층에서는 층 그룹이
-   * 돌므로 여기서 건드리면 어긋납니다. 낙하 연출이 바꿔 놓은
-   * y·회전·크기만 되돌립니다.                                    */
-  mesh.position.y = rec.baseY;
-  mesh.rotation.set(0, 0, 0);
-  mesh.scale.setScalar(1);
-  rec.mat.color.setRGB(0, 0, 0);
-  rec.mat.emissive.setRGB(0, 0, 0);
-  rec.mat.emissiveIntensity = 0;
-  rec.mat.opacity = a;
-}
-
 /** 이 타일을 얼마나 밝게 그릴 것인가 (1 = 그대로, 0 = 완전한 검정). */
 function darkFactorFor(rec) {
   if (!darkPass.on || !rec.darkTrait) return 1;
@@ -8183,18 +8128,12 @@ function updateTiles(dt, now) {
         mesh.rotation.z = t * 0.8;
         rec.mat.opacity = Math.max(0, 1 - t);
         mesh.scale.setScalar(Math.max(0.01, 1 - t * 0.5));
-      } else {
-        if (rec.liveMesh) {
-          mesh.visible = false;
-          /* 낙하가 끝났습니다 — 빼놨던 진짜 메시를 거둡니다.
-           * 여기서 안 거두면 무너진 타일마다 메시가 하나씩 남아,
-           * 한 라운드에 수백 개가 씬에 쌓입니다.                  */
-          TileInst.demote(rec);
-        }
-        /* 어둠 속에서는 무너진 자리도 검은 타일로 채웁니다
-         * (applyDarkGhost 주석). 매 프레임 봐야 합니다 — 내가 움직이면
-         * 같은 구멍이 밝은 구역에 들어왔다 나갔다 합니다.          */
-        applyDarkGhost(rec, mesh);
+      } else if (mesh.visible) {
+        mesh.visible = false;
+        /* 낙하가 끝났습니다 — 빼놨던 진짜 메시를 거둡니다.
+         * 여기서 안 거두면 무너진 타일마다 메시가 하나씩 남아,
+         * 한 라운드에 수백 개가 씬에 쌓입니다.                    */
+        TileInst.demote(rec);
       }
       /* ★ 아래 continue 가 반복문 끝의 syncLive 를 건너뜁니다.
        *   붕괴 연출은 바로 이 분기에서 만들어지므로 여기서 옮겨야
@@ -8637,7 +8576,7 @@ class RemoteRunner {
       t: localNow,
       p: new THREE.Vector3(s.p[0], s.p[1], s.p[2]),
       v: new THREE.Vector3(s.v[0], s.v[1], s.v[2]),
-      ry: s.ry, cy: s.cy, cp: s.cp, anim: s.a, layer: s.l, alive: !!s.al,
+      ry: s.ry, anim: s.a, layer: s.l, alive: !!s.al,
       // 서버가 g 를 안 보내면(구버전) 애니메이션으로 접지를 추정합니다
       grounded: s.g === undefined ? (s.a !== 'jump' && s.a !== 'fall') : !!s.g
     });
@@ -8696,7 +8635,6 @@ class RemoteRunner {
       target = this._tgt.copy(buf[0].p);
       this.renderRy = buf[0].ry;
       this.anim = buf[0].anim; this.layer = buf[0].layer; this.alive = buf[0].alive;
-      this.cy = buf[0].cy; this.cp = buf[0].cp;
     } else {
       let a = null, b = null;
       for (let i = buf.length - 1; i > 0; i--) {
@@ -8710,10 +8648,6 @@ class RemoteRunner {
         this.renderRy = lerpAngle(a.ry, b.ry, k);
         this.anim = k < 0.5 ? a.anim : b.anim;
         this.layer = b.layer; this.alive = b.alive;
-        /* ★ 시점 각도는 보간하지 않고 최신값(b)을 씁니다 — 관전 카메라가
-         *   자체적으로 부드럽게 따라가므로 여기서 또 섞으면 두 번
-         *   느려져 시점이 굼떠집니다.                                */
-        this.cy = b.cy; this.cp = b.cp;
         vel = b.v;
       } else {
         /* --- dead reckoning (extrapolation) path ---
@@ -8725,7 +8659,6 @@ class RemoteRunner {
         target = RemoteRunner.predict(last, ahead, vel);
         this.renderRy = last.ry;
         this.anim = last.anim; this.layer = last.layer; this.alive = last.alive;
-        this.cy = last.cy; this.cp = last.cp;
       }
     }
 
@@ -8931,15 +8864,8 @@ function updateCamera(dt) {
    * 격자 단위로 끊겨 움직여, 아바타를 보간해 놓고도 화면 전체가 덜컹입니다. */
   /* 피날레 중에는 승자를 봅니다 — 내가 죽었든 살았든 모두가 같은 그림을
    * 봐야 '저 사람이 이겼다'가 전달됩니다. */
-  /* ★ "내 캐릭터를 따라갈 것인가" 의 기준은 <b>이번 회차에 뛰는가</b>
-   *   입니다. 종전에는 local.alive 만 봤는데, 그 값은 <b>탈락했을 때만</b>
-   *   false 가 됩니다 — 처음부터 관전으로 들어온 사람은 계속 true 라
-   *   카메라가 자기 (보이지도 않는) 아바타를 따라다녔고,
-   *   <b>관전 대상을 아무리 바꿔도 화면이 그대로였습니다.</b>
-   *   spectateFocus 는 제대로 된 값을 돌려주고 있었는데 여기서
-   *   쓰이질 않았습니다.                                          */
-  const runner = G.role === 'player' && (local.alive || local.dying > 0);
-  const focus = finale ? finale : (runner ? local.render : spectateFocus());
+  const focus = finale ? finale
+    : ((local.alive || local.dying > 0) ? local.render : spectateFocus());
 
   /* ★ 대기 중에는 <b>발판 무리 가운데</b>를 봅니다.
    *   내 발판만 보면 다른 사람이 화면 구석으로 밀립니다 — 실측(3인)
@@ -8974,32 +8900,8 @@ function updateCamera(dt) {
    * 포화되지만, 속도선은 '한 층 낙하'와 '시작 낙하'를 구분해야 합니다. */
   updateSpeedLines(fallRatio);
   cam.pitch = THREE.MathUtils.lerp(cam.pitch, THREE.MathUtils.clamp(cam.pitch, 0.08, 1.36), 1);
-  /* ★ 관전 중 대상 각도를 따라갈 때는 자동 피치를 끕니다 — 안 그러면
-   *   아래에서 맞춘 pitch 를 매 프레임 여기서 도로 끌어당깁니다.  */
-  const specLocked = G.role !== 'player' && !G.specFree && !!G.specTarget;
-  const usedPitch = (cam.dragging || specLocked)
-    ? cam.pitch
-    : THREE.MathUtils.lerp(cam.pitch, autoPitch, smoothK(0.9, dt));
+  const usedPitch = cam.dragging ? cam.pitch : THREE.MathUtils.lerp(cam.pitch, autoPitch, smoothK(0.9, dt));
   if (!cam.dragging) cam.pitch = usedPitch;
-
-  /* ── 관전: 그 사람이 보는 각도를 그대로 ─────────────────────────────
-   * ★ 위치만 따라가면 "그 사람 주위를 내 마음대로 도는" 화면이지
-   *   그 사람의 시점이 아닙니다. 각도까지 맞춰야 같은 화면입니다.
-   * ★ 툭 끊어 맞추지 않고 따라갑니다. 20Hz 로 오는 값을 그대로 박으면
-   *   시점이 계단처럼 덜컥거립니다.
-   * ★ yaw 는 <b>각도 보간</b>이어야 합니다. 그냥 lerp 하면 −π ↔ +π 를
-   *   넘는 순간 화면이 한 바퀴 거꾸로 돕니다.
-   * ★ 관전자가 직접 드래그하면 그 순간부터 자유 시점입니다
-   *   (specFree). 명단에서 다시 고르면 그 사람 시점으로 돌아옵니다.  */
-  if (!runner && !G.specFree && G.specTarget) {
-    const t = G.players.get(G.specTarget);
-    if (t && t.alive && typeof t.cy === 'number') {
-      cam.yaw = lerpAngle(cam.yaw, t.cy, smoothK(9, dt));
-      if (typeof t.cp === 'number') {
-        cam.pitch = THREE.MathUtils.lerp(cam.pitch, t.cp, smoothK(9, dt));
-      }
-    }
-  }
 
   cam.dist += (cam.targetDist - cam.dist) * smoothK(5, dt);
 
@@ -10383,31 +10285,10 @@ function floorsLeft(layerIndex) {
 }
 
 let layerBannerT1 = 0, layerBannerT2 = 0;
-/* ── 층 배너가 떠 있는 시간 ───────────────────────────────────────────
- * 2026-09-18 — 테스터 의견: "너무 금방 없어진다."
- *
- * ★ 2600 은 3400 에서 줄인 값이었고, 줄인 근거 중 하나가 "다음 층으로
- *   내려갔을 때 이전 배너가 남는다" 였습니다. 그런데 그건 이미
- *   showLayerBanner 가 clearTimeout 으로 막고 있습니다 — 새 배너가
- *   옛 배너를 덮어씁니다. 남은 근거는 "화면을 가린다" 하나인데,
- *   한 층에 머무는 시간이 수십 초라 몇 초는 큰 비중이 아닙니다.
- *
- * ★ 고정값이 아니라 <b>읽을 양에 따라</b> 정합니다.
- *   층마다 기믹 항목 수가 다릅니다 — 의견제출통지는 둘(회전 + 거절이유)
- *   이고 숨 고르는 층은 "없음" 한 줄입니다. 같은 시간을 주면 한쪽은
- *   길고 한쪽은 짧습니다.
- *
- * ★ 상한을 둡니다. 층 구성을 바꿔 항목이 많아져도 배너가 화면을
- *   오래 덮지 않게 합니다.
- * ------------------------------------------------------------------ */
-const LAYER_BANNER_BASE_MS = 3600;   // 층 번호 + 이름 + 마지막 안내 한 줄
-const LAYER_BANNER_MARK_MS = 700;    // 기믹 항목 한 줄당 더 주는 시간
-const LAYER_BANNER_MAX_MS  = 6000;
-
-function layerBannerMs(markCount) {
-  return Math.min(LAYER_BANNER_MAX_MS,
-                  LAYER_BANNER_BASE_MS + Math.max(0, markCount) * LAYER_BANNER_MARK_MS);
-}
+/* 3400 → 2600. 글자를 키우면 같은 내용을 더 빨리 읽습니다.
+ * 오래 떠 있으면 그 자체가 화면을 가리고, 다음 층으로 내려갔을 때
+ * 이전 배너가 아직 남아 있는 일이 생깁니다. */
+const LAYER_BANNER_MS = 2600;
 
 /**
  * 층 진입 배너.
@@ -10448,8 +10329,6 @@ function showLayerBanner(layerIndex, dir) {
     safe.innerHTML = '한 층 떨어져도 탈락이 아닙니다 · 아래로 <b>' + left + '층</b> 더 있습니다';
   }
 
-  const holdMs = layerBannerMs(marks.length);
-
   clearTimeout(layerBannerT1); clearTimeout(layerBannerT2);
   el.classList.remove('out');
   /* 애니메이션을 다시 태우려면 클래스를 한 번 떼었다 붙여야 합니다 —
@@ -10457,9 +10336,9 @@ function showLayerBanner(layerIndex, dir) {
   el.classList.remove('on');
   void el.offsetWidth;
   el.classList.add('on');
-  layerBannerT1 = setTimeout(() => el.classList.add('out'), holdMs);
+  layerBannerT1 = setTimeout(() => el.classList.add('out'), LAYER_BANNER_MS);
   layerBannerT2 = setTimeout(() => { el.classList.remove('on'); el.classList.remove('out'); },
-    holdMs + 520);
+    LAYER_BANNER_MS + 520);
 }
 
 function hideLayerBanner() {
@@ -10599,7 +10478,6 @@ dom.specTargets.addEventListener('click', (e) => {
   const b = e.target.closest('.tgt');
   if (!b) return;
   G.specTarget = b.dataset.id;
-  G.specFree = false;
   updateSpectatorUI();
 });
 
@@ -11092,7 +10970,6 @@ function connect(name, mode, opts) {
     G.phaseOn = true;
     // 회전 반전 안내는 회차당 한 번이므로 새 회차에서 다시 열어 줍니다
     G.rotFlipTold = false;
-    G.specFree = false;          // 새 회차는 대상 시점에서 시작
     /* 지난 회차의 서든데스 배너가 새 회차로 넘어오지 않게 */
     applySudden(null);
     // 지난 회차의 밀림 기록이 새 회차 사인으로 넘어오지 않게 지웁니다
@@ -11814,11 +11691,6 @@ function simulate(dt, now) {
         p: [local.pos.x, local.pos.y, local.pos.z],
         v: [local.vel.x, local.vel.y, local.vel.z],
         ry: local.ry,
-        /* 관전자가 "내가 보는 화면"을 그대로 볼 수 있게 시점 각도도
-         * 같이 보냅니다. 몸 방향(ry)과 다릅니다 — 몸은 달리는 쪽을
-         * 보고 시점은 마우스로 따로 돕니다.                        */
-        cy: cam.yaw,
-        cp: cam.pitch,
         layer: local.layer,
         anim: local.anim,
         g: local.grounded ? 1 : 0   // 접지 여부 — 원격 클라이언트의 중력 적분 근거
@@ -12787,7 +12659,6 @@ window.addEventListener('pointerup', (e) => {
       break;
     }
     G.specTarget = id;
-    G.specFree = false;          // 자유 시점을 풀고 그 사람 시점으로
     updateSpectatorUI();
     updateRoster();
     toast(safeName(r.name) + ' 님 시점으로 봅니다', 'cheer', { key: 'watch', gapMs: 1500 });

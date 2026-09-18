@@ -243,19 +243,6 @@ body.dev #devLayers{display:flex}
 .rrow.dead{opacity:.35;text-decoration:line-through}
 .rrow .lay{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.1em;opacity:.7}
 .rrow .you{font-family:var(--mono);font-size:8px;letter-spacing:.14em;background:var(--paper);color:var(--ink);padding:1px 4px}
-/* 관전 중 지금 보고 있는 사람. 명단을 눌러 옮길 수 있다는 것이
-   눌러 보기 전에도 읽혀야 합니다.                                 */
-/* ⚠ background 를 민트 한 겹으로만 쓰면 .rrow 의 어두운 판이 통째로
-   사라져 밝은 하늘 위에 옅은 민트만 남습니다 — 이름이 안 읽힙니다.
-   (층 목록에서 겪은 것과 같은 실수) 어두운 판을 <b>유지한 채</b>
-   그 위에 민트를 얹습니다.                                       */
-.rrow.watch{
-  background:linear-gradient(rgba(0,255,204,.16),rgba(0,255,204,.16)),rgba(11,14,22,.88);
-  border-color:var(--l3)
-}
-.rrow.watch::after{content:'보는 중';font-family:var(--mono);font-size:8px;
-  letter-spacing:.1em;color:var(--l3);margin-left:6px;flex:0 0 auto;white-space:nowrap}
-#roster.watchable{cursor:pointer}
 /* ★ 폭이 212px 뿐입니다. 이름 + YOU + 방장 + 준비상태 넷이 들어가면
  *   이름이 글자 단위로 접힙니다("김출/원"). 배지는 줄지 않게 고정하고,
  *   줄어들 곳을 이름 하나로 정해 줍니다.                          */
@@ -447,30 +434,6 @@ body.dev #devLayers{display:flex}
 #lobby .lbState.wait{color:var(--mint,#00ffcc)}
 #lobby .lbState.soon{color:var(--gold,#ffd400)}
 #lobby .lbState.play{color:var(--mut,rgba(236,231,216,.45))}
-
-/* ── 고른 방의 참가자 명단 ────────────────────────────────────────────
- * 방 줄 자체는 4칸 그리드라 이름을 그 안에 넣으면 칸이 밀립니다.
- * 고른 방 <b>아래에 한 줄을 더</b> 붙입니다 — 고르기 전에는 없으므로
- * 목록 길이도 평소와 같습니다.                                      */
-#lobby .lbWho{
-  display:flex;flex-wrap:wrap;gap:5px 7px;align-items:center;
-  padding:8px 12px 10px;border-bottom:1px solid var(--rule);
-  background:rgba(0,255,204,.05)
-}
-#lobby .lbWho .who{
-  display:inline-flex;align-items:center;gap:5px;
-  font-size:11.5px;padding:3px 8px;border:1px solid var(--rule);
-  background:rgba(11,14,22,.55);white-space:nowrap
-}
-/* 좌석 색은 점으로만 씁니다 — 글자에 칠하면 색마다 대비가 달라집니다 */
-#lobby .lbWho .who i{width:7px;height:7px;border-radius:2px;flex:0 0 auto}
-#lobby .lbWho .who b{font-weight:700}
-#lobby .lbWho .who .tag{font-family:var(--mono);font-size:8px;letter-spacing:.1em;
-  color:rgba(236,231,216,.5)}
-#lobby .lbWho .who .tag.on{color:var(--mint,#00ffcc)}
-#lobby .lbWho .who.host{border-color:var(--gold,#ffd400)}
-#lobby .lbWho .who.out{opacity:.45;text-decoration:line-through}
-#lobby .lbWho .none{font-size:11px;color:rgba(236,231,216,.45)}
 #lobby .lbEmpty{padding:16px 13px;font-size:12px;color:var(--mut,rgba(236,231,216,.45))}
 .eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.32em;color:var(--stamp)}
 h1{font-size:29px;font-weight:900;line-height:1.18;margin:11px 0 6px;letter-spacing:-.01em}
@@ -968,25 +931,16 @@ body.touch .rbtn{padding:10px;font-size:13px}
  * accelAlert(13) 와 같은 층위에 두되 그 아래로 깔립니다.            */
 #darkAlert{position:absolute;inset:0;display:none;pointer-events:none;z-index:13}
 #darkAlert.on{display:block}
-/* ★ 2026-09-18 — 페이드를 없앴습니다.
- *   타일은 발동하는 순간 곧바로 검어지는데 이 화면 비네트만 0.8초에
- *   걸쳐 짙어졌습니다. 그래서 "부분 암전으로 시작해서 완전 암전으로
- *   바뀐다" 로 보였습니다 — 실제로는 같은 사건의 두 부분이 속도가
- *   달랐던 것입니다. 암전은 <b>걸리는 순간 전부</b>여야 규칙이
- *   분명합니다.
- *   (끌 때는 .on 이 빠지면서 display:none 이 되므로 어차피 전환이
- *    보이지 않습니다 — 지워도 잃는 것이 없습니다.)               */
 #darkAlert .vig{
   position:absolute;inset:0;
   background:radial-gradient(circle at 50% 56%,transparent 26%,rgba(2,3,8,.72) 78%);
-  opacity:0
+  opacity:0;transition:opacity .8s ease
 }
 #darkAlert.on .vig{opacity:1}
-/* 문구는 어둠 자체가 아니라 안내라, 0.18초만 두어 툭 튀지 않게 합니다 */
 #darkAlert .tag{
   position:absolute;top:88px;left:50%;transform:translateX(-50%);
   display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;
-  opacity:0;transition:opacity .18s ease
+  opacity:0;transition:opacity .5s ease .1s
 }
 #darkAlert.on .tag{opacity:1}
 #darkAlert .tag b{
@@ -1017,10 +971,10 @@ body.touch .rbtn{padding:10px;font-size:13px}
 .doc.rotate{border-color:#0088ff;box-shadow:-3px 0 0 #0088ff,0 0 26px -6px #0088ff}
 .doc.rotate .no{color:#7cc4ff}
 /* 회전 방향 표시. 반복되는 반전 배너 대신 여기서 조용히 읽힙니다. */
-/* .rotmark(층 목록의 ↻/↺)는 2026-09-18 에 뺐습니다.
-   회전은 라운드 내내 켜져 있어 그 층에는 <b>항상</b> 붙어 있었는데,
-   상시 표시는 상태가 아니라 장식입니다. 그 층에 내려서면 층 배너와
-   목록의 기믹 항목이 같은 내용을 훨씬 자세히 말합니다.            */
+.rotmark{
+  position:absolute;right:11px;bottom:9px;font-size:15px;line-height:1;
+  color:#7cc4ff;text-shadow:0 0 10px rgba(0,136,255,.9)
+}
 
 #diag{
   position:absolute;left:18px;bottom:18px;display:none;min-width:270px;
@@ -1798,9 +1752,6 @@ const G = {
   serverOffset: 0,
   rtt: 0,
   specTarget: null,
-  /* 관전자가 직접 시점을 돌렸는가. true 면 대상 각도를 따라가지
-   * 않습니다 — 명단에서 다시 고르면 false 로 돌아옵니다.        */
-  specFree: false,
   /* 관전자의 '보정 기회' 를 이번 회차에 썼는가. 쿨다운이 아니라 1회입니다. */
   amendUsed: false,
   bumpReadyAt: 0,          // 이 시각 전에는 주자간 충돌을 끕니다 (라운드 시작 낙하 구간)
@@ -2596,13 +2547,6 @@ let seaPuffs = null;
 let seaHaze = null;
 let seaBase = [];       // 각 퍼프의 기준 위치 (물결 애니메이션용)
 
-/* 구름바다 퍼프 윗면이 SEA_Y 에서 이만큼 위까지만 올라옵니다.
- * 맨 아래층은 y=0, 구름바다는 y=-16 이므로 11 이면 <b>상면 -5</b> —
- * 1층 타일 윗면(+0.49)보다 5.5 아래입니다. 더 올리면 가림이 돌아오고,
- * 더 내리면 구름바다가 멀어져 "바로 아래가 낭떠러지" 라는 긴장이
- * 약해집니다.                                                       */
-const SEA_TOP_CAP = 11;
-
 function buildCloudSea(t) {
   disposeGroup(seaGroup);
   seaBase = [];
@@ -2641,27 +2585,10 @@ function buildCloudSea(t) {
       const rr = ring.r + (Math.random() - 0.5) * 9;
       const px = Math.cos(a) * rr;
       const pz = Math.sin(a) * rr;
-      let py = y + (Math.random() - 0.5) * 3.2;
+      const py = y + (Math.random() - 0.5) * 3.2;
       const s = 9 + Math.random() * 9;
-      scl.set(s, s * (0.5 + Math.random() * 0.22), s);
-      /* ★ 퍼프 <b>윗면</b>에 상한을 둡니다.
-       *   맨 아래층(y=0)과 구름바다(y=-16)는 16 밖에 안 떨어져 있는데,
-       *   큰 퍼프는 반높이가 12.9 나 되고 흔들림이 1.15 라 윗면이
-       *   <b>-0.81</b> 까지 올라왔습니다 — 1층 타일 바닥(-0.49)과
-       *   거의 같은 높이입니다. 뚫지는 않지만, 1층에서는 카메라가
-       *   낮아 <b>앞쪽 퍼프가 뒤쪽 타일을 덮습니다.</b>
-       *   실측: 1층에서 화면 아래 절반으로 쏜 광선의 <b>19%</b> 가
-       *   타일보다 구름에 먼저 맞았습니다.
-       *
-       * ★ 크기를 줄이지 않고 <b>그 퍼프만 아래로 밀어</b> 맞춥니다.
-       *   크기를 깎으면 구름바다가 통째로 납작해져 "두꺼운 구름 위에
-       *   떠 있다"는 느낌이 사라집니다. 위치만 내리면 두께감은 그대로
-       *   두고 <b>상면만</b> 낮아집니다.                            */
-      const wobble = 1.15;
-      const topCap = y + SEA_TOP_CAP;
-      const top = py + wobble + scl.y;
-      if (top > topCap) py -= (top - topCap);
       pos.set(px, py, pz);
+      scl.set(s, s * (0.5 + Math.random() * 0.22), s);
       q.setFromEuler(new THREE.Euler(Math.random() * 3, Math.random() * 3, Math.random() * 3));
       m.compose(pos, q, scl);
       inst.setMatrixAt(i, m);
@@ -6141,14 +6068,6 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   camPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (camPts.size === 1) {
     cam.dragging = true; cam.lx = e.clientX; cam.ly = e.clientY;
-    /* ★ 관전 중 직접 시점을 돌리면 그 순간부터 자유 시점입니다.
-     *   안 그러면 돌리자마자 대상 각도가 도로 끌어당겨 <b>시점이
-     *   말을 안 듣습니다.</b> 명단에서 다시 고르면 돌아옵니다.    */
-    if (G.role !== 'player' && !G.specFree) {
-      G.specFree = true;
-      toast('자유 시점 — 명단에서 이름을 누르면 그 사람 시점으로 돌아갑니다', 'cheer',
-            { key: 'specFree', gapMs: 8000 });
-    }
   } else if (camPts.size === 2) {
     /* 두 손가락은 회전이 아니라 줌입니다. 여기서 회전을 끊지 않으면
      * 핀치하는 동안 화면이 같이 빙빙 돕니다.                       */
@@ -8087,41 +8006,6 @@ function beginDarkPass() {
   darkPass.outer = Math.max(clear + 0.5, view) * step; // 여기부터 완전한 검정
 }
 
-/* ── 무너진 자리도 검게 ───────────────────────────────────────────────
- * 2026-09-18 — 어둠 속에서 <b>구멍만 보였습니다.</b>
- *
- * 타일은 검게 눌러 가리는데, 무너진 자리는 메시를 숨기므로 그 너머
- * (아래층·하늘)가 그대로 비쳤습니다. 결과적으로 어둠 속에서 <b>어디가
- * 뚫렸는지만 또렷하게</b> 보였습니다 — 정작 그게 가장 중요한 정보라,
- * 어둠이 난이도를 올리기는커녕 지도를 그려 주고 있었습니다.
- *
- * 그래서 무너진 자리에 <b>검은 유령 타일</b>을 그립니다. 완전히 어두운
- * 구역에서는 진짜 타일도 검정이므로 둘이 구별되지 않습니다.
- *
- * ★ 투명도를 어둠 세기에 맞춥니다(alpha = 1 − 밝기). 내 주변
- *   밝은 구역에서는 0 이 되어 구멍이 그대로 보입니다 — 발밑은
- *   보여야 합니다. 가려지는 것은 <b>멀어서 어차피 안 보이는 곳</b>뿐입니다.
- *
- * ★ 물리에는 영향이 없습니다. 착지·지지 판정은 전부 rec.state 를 보고,
- *   mesh.visible 은 그리기 스위치일 뿐입니다(TileInst.sync).
- * ------------------------------------------------------------------ */
-function applyDarkGhost(rec, mesh) {
-  if (!darkPass.on || !rec.darkTrait) { mesh.visible = false; return; }
-  const a = 1 - darkFactorFor(rec);
-  if (a <= 0.02) { mesh.visible = false; return; }
-  mesh.visible = true;
-  /* x·z 는 만들 때 정해진 그대로 둡니다 — 회전층에서는 층 그룹이
-   * 돌므로 여기서 건드리면 어긋납니다. 낙하 연출이 바꿔 놓은
-   * y·회전·크기만 되돌립니다.                                    */
-  mesh.position.y = rec.baseY;
-  mesh.rotation.set(0, 0, 0);
-  mesh.scale.setScalar(1);
-  rec.mat.color.setRGB(0, 0, 0);
-  rec.mat.emissive.setRGB(0, 0, 0);
-  rec.mat.emissiveIntensity = 0;
-  rec.mat.opacity = a;
-}
-
 /** 이 타일을 얼마나 밝게 그릴 것인가 (1 = 그대로, 0 = 완전한 검정). */
 function darkFactorFor(rec) {
   if (!darkPass.on || !rec.darkTrait) return 1;
@@ -8183,18 +8067,12 @@ function updateTiles(dt, now) {
         mesh.rotation.z = t * 0.8;
         rec.mat.opacity = Math.max(0, 1 - t);
         mesh.scale.setScalar(Math.max(0.01, 1 - t * 0.5));
-      } else {
-        if (rec.liveMesh) {
-          mesh.visible = false;
-          /* 낙하가 끝났습니다 — 빼놨던 진짜 메시를 거둡니다.
-           * 여기서 안 거두면 무너진 타일마다 메시가 하나씩 남아,
-           * 한 라운드에 수백 개가 씬에 쌓입니다.                  */
-          TileInst.demote(rec);
-        }
-        /* 어둠 속에서는 무너진 자리도 검은 타일로 채웁니다
-         * (applyDarkGhost 주석). 매 프레임 봐야 합니다 — 내가 움직이면
-         * 같은 구멍이 밝은 구역에 들어왔다 나갔다 합니다.          */
-        applyDarkGhost(rec, mesh);
+      } else if (mesh.visible) {
+        mesh.visible = false;
+        /* 낙하가 끝났습니다 — 빼놨던 진짜 메시를 거둡니다.
+         * 여기서 안 거두면 무너진 타일마다 메시가 하나씩 남아,
+         * 한 라운드에 수백 개가 씬에 쌓입니다.                    */
+        TileInst.demote(rec);
       }
       /* ★ 아래 continue 가 반복문 끝의 syncLive 를 건너뜁니다.
        *   붕괴 연출은 바로 이 분기에서 만들어지므로 여기서 옮겨야
@@ -8637,7 +8515,7 @@ class RemoteRunner {
       t: localNow,
       p: new THREE.Vector3(s.p[0], s.p[1], s.p[2]),
       v: new THREE.Vector3(s.v[0], s.v[1], s.v[2]),
-      ry: s.ry, cy: s.cy, cp: s.cp, anim: s.a, layer: s.l, alive: !!s.al,
+      ry: s.ry, anim: s.a, layer: s.l, alive: !!s.al,
       // 서버가 g 를 안 보내면(구버전) 애니메이션으로 접지를 추정합니다
       grounded: s.g === undefined ? (s.a !== 'jump' && s.a !== 'fall') : !!s.g
     });
@@ -8696,7 +8574,6 @@ class RemoteRunner {
       target = this._tgt.copy(buf[0].p);
       this.renderRy = buf[0].ry;
       this.anim = buf[0].anim; this.layer = buf[0].layer; this.alive = buf[0].alive;
-      this.cy = buf[0].cy; this.cp = buf[0].cp;
     } else {
       let a = null, b = null;
       for (let i = buf.length - 1; i > 0; i--) {
@@ -8710,10 +8587,6 @@ class RemoteRunner {
         this.renderRy = lerpAngle(a.ry, b.ry, k);
         this.anim = k < 0.5 ? a.anim : b.anim;
         this.layer = b.layer; this.alive = b.alive;
-        /* ★ 시점 각도는 보간하지 않고 최신값(b)을 씁니다 — 관전 카메라가
-         *   자체적으로 부드럽게 따라가므로 여기서 또 섞으면 두 번
-         *   느려져 시점이 굼떠집니다.                                */
-        this.cy = b.cy; this.cp = b.cp;
         vel = b.v;
       } else {
         /* --- dead reckoning (extrapolation) path ---
@@ -8725,7 +8598,6 @@ class RemoteRunner {
         target = RemoteRunner.predict(last, ahead, vel);
         this.renderRy = last.ry;
         this.anim = last.anim; this.layer = last.layer; this.alive = last.alive;
-        this.cy = last.cy; this.cp = last.cp;
       }
     }
 
@@ -8931,15 +8803,8 @@ function updateCamera(dt) {
    * 격자 단위로 끊겨 움직여, 아바타를 보간해 놓고도 화면 전체가 덜컹입니다. */
   /* 피날레 중에는 승자를 봅니다 — 내가 죽었든 살았든 모두가 같은 그림을
    * 봐야 '저 사람이 이겼다'가 전달됩니다. */
-  /* ★ "내 캐릭터를 따라갈 것인가" 의 기준은 <b>이번 회차에 뛰는가</b>
-   *   입니다. 종전에는 local.alive 만 봤는데, 그 값은 <b>탈락했을 때만</b>
-   *   false 가 됩니다 — 처음부터 관전으로 들어온 사람은 계속 true 라
-   *   카메라가 자기 (보이지도 않는) 아바타를 따라다녔고,
-   *   <b>관전 대상을 아무리 바꿔도 화면이 그대로였습니다.</b>
-   *   spectateFocus 는 제대로 된 값을 돌려주고 있었는데 여기서
-   *   쓰이질 않았습니다.                                          */
-  const runner = G.role === 'player' && (local.alive || local.dying > 0);
-  const focus = finale ? finale : (runner ? local.render : spectateFocus());
+  const focus = finale ? finale
+    : ((local.alive || local.dying > 0) ? local.render : spectateFocus());
 
   /* ★ 대기 중에는 <b>발판 무리 가운데</b>를 봅니다.
    *   내 발판만 보면 다른 사람이 화면 구석으로 밀립니다 — 실측(3인)
@@ -8974,32 +8839,8 @@ function updateCamera(dt) {
    * 포화되지만, 속도선은 '한 층 낙하'와 '시작 낙하'를 구분해야 합니다. */
   updateSpeedLines(fallRatio);
   cam.pitch = THREE.MathUtils.lerp(cam.pitch, THREE.MathUtils.clamp(cam.pitch, 0.08, 1.36), 1);
-  /* ★ 관전 중 대상 각도를 따라갈 때는 자동 피치를 끕니다 — 안 그러면
-   *   아래에서 맞춘 pitch 를 매 프레임 여기서 도로 끌어당깁니다.  */
-  const specLocked = G.role !== 'player' && !G.specFree && !!G.specTarget;
-  const usedPitch = (cam.dragging || specLocked)
-    ? cam.pitch
-    : THREE.MathUtils.lerp(cam.pitch, autoPitch, smoothK(0.9, dt));
+  const usedPitch = cam.dragging ? cam.pitch : THREE.MathUtils.lerp(cam.pitch, autoPitch, smoothK(0.9, dt));
   if (!cam.dragging) cam.pitch = usedPitch;
-
-  /* ── 관전: 그 사람이 보는 각도를 그대로 ─────────────────────────────
-   * ★ 위치만 따라가면 "그 사람 주위를 내 마음대로 도는" 화면이지
-   *   그 사람의 시점이 아닙니다. 각도까지 맞춰야 같은 화면입니다.
-   * ★ 툭 끊어 맞추지 않고 따라갑니다. 20Hz 로 오는 값을 그대로 박으면
-   *   시점이 계단처럼 덜컥거립니다.
-   * ★ yaw 는 <b>각도 보간</b>이어야 합니다. 그냥 lerp 하면 −π ↔ +π 를
-   *   넘는 순간 화면이 한 바퀴 거꾸로 돕니다.
-   * ★ 관전자가 직접 드래그하면 그 순간부터 자유 시점입니다
-   *   (specFree). 명단에서 다시 고르면 그 사람 시점으로 돌아옵니다.  */
-  if (!runner && !G.specFree && G.specTarget) {
-    const t = G.players.get(G.specTarget);
-    if (t && t.alive && typeof t.cy === 'number') {
-      cam.yaw = lerpAngle(cam.yaw, t.cy, smoothK(9, dt));
-      if (typeof t.cp === 'number') {
-        cam.pitch = THREE.MathUtils.lerp(cam.pitch, t.cp, smoothK(9, dt));
-      }
-    }
-  }
 
   cam.dist += (cam.targetDist - cam.dist) * smoothK(5, dt);
 
@@ -9526,34 +9367,6 @@ function lobbyRoomLabel(r, seats) {
   return ['wait', '대기 중'];
 }
 
-/* 고른 방의 참가자 한 줄. 서버 members 를 그대로 그립니다.
- * ★ 이름은 남이 적은 값이라 반드시 이스케이프합니다.
- * ★ 대기 중에는 준비 여부를, 라운드 중에는 탈락 여부를 보여 줍니다 —
- *   방을 고르는 사람이 알고 싶은 것이 그 둘로 갈립니다.          */
-function whoRow(r) {
-  const m = r.members || [];
-  /* 관전 인원은 주자가 없을 때도 알려 줍니다 — 구경만 하는 사람이
-     있다는 것도 방을 고르는 근거입니다.                          */
-  const spec = r.spectators
-    ? '<span class="none">관전 ' + r.spectators + '명</span>' : '';
-  if (!m.length) {
-    return '<div class="lbWho"><span class="none">아직 아무도 없습니다 — 들어가면 첫 방장이 됩니다</span>' + spec + '</div>';
-  }
-  const waiting = r.phase === 'waiting' || r.phase === 'countdown';
-  const cells = m.map((p) => {
-    const col = previewColor(p.seat || 0);
-    const cls = 'who' + (p.host ? ' host' : '') + (!waiting && !p.alive ? ' out' : '');
-    let tag = '';
-    if (p.host) tag = '<span class="tag">방장</span>';
-    else if (waiting) tag = '<span class="tag' + (p.ready ? ' on' : '') + '">' +
-                            (p.ready ? '준비' : '대기') + '</span>';
-    else if (!p.alive) tag = '<span class="tag">탈락</span>';
-    return '<span class="' + cls + '"><i style="background:' + col + '"></i>' +
-           '<b>' + escapeHtml(safeName(p.name)) + '</b>' + tag + '</span>';
-  }).join('');
-  return '<div class="lbWho">' + cells + spec + '</div>';
-}
-
 function renderLobby(rooms) {
   G.lobbyRooms = rooms || [];     // 좌석 예측(previewSeat)이 참조합니다
   const box = dom.lbList;
@@ -9592,8 +9405,7 @@ function renderLobby(rooms) {
       '<span class="lbFill">' + dots.join('') +
         '<span class="lbNum">' + r.players + '/' + seats + '</span></span>' +
       '<span class="lbState ' + st[0] + '">' + st[1] + '</span>' +
-      '</div>' +
-      (r.id === lobbyPick ? whoRow(r) : '');
+      '</div>';
   }).join('');
   syncJoinCta();
   refreshAvPreview();      // 방이 차면 내 좌석 번호·색도 바뀝니다
@@ -10143,6 +9955,10 @@ function buildLayerStack() {
     alt.className = 'alt';
     alt.textContent = L.short || '';
 
+    /* 회전 방향 표시 자리. 반복되는 반전 배너를 대신하는 조용한 표시라
+     * 평소엔 비어 있고 회전이 걸린 층에서만 ↻/↺ 가 들어갑니다.        */
+    const rotm = document.createElement('div');
+    rotm.className = 'rotmark';
 
     /* 이 층의 기믹. 층 배너와 <b>같은 데이터(L.marks)</b>를 씁니다 —
      * 문구를 두 벌로 두면 반드시 한쪽만 낡습니다. 평소엔 접혀 있고
@@ -10158,7 +9974,7 @@ function buildLayerStack() {
       '<span>' + escapeHtml(m.t || '') + '</span></div>').join('');
 
     d.appendChild(no); d.appendChild(nm); d.appendChild(alt);
-    d.appendChild(mk);
+    d.appendChild(mk); d.appendChild(rotm);
     box.appendChild(d);
   }
 
@@ -10219,6 +10035,17 @@ function refreshTraitBanners() {
   }
 }
 
+/* 왼쪽 층 목록의 회전 방향 표시(↻/↺).
+ * 반복되는 반전 배너를 대신하는 '조용한' 표시입니다.                 */
+function updateRotMark() {
+  const st = G.traits.rotate;
+  for (const el of (dom.docs || [])) {
+    const mark = el.querySelector('.rotmark');
+    if (!mark) continue;
+    const on = !!(st && st.active) && st.layers.indexOf(+el.dataset.l) >= 0;
+    mark.textContent = on ? (st.dir > 0 ? '↻' : '↺') : '';
+  }
+}
 
 function applyLayerEvent(d) {
   if (!d) return;
@@ -10311,7 +10138,8 @@ function applyLayerEvent(d) {
     for (const el of (dom.docs || [])) {
       el.classList.toggle('rotate', st.active && st.layers.indexOf(+el.dataset.l) >= 0);
     }
-      /* fired 는 '이번 패킷이 방향 반전 순간'이라는 표시입니다.
+    updateRotMark();
+    /* fired 는 '이번 패킷이 방향 반전 순간'이라는 표시입니다.
      * 라운드 시작·중도 참가 때도 같은 이벤트가 오는데, 그때까지 문구를
      * 띄우면 접속하자마자 경고가 뜹니다.
      *
@@ -10383,31 +10211,10 @@ function floorsLeft(layerIndex) {
 }
 
 let layerBannerT1 = 0, layerBannerT2 = 0;
-/* ── 층 배너가 떠 있는 시간 ───────────────────────────────────────────
- * 2026-09-18 — 테스터 의견: "너무 금방 없어진다."
- *
- * ★ 2600 은 3400 에서 줄인 값이었고, 줄인 근거 중 하나가 "다음 층으로
- *   내려갔을 때 이전 배너가 남는다" 였습니다. 그런데 그건 이미
- *   showLayerBanner 가 clearTimeout 으로 막고 있습니다 — 새 배너가
- *   옛 배너를 덮어씁니다. 남은 근거는 "화면을 가린다" 하나인데,
- *   한 층에 머무는 시간이 수십 초라 몇 초는 큰 비중이 아닙니다.
- *
- * ★ 고정값이 아니라 <b>읽을 양에 따라</b> 정합니다.
- *   층마다 기믹 항목 수가 다릅니다 — 의견제출통지는 둘(회전 + 거절이유)
- *   이고 숨 고르는 층은 "없음" 한 줄입니다. 같은 시간을 주면 한쪽은
- *   길고 한쪽은 짧습니다.
- *
- * ★ 상한을 둡니다. 층 구성을 바꿔 항목이 많아져도 배너가 화면을
- *   오래 덮지 않게 합니다.
- * ------------------------------------------------------------------ */
-const LAYER_BANNER_BASE_MS = 3600;   // 층 번호 + 이름 + 마지막 안내 한 줄
-const LAYER_BANNER_MARK_MS = 700;    // 기믹 항목 한 줄당 더 주는 시간
-const LAYER_BANNER_MAX_MS  = 6000;
-
-function layerBannerMs(markCount) {
-  return Math.min(LAYER_BANNER_MAX_MS,
-                  LAYER_BANNER_BASE_MS + Math.max(0, markCount) * LAYER_BANNER_MARK_MS);
-}
+/* 3400 → 2600. 글자를 키우면 같은 내용을 더 빨리 읽습니다.
+ * 오래 떠 있으면 그 자체가 화면을 가리고, 다음 층으로 내려갔을 때
+ * 이전 배너가 아직 남아 있는 일이 생깁니다. */
+const LAYER_BANNER_MS = 2600;
 
 /**
  * 층 진입 배너.
@@ -10448,8 +10255,6 @@ function showLayerBanner(layerIndex, dir) {
     safe.innerHTML = '한 층 떨어져도 탈락이 아닙니다 · 아래로 <b>' + left + '층</b> 더 있습니다';
   }
 
-  const holdMs = layerBannerMs(marks.length);
-
   clearTimeout(layerBannerT1); clearTimeout(layerBannerT2);
   el.classList.remove('out');
   /* 애니메이션을 다시 태우려면 클래스를 한 번 떼었다 붙여야 합니다 —
@@ -10457,9 +10262,9 @@ function showLayerBanner(layerIndex, dir) {
   el.classList.remove('on');
   void el.offsetWidth;
   el.classList.add('on');
-  layerBannerT1 = setTimeout(() => el.classList.add('out'), holdMs);
+  layerBannerT1 = setTimeout(() => el.classList.add('out'), LAYER_BANNER_MS);
   layerBannerT2 = setTimeout(() => { el.classList.remove('on'); el.classList.remove('out'); },
-    holdMs + 520);
+    LAYER_BANNER_MS + 520);
 }
 
 function hideLayerBanner() {
@@ -10523,9 +10328,7 @@ function updateRoster() {
              (r.ready ? '준비 완료' : '준비 중') + '</span>')
       : '<span class="lay">' + (alive ? 'L' + (layer || '?') : 'OUT') + '</span>';
     rows.push(
-      '<div class="rrow' + (alive || waiting ? '' : ' dead') +
-        (r.id === G.specTarget ? ' watch' : '') +
-        '" data-id="' + r.id + '" style="border-left-color:' + (r.color || '#888') + '">' +
+      '<div class="rrow' + (alive || waiting ? '' : ' dead') + '" style="border-left-color:' + (r.color || '#888') + '">' +
       '<span>' + escapeHtml(safeName(r.name)) + '</span>' +
       (isSelf ? '<span class="you">YOU</span>' : '') +
       (isHost ? '<span class="host">방장</span>' : '') +
@@ -10554,9 +10357,6 @@ function updateSpectatorUI() {
    *   참가 화면이 이미 화면을 덮고 있기도 합니다.                    */
   const isSpec = G.role === 'spectator' && !previewing;
   dom.spec.classList.toggle('show', isSpec);
-  /* 명단을 눌러 시점을 옮길 수 있다는 것을 커서로도 알립니다 */
-  const rosterEl = document.getElementById('roster');
-  if (rosterEl) rosterEl.classList.toggle('watchable', isSpec);
   Touch.sync();   // 스틱·점프는 주자일 때만 (관전자는 이동이 없습니다)
   dom.hint.classList.toggle('hide', isSpec);
 
@@ -10579,14 +10379,7 @@ function updateSpectatorUI() {
 
   const alive = [...G.players.values()].filter((p) => p.alive);
   if (!G.specTarget || !alive.find((p) => p.id === G.specTarget)) {
-    /* ★ 첫 번째가 아니라 <b>무작위</b>로 고릅니다.
-     *   alive[0] 는 좌석 순서라, 관전자가 여럿이면 전부 같은 사람만
-     *   봅니다. 회차마다 보는 사람이 달라지는 편이 구경거리가 됩니다.
-     *   대상이 살아 있는 동안에는 다시 뽑지 않으므로 화면이 튀지
-     *   않습니다 — 죽었을 때만 새로 고릅니다.                      */
-    G.specTarget = alive.length
-      ? alive[Math.floor(Math.random() * alive.length)].id
-      : null;
+    G.specTarget = alive.length ? alive[0].id : null;
   }
   dom.specTargets.innerHTML = alive.length
     ? alive.map((p) =>
@@ -10599,7 +10392,6 @@ dom.specTargets.addEventListener('click', (e) => {
   const b = e.target.closest('.tgt');
   if (!b) return;
   G.specTarget = b.dataset.id;
-  G.specFree = false;
   updateSpectatorUI();
 });
 
@@ -11092,7 +10884,6 @@ function connect(name, mode, opts) {
     G.phaseOn = true;
     // 회전 반전 안내는 회차당 한 번이므로 새 회차에서 다시 열어 줍니다
     G.rotFlipTold = false;
-    G.specFree = false;          // 새 회차는 대상 시점에서 시작
     /* 지난 회차의 서든데스 배너가 새 회차로 넘어오지 않게 */
     applySudden(null);
     // 지난 회차의 밀림 기록이 새 회차 사인으로 넘어오지 않게 지웁니다
@@ -11814,11 +11605,6 @@ function simulate(dt, now) {
         p: [local.pos.x, local.pos.y, local.pos.z],
         v: [local.vel.x, local.vel.y, local.vel.z],
         ry: local.ry,
-        /* 관전자가 "내가 보는 화면"을 그대로 볼 수 있게 시점 각도도
-         * 같이 보냅니다. 몸 방향(ry)과 다릅니다 — 몸은 달리는 쪽을
-         * 보고 시점은 마우스로 따로 돕니다.                        */
-        cy: cam.yaw,
-        cp: cam.pitch,
         layer: local.layer,
         anim: local.anim,
         g: local.grounded ? 1 : 0   // 접지 여부 — 원격 클라이언트의 중력 적분 근거
@@ -12547,12 +12333,9 @@ if (dom.lbList) {
       return;
     }
     lobbyPick = (lobbyPick === row.dataset.room) ? null : row.dataset.room;
-    /* ★ 클래스만 토글하면 안 됩니다 — 고른 방 아래에 붙는 참가자 명단은
-     *   renderLobby 가 그리므로, 여기서 다시 그리지 않으면 <b>다음
-     *   폴링(1.5초)까지 이름이 안 뜹니다.</b> 누른 즉시 나와야 합니다.
-     *   목록은 innerHTML 을 새로 쓰지만 이 리스너는 부모에 위임돼
-     *   있어 그대로 살아 있습니다.                                */
-    renderLobby(G.lobbyRooms);
+    for (const el of dom.lbList.querySelectorAll('.lbRow')) {
+      el.classList.toggle('sel', el.dataset.room === lobbyPick);
+    }
     syncJoinCta();
     refreshAvPreview();
   });
@@ -12763,35 +12546,9 @@ window.addEventListener('pointerup', (e) => {
     return e.clientX >= b.left && e.clientX <= b.right &&
            e.clientY >= b.top && e.clientY <= b.bottom;
   };
-  const rosterEl = document.getElementById('roster');
-  const hitRoster = inside(rosterEl);
-  if (inside(document.getElementById('layerStack')) || hitRoster) {
+  if (inside(document.getElementById('layerStack')) ||
+      inside(document.getElementById('roster'))) {
     Sound.sfx('click');
-  }
-
-  /* ── 명단을 눌러 그 사람 시점으로 ─────────────────────────────────
-   * ★ 패널에 pointer-events 를 주지 않는 원칙은 그대로입니다(위 주석).
-   *   주면 그 위에서 시작한 시점 드래그가 캔버스로 안 내려갑니다.
-   *   그래서 여기서도 <b>좌표로만</b> 어느 줄인지 찾습니다.
-   * ★ 관전 중일 때만입니다. 뛰는 사람은 자기 시점이 고정이라
-   *   눌러도 바뀔 것이 없습니다.                                   */
-  if (!hitRoster || G.role !== 'spectator' || previewing) return;
-  for (const row of rosterEl.querySelectorAll('.rrow[data-id]')) {
-    const b = row.getBoundingClientRect();
-    if (e.clientY < b.top || e.clientY > b.bottom) continue;
-    const id = row.dataset.id;
-    const r = G.players.get(id);
-    if (!r) break;
-    if (!r.alive) {
-      toast(safeName(r.name) + ' 님은 이미 탈락했습니다', 'kill', { key: 'watchDead', gapMs: 3000 });
-      break;
-    }
-    G.specTarget = id;
-    G.specFree = false;          // 자유 시점을 풀고 그 사람 시점으로
-    updateSpectatorUI();
-    updateRoster();
-    toast(safeName(r.name) + ' 님 시점으로 봅니다', 'cheer', { key: 'watch', gapMs: 1500 });
-    break;
   }
 });
 

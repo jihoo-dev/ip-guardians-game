@@ -1733,12 +1733,6 @@ function makePlayer(id, name, seat, room) {
     pos: { x: spawn.x, y: spawn.y, z: spawn.z },
     vel: { x: 0, y: 0, z: 0 },
     ry: 0,
-    /* 그 사람이 <b>화면을 어느 쪽으로 보고 있는가</b>(카메라 yaw/pitch).
-     * 몸 방향(ry)과 다릅니다 — 몸은 달리는 쪽을 보고 시점은 마우스로
-     * 따로 돕니다. 관전자가 "그 사람이 보는 화면"을 그대로 보려면
-     * 이 둘이 필요합니다. 중계만 하고 검증에는 쓰지 않습니다.      */
-    cy: 0,
-    cp: 0.5,
     /* 접지 여부. 클라이언트 추측 항법이 "중력을 더할지" 판단하는 근거입니다.
      * 공중이면 낙하 가속을 적분하고, 접지 상태면 수평 등속으로만 밉니다.   */
     grounded: true,
@@ -3461,20 +3455,6 @@ app.get('/api/rooms', (_req, res) => {
     /* 로비 목록이 "이 방은 곧 시작하나" 를 보여 주는 근거 */
     ready: [...r.players.values()].filter((p) => p.id === r.hostId || p.ready).length,
     hostName: (r.players.get(r.hostId) || {}).name || '',
-    /* ★ 로비에서 방을 고를 때 <b>누가 있는지</b> 보여 주기 위한 명단입니다.
-     *   정원이 4명이라 방당 최대 4개, 목록 전체로도 수십 개 수준이라
-     *   1.5초마다 받아도 부담이 없습니다.
-     * ★ 좌석 순서로 보냅니다 — 클라이언트가 좌석 색을 그 순서로
-     *   칠하므로, 목록에서 본 색이 게임에 들어가서도 같습니다.    */
-    members: [...r.players.values()]
-      .sort((a, b) => a.seat - b.seat)
-      .map((p) => ({
-        name: p.name,
-        seat: p.seat,
-        host: p.id === r.hostId,
-        ready: p.id === r.hostId || !!p.ready,
-        alive: !!p.alive
-      })),
     spectators: r.spectators.size,
     // 이동 검증이 얼마나 개입했는지. 평상시 0 이어야 정상입니다.
     corrections: [...r.players.values()].reduce((n, p) => n + (p.corrections || 0), 0)
@@ -3737,10 +3717,6 @@ io.on('connection', (socket) => {
     /* 층 번호는 위가 큽니다(6F=6). 가장 작은 값이 가장 깊이 내려간 것. */
     if (p.layer < p.deepest) p.deepest = p.layer;
     p.anim = typeof s.anim === 'string' ? s.anim.slice(0, 12) : 'idle';
-    /* 카메라 각도는 그리기 전용이라 그대로 받습니다(검증 없음).
-     * 이상한 값이 와도 남의 화면 각도가 잠깐 이상해질 뿐입니다.   */
-    if (Number.isFinite(+s.cy)) p.cy = +s.cy;
-    if (Number.isFinite(+s.cp)) p.cp = +s.cp;
     // 접지 여부(g). 구 클라이언트는 이 필드를 안 보내므로, 없으면 종전처럼 공중으로 봅니다.
     p.grounded = s.g === undefined ? false : !!s.g;
     // lastInput 은 이 핸들러 맨 위에서 이미 찍었습니다 (검증 거절 경로에서도 찍히도록)
@@ -4114,7 +4090,6 @@ setInterval(() => {
         p: [r3(p.pos.x), r3(p.pos.y), r3(p.pos.z)],
         v: [r3(p.vel.x), r3(p.vel.y), r3(p.vel.z)],
         ry: r3(p.ry),
-        cy: r3(p.cy), cp: r3(p.cp),   // 그 사람의 시점 각도 (관전용)
         l: p.layer,
         a: p.anim,
         al: p.alive ? 1 : 0,
