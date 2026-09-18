@@ -9981,12 +9981,17 @@ function buildRulesText() {
     (kBase.hits ? kBase.hits + '번째로 밟히면' : '다시 밟히면') +
     (baseSpan ? ' ' + baseSpan + ' 뒤' : ''));
   floorSec.appendChild(flow);
-  /* 2026-09-18 — 아래 단계 그림 밑에 붙어 있던 보충 두 줄('금은 누가 밟았는지를
-   * 가리지 않습니다' · '한자리에 N초 머무르면 무너집니다')을 뺐습니다.
-   * 참가 화면에서 읽히지 않는다는 의견이 있었고, 둘 다 없어도 정보가 사라지지
-   * 않습니다 — 단계 그림이 '1번 밟음 → 다시 밟히면 붕괴'를 이미 말하고,
-   * 머무름 규칙은 라운드 중 #hint(buildHintText)에 그대로 남아 있습니다.
-   * ⚠ 되살릴 일이 있으면 #hint 와 <b>중복</b>이 된다는 점을 먼저 보세요.   */
+  const floorNote = mk('div', 'rgDesc');
+  floorNote.style.marginTop = '7px';
+  floorNote.textContent = '금은 누가 밟았는지를 가리지 않습니다 — 남이 지나간 자리는 이미 한 번 깎여 있습니다.';
+  /* ★ 이 한 줄이 없으면 '왜 가만히 있는데 발밑이 꺼지지' 가 됩니다.
+   *   바닥이 두 번 밟아야 무너지게 되면서, 멈춰 서 있는 것을 막는
+   *   규칙이 별도로 생겼습니다(서버 STAND_ROT_MS).                 */
+  if (cfg.STAND_ROT_MS) {
+    floorNote.appendChild(mk('span', 'rgWarn',
+      '한자리에 ' + sec(cfg.STAND_ROT_MS) + ' 머무르면 그 자리가 무너집니다 — 멈출 수 없습니다'));
+  }
+  floorSec.appendChild(floorNote);
 
   /* 지금 쓰이지 않는 타일 종류는 적지 않습니다(TILE_MIX 로 거릅니다). */
   if (used('normal') || used('fragile')) {

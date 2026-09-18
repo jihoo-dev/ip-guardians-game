@@ -54,7 +54,6 @@ node tools/loadbots.js --bots 120 --sec 40
 - `tools/` — 개발용 스크립트. 운영 서버는 쓰지 않으며 `.dockerignore` 로 이미지에서 빠집니다.
   - `fetch_vendor.js` — three.js r128 + GLTFLoader/DRACOLoader/SkeletonUtils 를 `public/vendor/` 로. `--draco` 로 Draco 디코더(1.05MB)까지.
   - `fetch_fonts.js` — 이 게임이 실제로 화면에 쓰는 글자만 골라 Google Fonts 서브셋을 받아 `public/vendor/fonts.css` 생성. **UI 문구를 크게 바꿨으면 다시 돌리세요.**
-    ⚠ 돌린 뒤 `index.html` 의 `<link href="vendor/fonts.css?v=N">` 을 **반드시 올리세요.** 이 CSS 는 `max-age=31536000, immutable` 로 나가므로, 안 올리면 이미 받은 브라우저가 1년 동안 옛 서브셋을 씁니다 — 새 문구의 글자만 맑은 고딕으로 빠지는데 **새로 접속하는 사람에게는 멀쩡해 보여** 발견이 늦습니다. woff2 파일명은 Google 쪽 해시라 겹치지 않으므로 올릴 것은 이 한 줄뿐입니다.
   - `shrink_glb.js` — GLB 텍스처 해상도만 낮춥니다(형상·애니메이션 불변). `--info` 로 분석만. `pngjs` devDependency 필요.
   - `testbots.js` — **검증용 봇**. 죽는 시각을 지정할 수 있어, 탭만으로는 못 만드는 상황(탈락 순위·사람마다 다른 생존 시간·일부만 생존한 시간 만료·탈락자 개입·정원 초과)을 만듭니다. `socket.io-client` devDependency 필요.
     브라우저 탭 하나를 같은 방(`--room`)에 넣고 봇으로 나머지를 채우면 결과 화면까지 같이 볼 수 있습니다.
@@ -126,7 +125,7 @@ ended ◀──(최후 1인 / 전멸 / 시간 만료 / 전원 이탈)───�
   - 클라이언트는 **대기 중에만** 시선을 발판 무리 쪽으로 절반 옮기고 4.5 유닛 내립니다(`pedestalCenter`). 완전히 가운데를 보면 내 캐릭터가 가장자리로 가고, 내리지 않으면 뒤쪽 사람이 준비 패널에 가립니다.
 - **여럿이면 승자는 언제나 한 명입니다**(`lastStanding`). **시계는 승자를 만들지 않습니다.**
   - 시간(`ROUND_MAX_MS`)이 다 됐는데 둘 이상 살아 있으면 라운드를 끝내지 않고 **서든데스**로 넘어갑니다(`startSuddenDeath`). 붕괴가 2 → 3 → 5배로 단계적으로 빨라지고(`SUDDEN.stepMs` 마다), 한 명이 남을 때까지 이어집니다.
-  - ⚠ **한때 `survived`(생존자 전원 공동 1위)가 있었습니다. 되돌리지 마세요.** 그건 원래 "타임아웃이면 무조건 `winner=null` 이라 살아 있는 사람에게도 '전원 탈락'이 뜨던" 버그를 고치다 나온 과잉 수정이었습니다. 등록결정은 한 건이고, 참가 화면 시놉시스도 "최후의 생존자에게 등록결정이 내려집니다"라고 말합니다.
+  - ⚠ **한때 `survived`(생존자 전원 공동 1위)가 있었습니다. 되돌리지 마세요.** 그건 원래 "타임아웃이면 무조건 `winner=null` 이라 살아 있는 사람에게도 '전원 탈락'이 뜨던" 버그를 고치다 나온 과잉 수정이었습니다. 등록결정은 한 건이고, 대기 화면 첫 문장부터 "단 한 사람"이라고 말합니다.
   - `survived` 는 **연습(혼자)에서만** 남았습니다 — 그쪽은 시간이 상대라 끝까지 버티는 것이 곧 이기는 것입니다. 서든데스는 `room.solo` 면 걸지 않습니다.
   - 배속은 `accelScaledMs` **한 곳**에서 곱합니다 — 퓨즈·머무름·자동 붕괴 세 경로가 전부 지나는 관문이라, 여기 걸면 "바닥이 빨라진다"가 경로마다 갈라지지 않습니다. 심사 가속과 달리 **층을 가리지 않습니다**(`traitAffects` 검사보다 앞에서 곱함).
   - 상태는 `room.sudden` 이고 `roomSnapshotMeta` 에 실려 중도 참가·재연결도 복구됩니다. `endRound` 에서 내립니다 — `resetRoom` 까지 기다리면 결과 화면 위에 붉은 배너가 남습니다.
@@ -211,7 +210,7 @@ RTT 가 아니라 지터를 보는 이유는, 버퍼가 막아 주는 것이 지
 - **외부 의존이 없습니다.** three.js·로더·글꼴 전부 `public/vendor/` 에서 자체 서빙합니다.
   사내망에서 cdnjs/jsdelivr 이 막히면 `THREE` 가 없어 **게임이 아예 뜨지 않고**, fonts.googleapis.com 이 응답 없이 막히면 `<link rel=stylesheet>` 가 렌더 차단 자원이라 **첫 화면이 수십 초 비어 있게** 됩니다. 둘 다 사내 행사에서 실제로 겪을 수 있는 실패라 의존을 끊었습니다.
   `THREE` 가 없으면 빈 화면 대신 원인을 적은 안내가 뜹니다(`index.html` 상단 방어 블록).
-  글꼴은 **쓰는 글자에 해당하는 서브셋만**(woff2 42개 813KB) 받아 둡니다. 플레이어가 이름에 아주 드문 음절을 쓰면 그 글자만 시스템 글꼴(맑은 고딕 등)로 나옵니다 — `--kr` 폴백 스택이 받아 줍니다.
+  글꼴은 **쓰는 글자에 해당하는 서브셋만**(woff2 37개 709KB) 받아 둡니다. 플레이어가 이름에 아주 드문 음절을 쓰면 그 글자만 시스템 글꼴(맑은 고딕 등)로 나옵니다 — `--kr` 폴백 스택이 받아 줍니다.
 - **three.js r128 을 전역 스크립트로 로드**합니다(모듈 아님, importmap 아님). `THREE.CapsuleGeometry` 등 최신 API가 없으므로 대체 지오메트리를 씁니다. 버전을 올릴 때는 `tools/fetch_vendor.js` 의 `THREE_VER` 과 `index.html` `<script src>` 의 `?v=` 를 함께 바꾸세요.
 - socket.io 연결은 `transports: ['polling', 'websocket']` + `tryAllTransports: true` 로 고정되어 있습니다. websocket 을 첫 transport 로 두면 사내 프록시/방화벽이 업그레이드를 막을 때 연결 자체가 실패합니다.
 - 정적 파일은 gzip/br 로 나갑니다(`compression`). 이미 압축된 것(glb·png·mp3 등)은 `PRECOMPRESSED` 정규식으로 건너뜁니다.
