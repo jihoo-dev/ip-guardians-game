@@ -1304,7 +1304,7 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
         <td><b>점프 타일</b> — 1층 위로 / 2층 위로</td><td>있음</td></tr>
     <tr><td><code>sfx_click.mp3</code></td>
         <td>대기 화면의 버튼 · 게임 화면의 <b>층 안내(좌)·출원인 명단(우)</b> 클릭</td><td>있음</td></tr>
-    <tr><td><code>sfx_jump.mp3</code> · <code>sfx_land.mp3</code></td><td>점프 · <b>층에서 떨어질 때</b> <span class="tiny">(착지에는 소리가 없습니다 — 아래)</span></td><td>있음</td></tr>
+    <tr><td><code>sfx_jump.mp3</code> · <code>sfx_land.mp3</code></td><td>점프 · 착지</td><td>있음</td></tr>
     <tr><td><code>sfx_death.mp3</code> · <code>sfx_win.mp3</code></td><td>구름바다 추락 · 등록결정</td><td>있음</td></tr>
     <tr><td class="tiny">start · tick · crack · eliminate · booster · lose</td>
         <td class="tiny">시작 · 카운트다운 5·4·3 · 금 · 탈락 · 검색 스캔 · 거절결정</td>
@@ -1328,14 +1328,6 @@ footer{border-top:1px solid var(--rule);margin-top:60px;padding-top:24px;
       <li><b><code>sfx_2_1_go.mp3</code> 는 한 파일에 2·1·GO 셋이 들어 있습니다.</b>
           그래서 2초 지점에서 한 번만 틀고 그 뒤로는 tick 을 내지 않습니다 —
           겹쳐 내면 두 소리가 어긋나 박자가 깨집니다.</li>
-      <li><b>착지에는 소리가 없고, 떨어질 때 납니다.</b>
-          <code>sfx_land.mp3</code> 는 원래 착지음이었는데 2026-09-19 에
-          <b>낙하</b>로 옮겼습니다. 착지는 <b>내가 시킨 일</b>이라 알려 줄 것이
-          없고, 한 번 떨어질 때마다 두 번 울려 소음이었습니다. 발밑이 꺼지는
-          것은 <b>예상 못 한 일</b>이고 그 순간 시선은 앞쪽 타일에 가 있습니다.<br>
-          판정은 <b>낙하 애니메이션과 같은 조건</b>을 써서 타일이 꺼진 경우 ·
-          빈 곳으로 걸어 나간 경우 · <b>점프했는데 빈 곳인 경우</b>를 모두
-          덮고, 한 번 떨어질 때 한 번만 냅니다.</li>
       <li><b>전부 없으면 종전 소리로 내려앉습니다.</b> 파일을 지우면 예전
           동작으로 그대로 돌아갑니다.</li>
     </ul>

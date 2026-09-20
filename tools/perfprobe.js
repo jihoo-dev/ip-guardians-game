@@ -29,6 +29,14 @@
  *      (visibilityState/hasFocus 를 noise() 가 봅니다.)
  *   2) <b>GPU 를 달군 뒤에 재야 합니다.</b> warm() 주석 참고 — 식은 채로
  *      재면 먼저 잰 쪽이 무조건 느려 보여 결론의 부호가 뒤집힙니다.
+ *   4) <b>vsync 에 걸리면 1ms 차이는 안 보입니다.</b> 창이 실제로 화면에
+ *      그려지는 동안 gl.finish() 값은 16.7ms 에 붙습니다 — 그림자 켜짐
+ *      18.78 / 꺼짐 18.79 처럼 <b>차이가 0 으로 나옵니다.</b> 절대 시간이
+ *      16~20ms 에 붙어 있으면 그 표로는 A/B 를 못 합니다(아래 sanity 주석).
+ *   5) <b>짝 사이에 이벤트 루프로 양보하면 나중 것이 항상 느립니다.</b>
+ *      아무것도 안 바꾼 대조에서 11.6ms(141%) 차이가 났습니다.
+ *      perf.sanity() 가 이 둘을 모두 잡습니다.
+ *
  *   3) <b>장면에 실제로 뭔가 있어야 합니다.</b> 라운드가 끝나면 맵도
  *      주자도 사라지는데, 그때도 숫자는 나옵니다(전부 0.2ms 로 붙어
  *      "절감 0%" 로 읽힙니다). <b>재기 전에 화면을 한 번 보세요</b> —
@@ -39,6 +47,7 @@
  *   보이고 GPU 가 실제로 그린 시간은 안 보입니다.
  *
  * 쓰는 법
+ *   perf.sanity()     <b>가장 먼저</b> — 이 기계에서 A/B 비교가 성립하는지 (귀무 대조)
  *   perf.all()        전체 (아래를 순서대로)
  *   perf.groups()     그룹별 삼각형·드로우콜·시간 기여도
  *   perf.frame()      갱신 함수별 시간·할당
@@ -58,6 +67,59 @@
   const gl = renderer.getContext();
   const n2 = (v) => +v.toFixed(2);
   const n3 = (v) => +v.toFixed(3);
+
+  /* 예열에 쓸 수 있는 시간. 2026-09-20 에 1.5 → 6초로 늘렸습니다 —
+   * 노트북 GPU 는 식은 상태에서 1.5초 안에 클럭이 안 올라와 '안 앉음'
+   * 으로 끝나 버리고, 그 뒤 값이 20ms → 3ms 로 떨어집니다.          */
+  const WARM_BUDGET_MS = 6000;
+
+  /* ── 측정 중에는 적응형 화질을 멈춥니다 (2026-09-20) ────────────────
+   * bench() 는 GPU 에 명령을 연달아 밀어 넣으므로 <b>게임의 fps 가 떨어집니다.</b>
+   * 그러면 Quality.sample() 이 그것을 보고 화질을 내려버리고, <b>측정 도중에
+   * 렌더 타깃 크기가 바뀝니다.</b> 실측: 예열 20초 동안 픽셀비가 2 → 0.65 로
+   * 내려가, 같은 자리에서 잰 그림자 절감이 +26% → -175% 로 흔들렸습니다.
+   * 앞뒤 값을 비교하는 도구인데 그 사이에 조건이 바뀌면 표 전체가 무의미합니다.
+   *
+   * ⚠ 되돌릴 때 localStorage 도 되돌립니다 — Quality.set() 이 정착값을
+   *   쓰고 가므로, <b>재기만 했는데 다음 접속의 시작 화질이 달라집니다.</b>
+   *
+   * 중첩(all() 안에서 groups() 등)을 위해 깊이를 셉니다.             */
+  let qDepth = 0, qSaved = null;
+  function freezeQuality() {
+    if (qDepth++ > 0 || typeof Quality === 'undefined') return;
+    let ls = null;
+    try { ls = localStorage.getItem('ipg.quality'); } catch (e) {}
+    qSaved = { auto: Quality.auto, level: Quality.level, floor: Quality.floor,
+               demotions: (Quality.demotions || []).slice(), ls };
+    Quality.auto = false;
+  }
+  function thawQuality() {
+    if (--qDepth > 0) return;
+    if (qDepth < 0) qDepth = 0;
+    if (!qSaved) return;
+    Quality.auto = qSaved.auto; Quality.floor = qSaved.floor;
+    if (qSaved.demotions.length) Quality.demotions = qSaved.demotions;
+    if (Quality.level !== qSaved.level) { Quality.level = qSaved.level; Quality.apply(); }
+    try {
+      if (qSaved.ls === null) localStorage.removeItem('ipg.quality');
+      else localStorage.setItem('ipg.quality', qSaved.ls);
+    } catch (e) {}
+    qSaved = null;
+  }
+
+  /** 입구마다 동결/해제를 걸어 줍니다. async 도 받습니다. */
+  function guard(fn) {
+    return function () {
+      freezeQuality();
+      try {
+        const r = fn.apply(null, arguments);
+        if (r && typeof r.then === 'function') return r.then(
+          (v) => { thawQuality(); return v; },
+          (e) => { thawQuality(); throw e; });
+        thawQuality(); return r;
+      } catch (e) { thawQuality(); throw e; }
+    };
+  }
 
   /* GPU 완료까지 기다려 재는 벤치. 이게 이 도구의 핵심입니다. */
   function bench(N) {
@@ -85,7 +147,7 @@
   function warm() {
     const t0 = performance.now();
     const a = [];
-    while (performance.now() - t0 < 1500) {
+    while (performance.now() - t0 < WARM_BUDGET_MS) {
       a.push(bench(30));
       if (a.length >= 3) {
         const last = a.slice(-3);
@@ -142,6 +204,79 @@
                      '창이 맨 앞': document.hasFocus() ? '예' : '아니오 ← 맨 앞으로',
                      '탭이 보임': document.visibilityState === 'visible' ? '예' : '아니오' }]);
     return ok;
+  }
+
+  /* ── ⓪ 귀무 대조 (2026-09-20 추가) ──────────────────────────────────
+   * <b>아무것도 바꾸지 않고</b> A/B 와 똑같은 리듬으로 두 번씩 잽니다.
+   * 차이가 0 이어야 정상입니다 — 0 이 아니면 그 기계에서는 <b>A/B 비교
+   * 자체가 성립하지 않습니다.</b>
+   *
+   * ★ 왜 필요한가 — 이것 때문에 두 번 속았습니다.
+   *   2026-09-18 에 '캐릭터 그림자를 끄면 느려진다' 는 부호가 뒤집힌 값이
+   *   <b>재현성 있게</b> 나왔고, 2026-09-20 에 다시 쟀을 때도 on/off 14쌍이
+   *   <b>전부</b> 그랬습니다. 원인은 GPU 예열이 아니라 <b>짝에서 나중에 잰
+   *   쪽이 느린 것</b>이었습니다 — 그림자를 건드리지 않은 이 대조에서
+   *   1번 자리 8.24ms / 2번 자리 19.88ms 로 <b>11.6ms 차이</b>가 났고
+   *   두 분포가 겹치지도 않았습니다. 무엇을 바꾸든 나중 것이 느립니다.
+   *
+   *   ⚠ 편차(noise)만으로는 이걸 <b>못 잡습니다</b> — 각 자리 안에서는 값이
+   *     고르기 때문에 '조용한 기계'로 읽힙니다. 반드시 이걸 먼저 도세요.
+   * ------------------------------------------------------------------ */
+  /* ★★ 2026-09-20 에 밝혀진 <b>근본 한계</b> — 이것부터 읽으세요.
+   *   이 도구의 시간은 gl.finish() 로 잽니다. 그런데 창이 <b>실제로 화면에
+   *   그려지는 동안</b>에는 그 값이 <b>vsync 주기(60Hz = 16.7ms)에 붙어
+   *   버립니다.</b> 실측 — 같은 장면(삼각형 253,740 · 픽셀비 1.25 · 4인)에서
+   *     · 창이 그려지는 동안 : 그림자 켜짐 18.78ms / 꺼짐 18.79ms → <b>차이 0</b>
+   *     · 창이 안 그려질 때  : 켜짐 1.03ms / 꺼짐 1.59ms → <b>-54%</b>(부호 반대)
+   *   앞의 것은 <b>vsync 에 포화되어 1ms 차이를 분해하지 못하는 것</b>이고,
+   *   뒤의 것은 <b>표시되지 않는 경로라 값 자체가 의미 없는 것</b>입니다.
+   *   즉 <b>둘 다 답이 아닙니다.</b> 삼각형 수·편차·자리 차이는 네 경우 모두
+   *   멀쩡해 보이므로 <b>표만 봐서는 절대 구분되지 않습니다</b> —
+   *   구분하는 단서는 <b>절대 시간이 16~20ms 에 붙어 있는가</b> 하나뿐입니다.
+   *
+   *   그래서 <b>캐릭터 그림자 절감(-25%)은 아직 수치로 확정되지 않았습니다.</b>
+   *   다만 <b>동작은 그대로 두세요</b> — 그림자 패스는 씬을 한 번 더 그리는
+   *   일이라 이득이 음수일 수 없고, 낮은 화질에서 캐릭터 그림자를 끄는 것은
+   *   어느 게임에나 있는 기본값입니다. 확정해야 할 것은 문서의 숫자뿐입니다.
+   *   제대로 재려면 vsync 를 벗기는 수밖에 없습니다
+   *   (예: chrome --disable-gpu-vsync --disable-frame-rate-limit 로 띄우기).  */
+  function sanity(pairs) {
+    pairs = pairs || 12;
+    warm();
+    /* ⚠ 장면이 <b>보이는지</b>도 같이 봅니다. 물체 수가 그대로여도 카메라가
+     *   맵 아래로 떨어지면 전부 프러스텀 밖이라 거의 아무것도 안 그립니다 —
+     *   그러면 편차도 작고 자리 차이도 0 이라 <b>'조용하고 건강한 기계'로
+     *   통과해 버립니다.</b> 실측: 가만히 선 주자가 바닥이 꺼져 떨어지자
+     *   같은 조건에서 16ms → 1.5ms 로 내려갔고, 그 상태에서 잰 그림자
+     *   절감이 -61% 였습니다. 주자가 <b>보이는 동안</b> 재세요.        */
+    renderer.render(scene, camera);
+    const tri = renderer.info.render.triangles;
+    const a = [], b = [];
+    for (let i = 0; i < pairs; i++) { a.push(bench(30)); b.push(bench(30)); }
+    const ma = med(a), mb = med(b);
+    const gap = mb - ma;
+    const pct = Math.abs(gap) / Math.max(ma, 0.01) * 100;
+    /* 10% 는 넉넉히 잡은 값입니다 — 실제로 걸린 경우는 141% 였습니다. */
+    /* 장면이 비었으면 자리 차이가 0 이어도 통과시키지 않습니다. */
+    const ok = pct <= 10 && tri >= 20000;
+    console.log('%c' + (ok ? '[perf] A/B 비교가 성립합니다.'
+                           : '[perf] ⚠ A/B 비교가 성립하지 않습니다 — 아래 표들을 믿지 마세요.'),
+                'font-weight:bold;color:' + (ok ? '#0a7' : '#c33'));
+    if (!ok) {
+      console.warn('[perf] 아무것도 안 바꿨는데 1번 자리와 2번 자리가 ' + pct.toFixed(0) + '% 다릅니다.');
+      console.warn('       이 상태에서 잰 「끄면 몇 ms 절감」 은 전부 잰 순서를 본 것입니다.');
+      console.warn('       탭을 진짜 맨 앞에 두고(자동화 브라우저는 안 됩니다) 다른 창을 닫고 다시 재세요.');
+    }
+    if (tri < 20000) {
+      console.warn('[perf] ⚠ 화면에 그려지는 것이 거의 없습니다(삼각형 ' + tri + ').');
+      console.warn('       라운드 중이어도 내 주자가 맵 아래로 떨어졌으면 이렇게 됩니다 —');
+      console.warn('       이 상태의 A/B 는 전부 무의미합니다. 주자가 보이는 화면에서 다시 재세요.');
+    }
+    return table('⓪ 귀무 대조 — 아무것도 안 바꾸고 두 번씩 (삼각형 ' + tri + ')', [
+      { 자리: '1번', ms: ma, 값: a.join(' ') },
+      { 자리: '2번', ms: mb, 값: b.join(' ') },
+      { 자리: '차이(0 이어야 함)', ms: n2(gap), 값: pct.toFixed(0) + '%' + (ok ? '  ✓' : '  ← 비교 불가') }
+    ]);
   }
 
   function table(title, rows) {
@@ -309,13 +444,22 @@
     if (!noise()) {
       console.warn('[perf] 그대로 진행합니다만, 위 경고를 먼저 해결하는 편이 좋습니다.');
     }
+    /* 2026-09-20 — 귀무 대조를 먼저. 이게 깨지면 아래 A/B 표는 전부
+     * 잰 순서를 본 것이라 숫자를 읽을 이유가 없습니다.            */
+    sanity();
     groups(); frame(); await alloc(4); quality(); shadow();
     console.log('%c=== 끝 ===', 'font-weight:bold');
   }
 
-  window.perf = { all, groups, frame, alloc, quality, shadow, noise, warm, bench };
+  window.perf = {
+    all: guard(all), groups: guard(groups), frame: guard(frame), alloc: guard(alloc),
+    quality: guard(quality), shadow: guard(shadow), noise: guard(noise),
+    sanity: guard(sanity), warm: guard(warm),
+    bench   // bench 만 맨몸입니다 — 직접 부르는 쪽이 조건을 책임집니다
+  };
   console.log('%c[perf] 준비됐습니다.', 'font-weight:bold;color:#0a7');
-  console.log('  perf.noise()  먼저 — 지금 재도 되는 상태인지');
+  console.log('  perf.sanity() 가장 먼저 — 이 기계에서 A/B 비교가 되는지 (귀무 대조)');
+  console.log('  perf.noise()  그 다음 — 지금 재도 되는 상태인지');
   console.log('  perf.all()    전체');
   console.log('  낱개: perf.groups() / perf.frame() / perf.alloc() / perf.quality() / perf.shadow()');
 })();

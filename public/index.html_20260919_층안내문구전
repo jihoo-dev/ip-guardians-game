@@ -16,9 +16,8 @@
      v=3: 2026-09-18 참가 버튼 문구 교체 (woff2 42 → 43개)
      v=4: 2026-09-18 '주자' → '출원인' 통일 (파일 수는 같지만 서브셋 내용이 바뀜
           — 개수만 보고 건너뛰지 마세요)
-     v=5: 2026-09-18 회전 알림 문구 교체 (woff2 43 → 44개)
-     v=6: 2026-09-19 층 안내·하단 문구 개편 (woff2 44 → 45개) -->
-<link href="vendor/fonts.css?v=6" rel="stylesheet">
+     v=5: 2026-09-18 회전 알림 문구 교체 (woff2 43 → 44개) -->
+<link href="vendor/fonts.css?v=5" rel="stylesheet">
 <style>
 /* ===========================================================================
    Design tokens — "심사서류 × 네온 서바이벌"
@@ -74,10 +73,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--l3);outline-off
   height:var(--topbar-h);overflow:hidden;
 }
 #topbar .tb{overflow:hidden}
-/* 성능 표시(RTT·FPS)는 F2 진단을 켰을 때만. 숨기는 것은 <b>그리기</b>
-   뿐이라 갱신 코드는 그대로 돕니다 — 켜는 순간 바로 현재값입니다. */
-#topbar .tb.perf{display:none}
-body.diag #topbar .tb.perf{display:flex}
 .tb{background:rgba(5,6,10,.82);backdrop-filter:blur(8px);padding:9px 14px;display:flex;flex-direction:column;gap:2px}
 .tb .k{font-family:var(--mono);font-size:9px;letter-spacing:.18em;color:rgba(236,231,216,.45)}
 .tb .v{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.04em}
@@ -354,12 +349,6 @@ body.dev #devLayers{display:flex}
 #layerBanner .lbName{font-size:34px;font-weight:800;letter-spacing:-.015em;line-height:1.12;margin:2px 0 4px}
 /* 기믹은 한 문장으로 뭉치지 않고 항목으로 쪼갭니다. 기믹이 둘인 층
  * (의견제출통지)에서 한 문장에 두 가지가 들어가 특히 안 읽혔습니다. */
-/* 이 층에서 무엇을 해야 하는가 — 층 이름 바로 밑 한 문장(LAYERS.tip).
-   항목(lbMarks)보다 크고 밝게 둡니다: 항목은 규칙이고 이쪽은 <b>지시</b>라,
-   같은 크기로 두면 무엇을 먼저 읽어야 할지가 사라집니다.               */
-#layerBanner .lbLead{font-size:15px;line-height:1.5;color:rgba(236,231,216,.95);
-  margin:2px 0 8px;word-break:keep-all}
-#layerBanner .lbLead:empty{display:none}
 #layerBanner .lbMarks{display:flex;flex-direction:column;gap:6px;margin:4px 0 2px}
 /* 배너도 같은 이유로 어절 단위 줄바꿈. 폭이 넓어 잘 안 걸리지만,
  * 긴 문구를 넣거나 좁은 화면에서 같은 증상이 납니다. */
@@ -517,13 +506,7 @@ h1 em{font-style:normal;color:var(--l3)}
  * 스무 줄 가까이 됐습니다. 첫 화면에서 읽히지 않아, 세계관 문장으로 바꾸고
  * 규격은 아래 토글로 접었습니다 (지우지 않았습니다 — 규격은 config 파생이라
  * 그 자체가 유일한 최신 설명이기 때문입니다).                          */
-/* ★ 가운데 정렬입니다(2026-09-20). 이 문단은 줄바꿈을 <b>의미 단위로
-   미리 끊어</b> 두기 때문에(buildSynopsis 주석), 줄마다 길이가 크게
-   다릅니다 — 왼쪽에 맞추면 오른쪽이 최대 152px 비어 '여백만 큰 칸'
-   으로 보였습니다(실측: 칸 390px, 가장 짧은 줄 127px). 가운데로 두면
-   그 차이가 양쪽으로 나뉘어 덩어리로 읽힙니다. */
-.synopsis{font-size:13.5px;line-height:1.85;color:rgba(236,231,216,.74);margin:12px 0 0;
-  text-align:center}
+.synopsis{font-size:13.5px;line-height:1.85;color:rgba(236,231,216,.74);margin:12px 0 0}
 .synopsis .q{display:block;font-size:15px;font-weight:800;color:var(--l3);
   letter-spacing:-.01em;margin-bottom:10px}
 .synopsis .ln{display:block;margin-top:9px}
@@ -743,14 +726,7 @@ input[type=text]{
   font-size:15px;font-weight:700;letter-spacing:.04em;transition:.18s
 }
 .cta:hover{background:var(--paper)}
-/* ★ 칸 사이를 16 → 10px 로 좁혔습니다(2026-09-20). 문구를 알아볼 수 있게
-   고치면서(드래그 시점 회전 · 휠 확대·축소) 폭이 31px 늘어 <b>한 줄이 두
-   줄</b>이 됐는데, 마지막 줄에 칸 하나만 남아 목록으로 안 읽혔습니다.
-   좁혀도 칸 앞머리(WASD·SHIFT…)가 굵은 글씨라 경계는 그대로 보입니다.
-   실측 600px 카드에서 간격 12px 이상은 두 줄, 10px 이하는 한 줄입니다.
-   더 좁은 창에서는 그냥 접힙니다(flex-wrap) — 접혀도 읽는 데 지장이 없어
-   폭을 줄이는 쪽으로 더 밀지 않았습니다. */
-.keys{margin-top:20px;padding-top:16px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:6px 10px}
+.keys{margin-top:20px;padding-top:16px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:6px 16px}
 .keys span{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:rgba(236,231,216,.45)}
 .keys b{color:var(--paper);font-weight:600}
 /* 조작 안내와 같은 줄에 섞이되, 누를 수 있다는 것이 보여야 합니다 */
@@ -765,43 +741,8 @@ input[type=text]{
 
 #countdown{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none;z-index:15}
 #countdown.show{display:flex}
-/* ★ 숫자에 <b>어두운 테두리</b>를 두릅니다(2026-09-20).
-   150px 짜리 글자가 대기 화면 한가운데 — 즉 <b>발판 무리와 구름 위</b>에
-   얹힙니다. 색만 밝게 두면 밝은 배경 위의 밝은 글자라 <b>명도 대비가
-   1.05</b> 까지 떨어집니다(실측). 색상(ΔE)만 갈라서는 안 올라갑니다 —
-   둘 다 밝기 때문입니다.
-   층 목록·#hint 는 어두운 <b>판</b>을 깔아 해결했지만, 150px 글자 뒤에
-   판을 깔면 화면 한가운데가 통째로 막힙니다. 그래서 <b>글자마다 두르는
-   판</b>, 즉 테두리로 같은 일을 합니다.
-
-   ★ 테두리는 <b>흰색</b>입니다(2026-09-20 의견 반영). 다만 흰색 한 겹만
-     두르면 <b>순백 구름 위에서 그 테두리가 사라집니다</b> — 애초에 고치려던
-     문제가 그대로 돌아옵니다. 그래서 <b>두 겹</b>입니다:
-       · 안쪽 2px 흰 테두리  — 민트 글자를 또렷하게 따 냅니다
-       · 바깥 어두운 번짐    — 그 흰 테두리가 흰 배경에 녹지 않게 받칩니다
-     흰 구름 위에서는 바깥 어두운 번짐이, 보라 발판 위에서는 안쪽 흰
-     테두리가 각각 일합니다. 한 겹만 남기면 둘 중 한 배경에서 무너집니다.
-   ⚠ 그림자는 <b>먼저 적은 것이 위에</b> 그려집니다. 흰 테두리 → 어두운
-     번짐 → 민트 번짐 순서를 지키세요. 순서를 바꾸면 어두운 번짐이 흰
-     테두리를 덮어 회색 테가 됩니다.                                   */
-#cdNum{font-family:var(--mono);font-size:150px;font-weight:700;line-height:1;color:var(--l3);
-  text-shadow:
-    /* ① 안쪽 흰 테두리 — 8방향 */
-    2px 0 0 #fff,-2px 0 0 #fff,0 2px 0 #fff,0 -2px 0 #fff,
-    2px 2px 0 #fff,-2px 2px 0 #fff,2px -2px 0 #fff,-2px -2px 0 #fff,
-    /* ② 그 바깥의 어두운 번짐 — 흰 테두리가 흰 구름에 녹는 것을 막습니다 */
-    0 0 7px rgba(5,6,10,.95),0 0 16px rgba(5,6,10,.75),
-    0 6px 20px rgba(0,0,0,.6),
-    /* ③ 원래의 민트 번짐 */
-    0 0 60px rgba(0,255,204,.5)}
-/* ★ 라벨에도 <b>어두운 판</b>을 깝니다(2026-09-20). 알파 0.55 짜리 글자가
-   순백 구름 위에 놓여 실측 대비가 <b>1.01</b> 이었습니다 — 1.0 이 "명도가
-   완전히 같다" 이므로 글자가 아예 없는 것과 같습니다. 숫자는 테두리로
-   해결했지만(글자가 커서 판을 깔면 화면을 막습니다) 이쪽은 작은 한 줄이라
-   층 목록·명단 제목과 같은 처방이 맞습니다. 판 0.76 + 글자 0.82 로 6.6.    */
-#cdLabel{position:absolute;bottom:calc(50% - 118px);font-family:var(--mono);font-size:11px;letter-spacing:.36em;
-  color:rgba(236,231,216,.82);padding:4px 12px;background:rgba(5,6,10,.76);
-  border:1px solid rgba(236,231,216,.18);text-shadow:0 1px 3px rgba(0,0,0,.85)}
+#cdNum{font-family:var(--mono);font-size:150px;font-weight:700;line-height:1;color:var(--l3);text-shadow:0 0 60px rgba(0,255,204,.5)}
+#cdLabel{position:absolute;bottom:calc(50% - 118px);font-family:var(--mono);font-size:11px;letter-spacing:.36em;color:rgba(236,231,216,.55)}
 
 /* ── 대기실 패널 ──────────────────────────────────────────────────────
  * 발판 위에 서 있는 동안(대기 중)만 보입니다.
@@ -1245,36 +1186,6 @@ body.touch #topbar .opt{display:none}   /* 가로 폰에 9칸은 안 들어갑�
 body.touch #hint{top:calc(var(--topbar-h) + 5px + env(safe-area-inset-top));bottom:auto;
   font-size:10px;max-width:min(60vw,480px);padding:5px 10px}
 body.touch #hint .rules{display:none}   /* 두 줄이면 층 안내와 겹칩니다 */
-/* ── 암전 배너가 조작 안내와 겹치던 것 (2026-09-20) ──────────────────
- * 터치에서는 #hint 가 <b>위로</b> 올라가 상단바 바로 밑을 차지하는데,
- * 암전 배너는 데스크톱 기준인 top:88px 을 그대로 써서 그 위에 겹쳐
- * 그려졌습니다 — 실측(845×548): #hint 58~104 · 배너 88~137 로
- * <b>16px 겹침</b>이고 가로 범위도 #hint 안에 들어갑니다.
- * 데스크톱은 #hint 가 화면 <b>아래</b>라 이 문제가 없어 안 드러났습니다.
- *
- * ★ 겹침을 키운 것은 <b>불필요한 줄바꿈</b>이었습니다.
- *   폭 계산식이 좌우로 250px 씩 비우는데(데스크톱 층 목록 226 · 명단 230
- *   기준), 터치에서는 두 패널이 0.78 / 0.82 로 축소돼 <b>실측 130px 남짓</b>
- *   만 씁니다. 그래서 쓸 수 있는 573px 중 345px 만 쓰고 두 줄이 됐습니다.
- *   터치에서는 150px 씩만 비웁니다.
- * ★ 글자도 17 → 15px. 이것까지 해야 667px 짜리 작은 가로 폰에서도
- *   한 줄에 들어갑니다(15px 기준 362px 필요 · 그 폰에서 쓸 수 있는 폭 367px).
- *   더 좁은 폰에서는 두 줄이 되지만 겹치지는 않습니다.
- * ⚠ 이 값은 #hint 가 <b>두 줄(46px)</b>인 것에 맞춘 것입니다 — 조작 안내
- *   문구를 늘려 줄이 늘면 top 도 같이 올리세요(#ready 와 같은 관계입니다). */
-/* ⚠ width:max-content 가 <b>핵심</b>입니다 — #hint 와 똑같은 함정입니다.
- *   이 칸은 left:50% 라 <b>레이아웃이 쓸 수 있는 폭이 화면의 오른쪽
- *   절반뿐</b>입니다(가운데로 보이는 것은 transform 이라 폭 계산에 안
- *   들어갑니다). 그래서 max-width 를 545px 로 올려 줘도 실제로는 335px
- *   에 갇혀 두 줄이 됐습니다 — 실측(669px 폰): 필요 361 · 허용 369 인데
- *   <b>쓸 수 있는 폭 335</b> 라 34px 짜리 둘째 줄이 생겼습니다.
- *   max-content 로 먼저 잡고 max-width 로 상한만 겁니다.            */
-body.touch #darkAlert .tag{
-  top:calc(var(--topbar-h) + 59px + env(safe-area-inset-top));
-  width:max-content;
-  max-width:min(560px,max(240px,calc(100vw - 300px)))
-}
-body.touch #darkAlert .tag b{font-size:15px}
 body.touch #toasts{bottom:calc(20px + env(safe-area-inset-bottom))}
 /* ── 관전 중에는 토스트를 관전 패널 위로 ──────────────────────────
  * 2026-09-18 — 관전으로 들어가 라운드가 시작되면 화면 아래 가운데에
@@ -1397,13 +1308,8 @@ body.touch-run #touch{display:block}
     <div class="tb panel"><span class="k">남은 층</span><span class="v" id="vFloors">—</span></div>
     <div class="tb opt" id="tbTitle"><span class="k" style="text-align:center">IP GUARDIANS</span><span class="v">특허 <b>패스트트랙</b> 서바이벌</span></div>
     <div class="tb panel opt"><span class="k">관전자</span><span class="v" id="vSpec">0</span></div>
-    <!-- ★ RTT·FPS 는 기본으로 보이지 않습니다(2026-09-20). 게임 규칙이
-         아니라 <b>기기 사양</b> 이야기라, 늘 떠 있으면 상단바 한 줄을
-         차지하면서 플레이어가 할 수 있는 일은 없습니다. F2 진단을 켜면
-         그 자리에 다시 나타납니다 — 값은 계속 갱신되고 있으므로
-         보이기만 갈립니다. -->
-    <div class="tb panel perf"><span class="k">RTT</span><span class="v" id="vPing">— ms</span></div>
-    <div class="tb panel perf"><span class="k">FPS</span><span class="v" id="vFps">60</span></div>
+    <div class="tb panel opt"><span class="k">RTT</span><span class="v" id="vPing">— ms</span></div>
+    <div class="tb panel"><span class="k">FPS</span><span class="v" id="vFps">60</span></div>
     <button class="tb panel" id="btnAudio" title="소리 켜기/끄기 (M)">
       <span class="k">소리</span><span class="v" id="vAudio">ON</span>
     </button>
@@ -1428,7 +1334,7 @@ body.touch-run #touch{display:block}
   <div id="roster"><div class="rname">출원인 명단</div><div id="rosterList"></div></div>
 
   <div id="specBanner">관전 중 · 다음 회차에 출원인으로 자동 참가합니다</div>
-  <div id="layerBanner"><div class="lbNo"></div><div class="lbName"></div><div class="lbLead"></div><div class="lbMarks"></div></div>
+  <div id="layerBanner"><div class="lbNo"></div><div class="lbName"></div><div class="lbMarks"></div></div>
   <div id="toasts"></div>
 
   <!-- 대기실. 발판 위에 서 있는 동안만 보입니다(updateReadyUI). -->
@@ -1540,12 +1446,7 @@ body.touch-run #touch{display:block}
     <div class="keys">
       <!-- 터치 기기에서는 Touch.init 이 .kbd 를 지우고 터치용으로 갈아끼웁니다. -->
       <span class="kbd"><b>WASD</b> 이동</span><span class="kbd"><b>SPACE</b> 점프</span><span class="kbd"><b>SHIFT</b> 질주</span>
-      <!-- ★ '드래그 시점' · '휠 줌' 이었습니다(2026-09-20 수정). 명사 둘을
-           붙여 놓아 무엇을 하는 칸인지 안 읽혔고, 나머지 칸(이동·점프·질주)이
-           전부 우리말 동작이라 '줌' 만 튀었습니다. 실제로 "오타인 것 같다"는
-           의견이 들어온 자리입니다. 글꼴 문제가 아닙니다 — 서브셋에 '휠'·'줌'
-           둘 다 들어 있는 것을 확인했습니다. -->
-      <span class="kbd"><b>드래그</b> 시점 회전</span><span class="kbd"><b>휠</b> 확대·축소</span>
+      <span class="kbd"><b>드래그</b> 시점</span><span class="kbd"><b>휠</b> 줌</span>
       <!-- 대기실과 나가기. 화면에 버튼이 있지만 키가 있다는 것도
            여기서 알려 줍니다 — 혼자 들어온 사람이 버튼을 찾기 전에
            키부터 눌러 보는 일이 실제로 있었습니다. -->
@@ -3545,39 +3446,6 @@ function clampToArena() {
    * 빼면 끝 타일에 아예 못 올라섭니다. */
   const lim = R * ARENA_SQ32;                    // 법선 투영 기준(내접반지름)
   const layer = local.grounded ? local.layer : currentLayerOf(local.pos.y);
-
-  /* ── 회전층은 <b>원</b>으로 막습니다 ────────────────────────────────
-   * 2026-09-19 — "테두리를 밟으면 캐릭터가 마음대로 움직이고 조작이 안
-   * 된다" 는 의견의 정체입니다(의견제출통지 층에서 나왔습니다).
-   *
-   * ★ 막는 모양이 <b>육각형</b>이고 그것이 층과 함께 <b>돕니다.</b>
-   *   육각형은 방향에 따라 반지름이 다릅니다(꼭짓점 R, 변 0.866R).
-   *   그래서 그 사이(6.6 유닛 ≈ 타일 두 장)에 서 있으면, 층이 돌면서
-   *   <b>벽이 나를 쓸고 지나갑니다</b> — 입력이 없어도 안쪽으로 밀리고
-   *   (실측 4 유닛), 밀어내는 동안 <b>바깥으로 향하는 속도를 매 프레임
-   *   0 으로 만들기 때문에</b> 난간 쪽으로 가려는 조작이 먹지 않습니다.
-   *   "마음대로 움직이고 작동이 안 된다" 가 정확히 이 두 가지입니다.
-   *
-   * ★ 원은 돌려도 같은 모양이라 쓸고 지나갈 것이 없습니다.
-   *   반지름은 육각형의 <b>내접</b>(lim)을 씁니다 — 지금도 결국 그 자리로
-   *   밀려나므로 <b>갈 수 있는 범위는 같고</b>, 벽이 가만히 있는 것만
-   *   달라집니다. 회전층에서만 원이고, 나머지 층은 그대로 육각형입니다
-   *   (돌지 않으니 쓸고 지나갈 일이 없고, 육각이라야 눈에 보이는 난간과
-   *    막히는 선이 맞습니다).                                        */
-  if (isRotatingLayer(layer)) {
-    const r = Math.hypot(local.pos.x, local.pos.z);
-    if (r <= lim || r === 0) return;
-    const k = lim / r;
-    local.pos.x *= k;
-    local.pos.z *= k;
-    /* 바깥으로 향하는 속도 성분만 깎습니다 — 전부 0 으로 만들면 난간을
-     * 따라 도는 것까지 멈춰 벽에 붙어 버립니다(육각 쪽과 같은 규칙). */
-    const nx = local.pos.x / lim, nz = local.pos.z / lim;
-    const vn = local.vel.x * nx + local.vel.z * nz;
-    if (vn > 0) { local.vel.x -= nx * vn; local.vel.z -= nz * vn; }
-    return;
-  }
-
   const a = layerAngleOf(layer);
   const ca = Math.cos(-a), sa = Math.sin(-a);
   /* 층 로컬로 */
@@ -4488,60 +4356,6 @@ let pedDoorA = null;   // +z 쪽 반쪽
 let pedDoorB = null;   // -z 쪽 반쪽
 let pedRingGeo = null;
 
-/* ── 대기 발판 색 (2026-09-20) ────────────────────────────────────────
- * 종전에는 몸통이 0xf2f7ff — <b>사실상 흰색</b>이었습니다. 그런데 세 테마가
- * 모두 <b>순백 구름</b>(cloudTop 0xffffff)과 밝은 하늘을 배경으로 깔기
- * 때문에, 발판이 배경에 그대로 녹았습니다.
- *
- * 실측(캔디 스카이 · 대기 구도에서 발판을 켠 화면과 끈 화면의 픽셀 차이로
- * 실루엣을 뽑아 비교): 발판 (235,248,255) · 그 뒤 배경 (170,223,248) —
- * <b>대비비 1.32</b>. 1.0 이 '명도가 완전히 같다' 이므로 사실상 구분이 없습니다.
- * (같은 방식으로 층 목록·명찰의 구름 대비를 고쳤습니다 — 그때와 같은 처방입니다.)
- *
- * ★ 색만 어둡게 해서는 안 올라갑니다. <b>자체발광(emissive)이 표면을 다시
- *   밝히기</b> 때문입니다 — 0x1a2340 을 줘도 발광 0.28 이면 (99,192,208) 로
- *   렌더되어 대비가 1.46 에 그쳤습니다. 발광을 같이 낮춰야 합니다.
- * ★ 반대로 발광을 0 으로 빼면 '빛의 관문' 이 아니게 됩니다. 그래서 몸통은
- *   어둡게 두고 <b>빛은 링과 관문(가산 블렌딩)이 내게</b> 나눴습니다.
- *
- * ★ 그 빛을 <b>민트에서 보라로</b> 옮겼습니다(2026-09-20, 두 번째 수정).
- *   처음에는 최상층(우선심사 패스트트랙)에 맞춰 민트(0x00ffcc)로 뒀는데,
- *   <b>카운트다운 숫자(#cdNum)가 같은 민트</b>입니다(--l3 · 게임의 주 강조색).
- *   하필 카운트다운 동안 발판 발광이 0.35 → 1.35 로 <b>맥동</b>하기 때문에,
- *   숫자가 가장 필요한 순간에 배경이 가장 밝은 민트가 됩니다 —
- *   실측: 숫자 뒤 배경 (129,246,244) · 숫자 (0,255,204) · <b>대비 1.05</b>.
- *   주 강조색은 버튼·수치 전반이 쓰므로 그쪽 대신 발판을 옮겼습니다.
- *   보라는 색이 갈릴 뿐 아니라(ΔE 34 → 54) <b>발판 자체의 가시성도 더 좋습니다</b>
- *   — 대비 캔디 2.46 → 2.55 · 네온 2.73 → 2.93 · 새벽 1.59 → 2.08.
- *   실체심사 층 색이자 새벽 테마 림라이트(0xb98cff)와 같은 계열입니다.
- *
- * 고친 뒤 실측(발판+링을 함께, 좌석 1명 착석 상태) —
- *   대비비  캔디 1.12 → 2.48 · 네온 1.06 → 2.61 · 새벽 1.77 → 1.69
- *   색 차이  ΔE 17.6 → 40.2 · 13.7 → 40.1 · 29.2 → 38.4
- * ⚠ 대기 화면은 캐릭터·발판 부유·관문 맥동이 계속 움직이므로 같은 값을
- *   다시 재면 ±0.3 쯤 흔들립니다. 그 이하의 차이로 색을 고르지 마세요.
- * 몸통은 (100,140,120) 언저리 — 어두운 청록으로 그려지고, 링이 밝아
- * 밝기 분포가 0.08~0.61 로 넓습니다(검은 덩어리가 아닙니다).
- * ⚠ 새벽 구름은 배경이 따뜻한 주황빛이라 <b>명도비만으로는 잘 안 읽힙니다</b>
- *   — 고치기 전에도 1.77 이었는데 그때는 발판이 배경보다 <b>밝은</b> 쪽
- *   1.77 이었고 지금은 <b>어두운</b> 쪽 입니다. 그 테마에서 실제로 갈라 주는
- *   것은 ΔE 쪽이므로 둘을 같이 보세요.
- *
- * ⚠ 이 값들은 <b>여섯 군데</b>에 흩어져 있었습니다(재질·관문·링·좌석 색
- *   갱신의 두 갈래). 상수로 모읍니다 — 따로 두면 한 곳만 고치고 끝내게 됩니다.
- * ⚠ 실제로 화면에 나가는 발광 세기는 updatePedestals 가 매 프레임
- *   <b>emiBase 로 덮어씁니다.</b> 그래서 재질에만 적어 두면 아무 효과가
- *   없습니다 — 레코드의 emiBase 도 반드시 같이 세우세요.            */
-const PED_BODY = 0x0a1018;   // 몸통 — 흰 구름에 묻히지 않는 심해 남색
-const PED_GLOW = 0x7c5cff;   // 링·관문 — 카운트다운 숫자(민트)와 겹치지 않는 보라
-const PED_EMI  = 0.06;       // 몸통 자체발광 세기 (높이면 도로 하얘집니다)
-const PED_RING = 0.42;       // 빈 발판의 링 불투명도
-/* 좌석 색을 몸통에 섞는 비율. 낮게 잡은 이유 — 좌석 색은 #ffcc00 처럼
- * 밝은 것이 섞여 있어, 많이 섞으면 그 사람 발판만 다시 하얗게 뜹니다
- * (실측: 종전 '흰색으로 45%' 방식은 앉은 발판 대비가 1.39 였습니다).
- * 누구 자리인지는 <b>링과 관문</b>이 좌석 색 그대로 말합니다.       */
-const PED_TINT = 0.12;
-
 function buildPedestals(map, cfg) {
   for (const rec of G.pedestals.values()) {
     if (rec.gate) { detach(rec.gate.group); }
@@ -4573,10 +4387,11 @@ function buildPedestals(map, cfg) {
   const halfZ = R * Math.sqrt(3) / 2;
 
   for (const p of map.pedestals) {
+    const col = new THREE.Color(0xffffff);
     const mat = new THREE.MeshStandardMaterial({
-      color: PED_BODY,
-      emissive: PED_GLOW,
-      emissiveIntensity: PED_EMI,
+      color: 0xf2f7ff,
+      emissive: 0x88ccff,
+      emissiveIntensity: 0.35,
       roughness: 0.45,
       metalness: 0.15,
       transparent: true,
@@ -4610,12 +4425,12 @@ function buildPedestals(map, cfg) {
     /* 관문은 tileGroup 이 아니라 fxGroup 에 둡니다 — 층 반투명 처리
      * (applyLayerTransparency)가 타일 재질을 훑는데, 거기 섞이면 관문까지
      * 같이 흐려집니다. */
-    const gate = makeGate(R, PED_GLOW);
+    const gate = makeGate(R, 0x88ccff);
     gate.group.position.set(p.x, p.y, p.z);
     fxGroup.add(gate.group);
 
     const ring = new THREE.Mesh(pedRingGeo, new THREE.MeshBasicMaterial({
-      color: PED_GLOW, transparent: true, opacity: PED_RING,
+      color: 0x88ccff, transparent: true, opacity: 0.55,
       side: THREE.DoubleSide, depthWrite: false, toneMapped: false
     }));
     ring.rotation.x = -Math.PI / 2;
@@ -4632,7 +4447,7 @@ function buildPedestals(map, cfg) {
       mesh, mat, ring, hingeA, hingeB, gate, baseY: p.y,
       /* 카운트다운 맥동이 되돌아갈 기준 불투명도. 좌석 색이 정해지면
        * 아래 좌석 색 갱신 루프가 이 값을 다시 씁니다. */
-      ringBase: PED_RING, emiBase: PED_EMI,
+      ringBase: 0.55,
       state: 'idle', clearAt: 0, phase: Math.random() * 6.28
     });
   }
@@ -4656,23 +4471,21 @@ function tintPedestals() {
   for (const rec of G.pedestals.values()) {
     const c = bySeat.get(rec.seat);
     if (c) {
-      /* 어두운 몸통에서 <b>출발해</b> 좌석 색을 조금만 섞습니다.
-       * 종전처럼 좌석 색에서 출발해 흰색을 섞으면 도로 하얘집니다. */
-      rec.mat.color.setHex(PED_BODY).lerp(new THREE.Color(c), PED_TINT);
+      rec.mat.color.set(c).lerp(new THREE.Color(0xffffff), 0.45);
       rec.mat.emissive.set(c);
-      rec.mat.emissiveIntensity = PED_EMI;
-      rec.emiBase = PED_EMI;
+      rec.mat.emissiveIntensity = 0.5;
+      rec.emiBase = 0.5;
       rec.ring.material.color.set(c);
-      rec.ring.material.opacity = 0.8;
-      rec.ringBase = 0.8;
+      rec.ring.material.opacity = 0.75;
+      rec.ringBase = 0.75;
     } else {
-      rec.mat.color.setHex(PED_BODY);
-      rec.mat.emissive.setHex(PED_GLOW);
-      rec.mat.emissiveIntensity = PED_EMI;
-      rec.emiBase = PED_EMI;
-      rec.ring.material.color.setHex(PED_GLOW);
-      rec.ring.material.opacity = PED_RING;
-      rec.ringBase = PED_RING;
+      rec.mat.color.setHex(0xf2f7ff);
+      rec.mat.emissive.setHex(0x88ccff);
+      rec.mat.emissiveIntensity = 0.28;
+      rec.emiBase = 0.28;
+      rec.ring.material.color.setHex(0x88ccff);
+      rec.ring.material.opacity = 0.35;
+      rec.ringBase = 0.35;
     }
     rec.mat.needsUpdate = true;
   }
@@ -4784,8 +4597,7 @@ function clearPedestals() {
   for (const rec of G.pedestals.values()) {
     rec.state = 'clearing';
     rec.clearAt = now;
-    /* 관문이 터지는 색도 관문과 같게 — 따로 두면 열리는 순간만 하늘색으로 튑니다 */
-    if (rec.gate) spawnGateFlare(rec.x, rec.baseY, rec.z, PED_GLOW);
+    if (rec.gate) spawnGateFlare(rec.x, rec.baseY, rec.z, 0x9fe4ff);
   }
   riftAfterglow = 1;     // 하늘 균열이 한 번 확 타올랐다 사그라듭니다
   Sound.sfx('start');
@@ -5232,18 +5044,7 @@ const Sound = {
   },
 
   startBgm(src) {
-    /* 같은 곡이면 유지합니다. ★ '멈춰 있으면 새로 만든다' 가 아니라
-     *   <b>그것을 다시 틀어 봅니다</b>(2026-09-20). 자동재생이 막혀
-     *   요소가 준비만 된 채 멈춰 있을 때, 첫 제스처에서 새 요소를 만들면
-     *   <b>같은 곡이 자기 자신과 0.9초 크로스페이드</b>되어 겹쳐 들립니다.
-     *   (막힌 브라우저에서 실측 — 요소가 2개가 됐습니다)              */
-    if (this.elSrc === src && this.el) {
-      if (this.el.paused && !this.muted) {
-        const again = this.el.play();
-        if (again && again.catch) again.catch(() => {});   // 아직 이르면 다음 제스처에서
-      }
-      return;
-    }
+    if (this.elSrc === src && this.el && !this.el.paused) return;   // 같은 곡이면 유지
     if (this.nextSrc === src) return;                // 이미 이 곡으로 넘어가는 중
 
     const next = new Audio(assetUrl(src));
@@ -6776,7 +6577,7 @@ const Touch = {
      * 'WASD 이동 · SPACE 점프' 가 떠 있으면 조작법을 알 길이
      * 화면 어디에도 없습니다.                                     */
     const hk = $('hintKeys');
-    if (hk) hk.textContent = '왼쪽을 밀어 이동 · 많이 밀수록 빠르게 · 오른쪽 드래그로 시점 회전 · 두 손가락으로 확대·축소';
+    if (hk) hk.textContent = '왼쪽을 밀어 이동 · 많이 밀수록 빠르게 · 오른쪽 드래그로 시점 · 두 손가락으로 줌';
 
     /* 참가 화면 아래 줄도 같이 바꿉니다. 여기만 두면 폰 사용자는 참가를
      * 누르기 전에 이미 '키보드가 필요한 게임'으로 읽습니다.          */
@@ -6785,11 +6586,8 @@ const Touch = {
       const old = keyRow.querySelectorAll('.kbd');
       if (old.length) {
         const anchor = old[0];
-        /* 문구는 위 키보드 칸과 같은 규칙입니다 — 무엇을 하는지를
-         * 우리말 동작으로 적습니다('시점'·'줌' 같은 명사 하나로 두면
-         * 무엇을 하는 칸인지 안 읽힙니다).                        */
-        for (const [k, v] of [['왼쪽', '이동'], ['기울기', '속도'], ['오른쪽', '시점 회전'],
-                              ['두 손가락', '확대·축소'], ['버튼', '점프']]) {
+        for (const [k, v] of [['왼쪽', '이동'], ['기울기', '속도'], ['오른쪽', '시점'],
+                              ['두 손가락', '줌'], ['버튼', '점프']]) {
           const sp = document.createElement('span');
           const b = document.createElement('b');
           b.textContent = k;
@@ -7377,8 +7175,6 @@ function stepPhysics(dt) {
   local.jumpBuffer = Math.max(0, local.jumpBuffer - dt);
   if (local.jumpBuffer > 0 && local.coyote > 0) {
     local.vel.y = PHYS.JUMP_V;
-    /* 점프 소리는 그대로입니다. "사람 소리" 는 착지음(sfx_land)이었고,
-     * 그쪽을 낙하로 옮겼습니다(아래 낙하 판정).                    */
     Sound.sfx('jump', { rate: 0.96 + Math.random() * 0.08 });
     local.grounded = false;
     local.jumped = true;
@@ -7422,12 +7218,10 @@ function stepPhysics(dt) {
   if (local.vel.y <= 0) {
     const hit = findLanding(local.pos.x, local.pos.z, prevY, nextY);
     if (hit) {
-      /* 2026-09-19 — 착지 소리를 없앴습니다.
-       * 소리를 <b>떨어지는 순간</b> 하나로 모읍니다(아래 wasGrounded 분기의
-       * 사람 소리). 착지까지 울리면 한 번 떨어질 때마다 두 번 나는데,
-       * 이 게임은 <b>쉬지 않고 떨어지는</b> 게임이라 그 두 배가 그대로
-       * 소음이 됩니다. 알려야 할 사건은 "발밑이 꺼졌다" 이고, 착지는
-       * 그 결과라 화면으로 이미 보입니다.                          */
+      // 착지 순간에만 (매 프레임이 아니라) 소리를 냅니다
+      if (!local.grounded && local.vel.y < -6) {
+        Sound.sfx('land', { volume: Math.min(1, -local.vel.y / 40) });
+      }
       local.pos.y = hit.surf;
       /* 충격 세기는 vel.y 를 0 으로 만들기 전에 읽어야 합니다.
        * wasGrounded 로 걸러 '공중에서 내려온 착지'만 흔듭니다 — 지면을
@@ -7471,14 +7265,10 @@ function stepPhysics(dt) {
     const pushed = performance.now() - lastBump.at < BUMP.CREDIT_MS;
     local.deathBy = pushed ? lastBump.id : null;
     local.deathByName = pushed ? lastBump.name : '';
-    /* 낙하 소리는 여기서 내지 않습니다 — 이 분기는 <b>발이 떨어진 순간</b>
-     * 이라 아직 "층을 벗어났는지" 를 모릅니다. 같은 층 타일로 건너뛰는
-     * 것도 여기를 지납니다. 아래 낙하 판정에서 냅니다.              */
   }
 
   // ---- 애니메이션 상태 ----
   if (local.grounded) {
-    local.fellTold = false;          // 다음 낙하를 위해 다시 열어 둡니다
     local.lastGroundY = local.pos.y;
     local.jumped = false;
     local.anim = hs > 1.2 ? 'run' : 'idle';
@@ -7501,26 +7291,7 @@ function stepPhysics(dt) {
     const layerFloor = G.layerY[launchLayer] + G.hexThick / 2;
     const leftLayer = local.pos.y < layerFloor - drop;
     const droppedEnough = local.pos.y < local.lastGroundY - drop;
-    const falling = leftLayer && droppedEnough;
-    local.anim = falling ? 'fall' : 'jump';
-
-    /* ── 층에서 떨어지는 소리 (2026-09-19) ──────────────────────────
-     * 기존 착지음(sfx_land)을 <b>떨어지는 순간</b>으로 옮긴 것입니다.
-     *
-     * ★ 판정은 위 낙하 애니메이션과 <b>똑같은 조건</b>을 씁니다. 그래야
-     *   "화면은 떨어지는데 소리는 안 난다" 가 생기지 않습니다. 그 조건은
-     *   이미 세 경우를 모두 담고 있습니다 —
-     *     · 발밑 타일이 꺼져서            (jumped=false)
-     *     · 빈 곳으로 걸어 나가서          (jumped=false)
-     *     · <b>점프했는데 빈 곳으로</b>    (jumped=true, 문턱만 다름)
-     *   앞서 "발이 떨어진 순간"에 걸었을 때는 마지막 경우가 빠졌습니다.
-     *
-     * ★ 한 번의 낙하에 한 번만 냅니다(fellTold). 여기는 매 프레임 도는
-     *   자리라 걸지 않으면 떨어지는 내내 울립니다.                  */
-    if (falling && !local.fellTold) {
-      local.fellTold = true;
-      Sound.sfx('land', { volume: 0.9 });
-    }
+    local.anim = (leftLayer && droppedEnough) ? 'fall' : 'jump';
   }
 
   // ---- 대기 중 이탈 방지 ----
@@ -7539,9 +7310,7 @@ function stepPhysics(dt) {
       snapRender();
       local.lastGroundY = myPed.top;
       local.anim = 'idle';
-      /* 2026-09-19 — 여기 있던 착지음(sfx_land)을 뺐습니다. 그 소리는
-       * 이제 <b>층에서 떨어지는</b> 뜻이라, 발판으로 되돌아온 순간에
-       * 울리면 방금 떨어진 것처럼 들립니다. 복귀는 눈으로 보입니다. */
+      Sound.sfx('land', { volume: 0.4 });
     }
     return;   // 대기 중에는 구름바다 판정을 하지 않습니다
   }
@@ -7655,11 +7424,8 @@ function flushTipQueue() {
       tipTimer = setTimeout(step, 300);
       return;
     }
-    const item = tipQueue.shift();
-    /* 그 층을 떠났으면 버립니다(noticeTileTip 주석). 버린 것도 한 칸
-     * 넘긴 것이므로 다음 줄은 기다리지 않고 바로 봅니다.          */
-    if (item.layer === local.layer) toast(item.text, 'learn');
-    if (tipQueue.length) tipTimer = setTimeout(step, item.layer === local.layer ? TIP_GAP_MS : 0);
+    toast(tipQueue.shift(), 'learn');
+    if (tipQueue.length) tipTimer = setTimeout(step, TIP_GAP_MS);
   };
   tipTimer = setTimeout(step, 300);
 }
@@ -7677,15 +7443,7 @@ function noticeTileTip(rec) {
   if (!key || G.seenTips.has(key)) return;
   G.seenTips.add(key);
   if (!tips[key]) return;
-  /* ★ 2026-09-19 — 어느 층에서 밟은 설명인지 같이 들고 갑니다.
-   *   줄 세워 두었다가 배너가 끝난 뒤 2.5초 간격으로 내보내는 구조라,
-   *   그 사이에 층이 바뀌면 <b>엉뚱한 층에서</b> 뜹니다 — 점프 타일이
-   *   특히 그렇습니다. 밟자마자 두 층 위로 쏘아 올려지므로, 도착한
-   *   층의 배너가 끝난 뒤에야 "아이디어 타일" 설명이 나옵니다.
-   *   위상 타일도 꺼지는 순간 아래층으로 떨어져 같은 일이 납니다.
-   *   그 층을 떠났으면 <b>버립니다</b> — 지나간 일을 뒤늦게 설명하는
-   *   것은 안내가 아니라 소음입니다.                              */
-  tipQueue.push({ text: tips[key], layer: local.layer });
+  tipQueue.push(tips[key]);
   flushTipQueue();
 }
 
@@ -10243,35 +10001,17 @@ function renderQueue(rooms) {
   const txt = document.getElementById('joinQueueText');
   if (!box || !txt) return;
   const seats = (G.cfg && G.cfg.MAX_PLAYERS) || G.seats || 4;
-  /* ── 이 줄은 <b>바로 위 목록과 같은 것</b>을 말해야 합니다 (2026-09-20) ──
-   * 종전에는 방을 두 갈래로만 나눴습니다 — 진행 중(playing·countdown)이
-   * 아니면 전부 '대기' 로 보고 <b>주자 수</b>를 더했습니다. 그래서 주자가
-   * 0명인 방은 어느 쪽에도 안 세어져, 목록에 방이 <b>멀쩡히 보이는데</b>
-   * 아래 줄만 '열린 심사실이 없습니다' 가 됐습니다. 실제로 그런 방이 있습니다:
-   *
-   *   · <b>관전자만 남은 방</b> — 서버는 주자와 관전자가 <b>모두</b> 없을 때만
-   *     방을 지웁니다. 순수 관전자(wantsPlay:false)는 다음 회차에 승격되지
-   *     않으므로, 주자 0 · 관전 N 인 방이 그대로 남습니다.
-   *   · <b>결과 화면(ended)</b> — 진행 중으로 세지 않아 '대기' 로 흘렀습니다.
-   *
-   * 지금은 <b>모든 방이 정확히 한 갈래</b>에 들어갑니다(진행 중 / 사람 있는
-   * 대기 / 빈 방). 그래서 목록이 비어 있을 때만 '없습니다' 가 나옵니다.  */
-  let waiting = 0, playing = 0, idle = 0, specs = 0;
+  let waiting = 0, playing = 0;
   for (const r of rooms || []) {
-    specs += (r.spectators || 0);
-    /* 결과 화면도 '진행 중' 입니다 — 들어가면 다음 회차부터인 것이 같습니다 */
-    if (r.phase === 'playing' || r.phase === 'countdown' || r.phase === 'ended') playing++;
-    else if ((r.players || 0) > 0) waiting += r.players;
-    else idle++;
+    if (r.phase === 'playing' || r.phase === 'countdown') playing++;
+    else waiting += (r.players || 0);
   }
   let msg;
   if (waiting > 0) msg = '대기 중인 출원인 ' + waiting + '명 · 전원 준비하면 방장이 시작합니다';
   else if (playing > 0) msg = '진행 중인 심사 ' + playing + '회차 · 지금 들어가면 다음 회차부터';
-  else if (idle > 0) msg = '열린 심사실 ' + idle + '곳 · ' +
-      (specs > 0 ? '관전 ' + specs + '명 · ' : '') + '들어가면 첫 방장이 됩니다';
   else msg = '열린 심사실이 없습니다 · 방을 만들면 첫 방장이 됩니다';
   txt.textContent = msg;
-  box.classList.toggle('live', waiting > 0 || playing > 0 || idle > 0);
+  box.classList.toggle('live', waiting > 0 || playing > 0);
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -10753,14 +10493,20 @@ function buildRulesText() {
    * ★ 그리고 TILE_MIX 로 걸러야 합니다. 조인 화면 문구(위)는 이미
    *   거르는데 여기만 안 걸러서, 0장인 일반·취약까지 설명하고
    *   있었습니다 — 네 항목 중 셋이 존재하지 않는 타일이었습니다.   */
-  /* ★ 2026-09-19 — 종류별로 수치를 늘어놓던 것을 <b>두 줄</b>로 줄였습니다.
-   *   종전: "바닥 2번 밟으면 2.5초 뒤 붕괴 · 특수 타일 1번 밟으면 0.7~1초
-   *   뒤 붕괴 · 한자리에 2.5초 머무르면 발밑이 무너짐" — 달리면서 읽기에
-   *   숫자가 너무 많았습니다. 화면 아래 한 줄은 <b>규칙서가 아니라 기억
-   *   보조</b>이고, 정확한 수치는 대기 화면 심사 규격에 있습니다.
-   * ★ 밟는 횟수만 config 에서 꺼냅니다 — 2회 규칙이 바뀌면 따라옵니다. */
-  const hits = (K.reinforced && K.reinforced.hits) || 2;
-  hint.textContent = '＊타일 ' + (hits === 2 ? '한번 밟으면 금이 가고, 두번 밟으면' : hits + '번 밟으면') + ' 붕괴' + '  ＊층마다 특수타일 존재';
+  const label = { normal: '일반 타일', fragile: '금 간 타일',
+                  reinforced: '바닥', special: '특수 타일' };
+  const bits = [];
+  for (const k of Object.keys(K)) {
+    if (!used(k)) continue;
+    if (K[k].autoMs > 0) bits.push(label[k] + ' ' + K[k].hits + '번 밟으면 붕괴 (안 밟아도 ' + sec(K[k].autoMs) + ')');
+    else bits.push(label[k] + ' ' + K[k].hits + '번 밟으면 ' + span(k) + ' 뒤 붕괴');
+  }
+  /* 각 항목이 '…붕괴'로 끝나므로 꼬리를 또 붙이면 겹칩니다
+   * (종전 문구는 항목이 '강화 2회' 처럼 끝나서 꼬리가 필요했습니다). */
+  /* 머무름 규칙은 타일 종류가 아니라 '나'에 걸리는 규칙이라 맨 뒤에
+   * 따로 답니다 — 종류 설명 사이에 끼면 그 타일만의 성질로 읽힙니다. */
+  if (cfg.STAND_ROT_MS) bits.push('한자리에 ' + sec(cfg.STAND_ROT_MS) + ' 머무르면 발밑이 무너짐');
+  hint.textContent = bits.join(' · ');
 }
 
 function buildLayerStack() {
@@ -10796,10 +10542,9 @@ function buildLayerStack() {
      * 내가 선 층(.doc.on)에서만 펼쳐집니다. */
     const mk = document.createElement('div');
     mk.className = 'marks';
-    /* ★ 왼쪽 목록은 tip 을 쓰지 않습니다(2026-09-19). tip 은 "이 층에서
-     *   무엇을 해야 하는가" 라는 <b>지시 문장</b>이라 가운데 배너에만
-     *   어울립니다 — 여기는 라운드 내내 떠 있어 짧은 항목만 둡니다. */
-    const marks = (L.marks && L.marks.length) ? L.marks : [];
+    const marks = (L.marks && L.marks.length)
+      ? L.marks
+      : (L.tip ? [{ i: '·', t: L.tip }] : []);
     mk.innerHTML = marks.map((m) =>
       '<div class="mk' + (m.i === '—' ? ' none' : '') + '">' +
       '<i>' + escapeHtml(m.i || '·') + '</i>' +
@@ -11100,15 +10845,13 @@ function showLayerBanner(layerIndex, dir) {
   el.querySelector('.lbNo').textContent = 'LAYER ' + String(Lx.index).padStart(2, '0');
   el.querySelector('.lbName').textContent = Lx.name || '';
 
-  /* 문구는 서버 LAYER_DEFS 가 유일한 출처입니다. 클라이언트가 들고 있으면
-   * 기믹을 바꿀 때 설명만 옛날 것으로 남습니다.
-   *   tip   : 이 층에서 무엇을 해야 하는가 — <b>가운데 배너에만</b> 한 문장
-   *   marks : 장치 항목. 왼쪽 층 목록과 <b>같은 내용</b>을 씁니다.
-   * 2026-09-19 — 종전에는 marks 가 없으면 tip 을 항목으로 바꿔 넣었는데,
-   * 이제 tip 은 역할이 달라 그렇게 쓰면 <b>같은 문장이 두 줄</b>로 나옵니다. */
-  const lead = el.querySelector('.lbLead');
-  if (lead) lead.textContent = Lx.tip || '';
-  const marks = (Lx.marks && Lx.marks.length) ? Lx.marks : [];
+  /* 층 기믹은 서버 LAYER_DEFS 가 유일한 출처입니다(marks, 없으면 tip).
+   * 클라이언트가 문구를 들고 있으면 기믹을 바꿀 때 설명만 옛날 것으로
+   * 남습니다. marks 는 한 문장으로 뭉치지 않고 항목으로 그립니다 —
+   * 기믹이 둘인 층에서 한 줄에 두 가지를 넣으면 읽히지 않았습니다. */
+  const marks = (Lx.marks && Lx.marks.length)
+    ? Lx.marks
+    : (Lx.tip ? [{ i: '·', t: Lx.tip }] : []);
   el.querySelector('.lbMarks').innerHTML = marks.map((m) =>
     '<div class="lbMark' + (m.i === '—' ? ' none' : '') + '">' +
     '<i>' + escapeHtml(m.i || '·') + '</i>' +
@@ -12143,9 +11886,7 @@ function connect(name, mode, opts) {
     const rec = G.tiles.get(d.tileId);
     if (!rec) return;
     restoreTile(rec);
-    /* 2026-09-19 — 종전에는 착지음을 올려 썼는데, 그 파일이 이제
-     * <b>떨어지는 사람 소리</b>라 되살아나는 장면과 뜻이 반대입니다. */
-    Sound.sfx('powerUp', { pos: rec, rate: 1.15, volume: 0.7 });
+    Sound.sfx('land', { pos: rec, rate: 1.3, volume: 0.8 });
   });
 
   socket.on('tile_break', (d) => {
@@ -12889,14 +12630,6 @@ const diagEl = document.getElementById('diag');
 const diagBody = document.getElementById('diagBody');
 let diagAuto = false;
 
-/* 진단 패널을 여닫을 때 상단바의 성능 표시도 같이 움직입니다.
- * 한 곳에 모아 두는 이유 — 여는 자리가 둘(F2 · 5초 무응답 자동 펼침)이라,
- * 각자 클래스를 붙이면 한쪽을 빠뜨렸을 때 '패널은 떴는데 FPS 는 없는'
- * 어중간한 상태가 됩니다.                                          */
-function syncDiagChrome() {
-  document.body.classList.toggle('diag', diagEl.classList.contains('show'));
-}
-
 function renderDiag() {
   if (!diagEl.classList.contains('show')) return;
   const s = G.socket;
@@ -13027,12 +12760,7 @@ function renderDiag() {
 }
 
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'F2') {
-    e.preventDefault();
-    diagEl.classList.toggle('show');
-    syncDiagChrome();      // 상단바의 RTT·FPS 도 같이 여닫습니다
-    renderDiag();
-  }
+  if (e.code === 'F2') { e.preventDefault(); diagEl.classList.toggle('show'); renderDiag(); }
 });
 setInterval(renderDiag, 500);
 
@@ -13405,48 +13133,6 @@ if (dom.joinScreen) {
   for (const ev of ['pointerdown', 'mousedown', 'touchstart', 'click', 'keydown', 'wheel']) {
     document.addEventListener(ev, armLobbyAudio, { capture: true, passive: true });
   }
-
-  /* ── 주소를 치고 들어오자마자 걸어 봅니다 (2026-09-20) ──────────────
-   * 위 제스처 경로는 <b>무엇이든 건드려야</b> 열립니다. 그런데 행사장에서
-   * 가장 흔한 첫 장면은 '띄워 놓고 화면만 보고 있는' 상태라, 손을 대기
-   * 전까지는 조용합니다. 그래서 <b>제스처를 기다리지 않고 먼저</b> 겁니다.
-   *
-   * ★ 될 때도 있고 안 될 때도 있습니다 — 그리고 그게 정상입니다.
-   *   브라우저 자동재생 정책은 <b>페이지가 정하는 것이 아니라 브라우저가</b>
-   *   정합니다. 막히면 play() 가 NotAllowedError 로 거절되고, 그 뒤는
-   *   종전과 완전히 같습니다(첫 제스처에 열림). 즉 <b>잃는 것이 없습니다.</b>
-   *   실제로 통과하는 경우:
-   *     · 크롬이 이 주소를 '소리를 듣는 곳'으로 기억했을 때(MEI).
-   *       같은 PC 에서 몇 판 하고 나면 저절로 그렇게 됩니다 — 행사장
-   *       PC 처럼 같은 사람이 계속 여는 자리에서 특히 잘 걸립니다.
-   *     · 사이트 권한에서 자동 재생을 허용했을 때(엣지: 미디어 자동 재생).
-   *     · 키오스크로 띄울 때(--autoplay-policy=no-user-gesture-required).
-   *
-   * ★ 막혔는데 UI 를 '소리 켜짐' 으로 바꾸면 안 됩니다. 버튼이 거짓말을
-   *   하면 눌러서 켤 생각을 안 하게 됩니다 — 그래서 <b>정말로 소리가
-   *   나고 있는지</b>(요소가 돌고 currentTime 이 흐르는지) 확인한 뒤에만
-   *   armed 로 올립니다.
-   * ★ 뮤트로 저장해 둔 사람에게는 걸지 않습니다.                  */
-  function autoplayOnLoad() {
-    if (Sound.muted) return;
-    Sound.unlock();          // 여기서 만든 AudioContext 는 suspended 일 수
-                             // 있지만, resumeAudioIfStuck 이 첫 제스처에
-                             // 깨웁니다(그 주석 참고).
-    Sound.playBgm('lobby');
-    let tries = 0;
-    const t = setInterval(() => {
-      const el = Sound.el || Sound.elNext;
-      if (el && !el.paused && el.currentTime > 0) {
-        clearInterval(t);
-        lobbyAudioArmed = true;
-        syncJoinSnd();
-        if (typeof refreshAudioUI === 'function') { try { refreshAudioUI(); } catch (e) {} }
-      } else if (++tries >= 10) {
-        clearInterval(t);     // 막혔습니다 — 위 제스처 경로가 그대로 받습니다
-      }
-    }, 300);
-  }
-  autoplayOnLoad();
 }
 
 if (dom.btnJoinSnd) {
@@ -13539,7 +13225,6 @@ dom.btnJoin.addEventListener('click', () => {
     if (!G.started && !diagAuto) {
       diagAuto = true;
       diagEl.classList.add('show');
-      syncDiagChrome();
       renderDiag();
       toast('서버 응답이 없습니다 — 좌하단 진단 패널을 확인하세요', 'kill');
     }
