@@ -2060,6 +2060,22 @@ const G = {
  * 층을 3→5 로 늘린 것 자체는 거의 영향이 없었습니다 — 프러스텀 컬링으로
  * 아래 층이 대부분 화면 밖입니다 (3층 32.6fps vs 5층 34.7fps, 노이즈 이내).
  * ------------------------------------------------------------------ */
+/* ── 전체화면으로 시작할지 (WANT_FULLSCREEN) ─────────────────────────
+ * 참가 버튼을 누르는 순간 전체화면으로 들어갑니다.
+ *
+ * ⚠ <b>페이지가 열리는 순간에는 넣을 수 없습니다.</b> requestFullscreen 은
+ *   사용자 제스처 안에서만 허용되고, 로드 시점 호출은 브라우저가 그냥
+ *   거절합니다. 그래서 '접속하면 전체화면' 의 실제 구현 지점은
+ *   <b>첫 클릭</b>(참가 버튼)이고, 사람 입장에서는 그게 곧 게임에 들어가는
+ *   순간이라 차이가 느껴지지 않습니다.
+ *
+ * ?fs=0 으로 끕니다 — 화면 배율·해상도 점검처럼 브라우저 UI 가 보여야
+ * 하는 상황이 있습니다(?touch=·?gpu= 와 같은 방식).               */
+const WANT_FULLSCREEN = (() => {
+  try { return new URLSearchParams(location.search).get('fs') !== '0'; }
+  catch (e) { return true; }
+})();
+
 /* ── 터치 기기 판정 (IS_TOUCH) ───────────────────────────────────────
  * ★ maxTouchPoints 만 보면 터치 패널 달린 노트북이 전부 걸립니다.
  *   묻고 싶은 것은 "터치가 되는가"가 아니라 "주 입력 장치가
@@ -13134,6 +13150,25 @@ function toggleLeaveMenu(on) {
   if (want) Input.releaseAll();
 }
 
+/* ── 전체화면에서 빠져나오면 '나가기 메뉴' 를 엽니다 ──────────────────
+ * ⚠ 전체화면 중에는 <b>ESC 가 게임까지 오지 않습니다.</b> 브라우저가
+ *   전체화면 해제에 먼저 쓰고 keydown 을 페이지로 내려보내지 않습니다.
+ *   그대로 두면 이 게임에서 ESC 는 <b>두 번</b> 눌러야 메뉴가 열립니다
+ *   (한 번은 전체화면 해제, 한 번은 메뉴) — 조작법을 모르는 사람이
+ *   계속 들어오는 행사장에서 '나가는 길' 이 한 겹 깊어집니다.
+ *   해제 자체를 신호로 삼아 메뉴를 열면 ESC 한 번으로 종전과 같아집니다.
+ * ⚠ F11 이나 브라우저 버튼으로 나가도 메뉴가 뜹니다 — 그건 '전체화면을
+ *   벗어나겠다' 는 뜻이라 나가기 메뉴가 엉뚱하지 않습니다. 닫기는 ESC
+ *   한 번이면 됩니다.
+ * 참가 화면(아직 게임에 안 들어옴)에서는 열지 않습니다.            */
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement) return;          // 들어갈 때는 아무것도 안 합니다
+  if (!WANT_FULLSCREEN) return;
+  if (dom.joinScreen && dom.joinScreen.classList.contains('show')) return;
+  if (!dom.leaveMenu || dom.leaveMenu.classList.contains('show')) return;
+  toggleLeaveMenu(true);
+});
+
 window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || e.repeat) return;
   const el = document.activeElement;
@@ -13480,15 +13515,27 @@ dom.btnJoin.addEventListener('click', () => {
   if ((dom.nameInput.value || '').trim()) rememberName(name);
   // 브라우저 자동재생 정책상 여기(첫 클릭)에서 오디오를 열어야 합니다
   Sound.unlock();
-  /* ★ 전체화면도 '사용자 제스처 안에서만' 허용되므로 같은 자리입니다.
-   *   주소창이 세로 폭의 15% 를 먹고, 스크롤에 따라 사라졌다 나타나며
-   *   캔버스 크기가 계속 바뀝니다 — 가로 폰에서는 그 15% 가 곧 시야
-   *   한 줄입니다. 거절되더라도(iOS 사파리는 문서 전체화면을 막습니다)
-   *   게임은 그대로 동작하므로 실패를 삼킵니다.                    */
-  if (IS_TOUCH) {
+  /* ★ 전체화면은 '사용자 제스처 안에서만' 허용되므로 여기가 유일한 자리입니다.
+   *   ⚠ 페이지가 열리는 순간에는 넣을 수 없습니다 — 브라우저가 거절합니다.
+   *     그래서 '접속하면 전체화면' 은 실제로는 <b>첫 클릭(참가 버튼)</b> 이
+   *     가장 이른 시점이고, 사람 입장에서는 그게 곧 '게임에 들어가는 순간'
+   *     입니다. 방 만들기도 이 버튼을 눌러 주므로(btnCreate) 한 곳이면 됩니다.
+   *
+   *   왜 필요한가 — 폰에서는 주소창이 세로 폭의 15% 를 먹고 스크롤에 따라
+   *   사라졌다 나타나며 캔버스 크기가 계속 바뀝니다(가로 폰에서 그 15% 는
+   *   곧 시야 한 줄). PC 에서는 행사장 화면이 그대로 게임이 되어, 주소창과
+   *   탭 줄이 사라진 만큼 아레나가 넓어집니다.
+   *
+   *   거절되더라도(iOS 사파리는 문서 전체화면을 막습니다) 게임은 그대로
+   *   동작하므로 실패를 삼킵니다.
+   *   ⚠ 화면 배율 점검 등으로 끄고 싶으면 ?fs=0 입니다(?touch=·?gpu= 와 같은 방식). */
+  if (WANT_FULLSCREEN && !document.fullscreenElement) {
     const el = document.documentElement;
     const rq = el.requestFullscreen || el.webkitRequestFullscreen;
     if (rq) { try { const p = rq.call(el); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+  }
+  /* 방향 고정은 터치에서만 뜻이 있습니다 — PC 에서는 거절되거나 무시됩니다. */
+  if (IS_TOUCH) {
     try {
       if (screen.orientation && screen.orientation.lock) {
         const p = screen.orientation.lock('landscape');
