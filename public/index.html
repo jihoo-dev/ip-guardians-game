@@ -789,8 +789,16 @@ input[type=text]{
     /* ① 안쪽 흰 테두리 — 8방향 */
     2px 0 0 #fff,-2px 0 0 #fff,0 2px 0 #fff,0 -2px 0 #fff,
     2px 2px 0 #fff,-2px 2px 0 #fff,2px -2px 0 #fff,-2px -2px 0 #fff,
-    /* ② 그 바깥의 어두운 번짐 — 흰 테두리가 흰 구름에 녹는 것을 막습니다 */
-    0 0 7px rgba(5,6,10,.95),0 0 16px rgba(5,6,10,.75),
+    /* ② 그 바깥의 어두운 번짐 — 흰 테두리가 흰 구름에 녹는 것을 막습니다.
+       ⚠ 종전에는 두 겹(7px .95 + 16px .75)이었는데 한 겹으로 합쳤습니다
+         (2026-09-21). 150px 짜리 글자에 그림자 11겹은 저사양 폰에서
+         카운트다운 3초 동안 래스터 부담이 됩니다.
+       알파를 1 로 올리고 번짐을 16px 으로 잡으면 두 겹과 사실상 같습니다 —
+       흰 바탕(#f2f7fb) 위에서 캔버스로 같은 그림자를 재현해 재니
+       가장 어두운 휘도 0.070(두 겹 0.059) · 어두운 화소 2.03%(두 겹 1.93%).
+       번짐만 줄이면(8~12px) 0.09~0.12 로 옅어져 흰 배경에서 테두리가
+       묻히기 시작합니다 — <b>알파를 1 로 올리는 것이 핵심</b>입니다. */
+    0 0 16px rgba(5,6,10,1),
     0 6px 20px rgba(0,0,0,.6),
     /* ③ 원래의 민트 번짐 */
     0 0 60px rgba(0,255,204,.5)}
@@ -1238,6 +1246,12 @@ body.touch #topbar{height:calc(var(--topbar-h) + env(safe-area-inset-top));
 /* 관전 배너도 노치만큼 같이 내려갑니다 */
 body.touch #specBanner{top:calc(var(--topbar-h) + env(safe-area-inset-top))}
 body.touch #topbar .opt{display:none}   /* 가로 폰에 9칸은 안 들어갑니다 */
+/* ⚠ 그런데 숨기는 칸 중에 <b>#tbTitle 이 flex:1 인 여백 노릇</b>을 하고
+ *   있었습니다. 터치에서 그게 사라지자 오른쪽 그룹(소리·메뉴)이 통째로
+ *   <b>왼쪽으로 붙어</b> 화면 왼쪽 44% 안에 들어갔고, 거기는 이동 영역이라
+ *   눌리지 않았습니다(위 #tMove 주석). 자리도 틀렸고 눌리지도 않던 것이라
+ *   둘 다 고칩니다 — 여기서는 소리 버튼부터 오른쪽으로 밀어 둡니다. */
+body.touch #btnAudio{margin-left:auto}
 /* ★ 안내문을 위로 올립니다. 화면 아래 좌우는 양 엄지가 차지하고,
  *   가운데로 두어도 왼쪽 이동 영역과 실측 170px 겹쳤습니다(844px 기준).
  *   위쪽은 상단바 아래가 통째로 비어 있어 가릴 것이 없습니다.
@@ -1256,7 +1270,20 @@ body.touch #hint .rules{display:none}   /* 두 줄이면 층 안내와 겹칩니
  *   폭 계산식이 좌우로 250px 씩 비우는데(데스크톱 층 목록 226 · 명단 230
  *   기준), 터치에서는 두 패널이 0.78 / 0.82 로 축소돼 <b>실측 130px 남짓</b>
  *   만 씁니다. 그래서 쓸 수 있는 573px 중 345px 만 쓰고 두 줄이 됐습니다.
- *   터치에서는 150px 씩만 비웁니다.
+ *
+ * ★ 비우는 폭을 <b>150 → 210px</b> 로 다시 올렸습니다(2026-09-21).
+ *   150 은 <b>넓은 화면만 보고 정한 값</b>이었습니다. 좌우 패널은 화면이
+ *   좁아져도 줄지 않습니다 — 실측으로 층 목록이 <b>오른쪽 끝 180px</b>,
+ *   명단이 <b>오른쪽에서 192px</b> 를 늘 차지합니다. 그런데 배너는 화면
+ *   가운데 기준이라, 화면이 좁아질수록 배너의 왼쪽 끝이 층 목록 쪽으로
+ *   다가갑니다. 계산: 배너 왼쪽 = 100vw/2 − 폭/2 이므로 <b>가로 740px
+ *   아래부터 겹칩니다</b>(667px 폰에서 27px 겹침 — 실제로 들어온 의견).
+ *   210px 씩 비우면 층 목록과 30px 이 남습니다.
+ * ⚠ 아래끝(240px)도 같이 내려야 합니다 — 240 으로 두면 568px 폰에서
+ *   그 값이 이겨 배너가 다시 16px 겹칩니다. 160 이면 가로 520px 까지
+ *   안 겹칩니다(가로 폰은 568px 이 가장 좁습니다).
+ * ⚠ 좁은 폰에서는 두 줄이 됩니다. 겹치는 것보다 낫고, 세로 폭은
+ *   #hint 아래 112px 에서 시작해 충분히 남습니다.
  * ★ 글자도 17 → 15px. 이것까지 해야 667px 짜리 작은 가로 폰에서도
  *   한 줄에 들어갑니다(15px 기준 362px 필요 · 그 폰에서 쓸 수 있는 폭 367px).
  *   더 좁은 폰에서는 두 줄이 되지만 겹치지는 않습니다.
@@ -1272,7 +1299,7 @@ body.touch #hint .rules{display:none}   /* 두 줄이면 층 안내와 겹칩니
 body.touch #darkAlert .tag{
   top:calc(var(--topbar-h) + 59px + env(safe-area-inset-top));
   width:max-content;
-  max-width:min(560px,max(240px,calc(100vw - 300px)))
+  max-width:min(560px,max(160px,calc(100vw - 420px)))
 }
 body.touch #darkAlert .tag b{font-size:15px}
 body.touch #toasts{bottom:calc(20px + env(safe-area-inset-bottom))}
@@ -1320,7 +1347,17 @@ body.touch #roster{transform:scale(.82);transform-origin:top right;top:70px}
 #touch{position:fixed;inset:0;z-index:11;display:none;pointer-events:none;
   touch-action:none}
 body.touch-run #touch{display:block}
-#tMove{position:absolute;left:0;top:0;width:44%;height:100%;pointer-events:auto}
+/* ⚠ 이동 영역은 <b>상단바 아래에서</b> 시작해야 합니다(2026-09-21).
+ *   #touch 는 z-index 11 로 #hud(10) <b>위</b>에 있고, #tMove 는 화면
+ *   왼쪽 44% 를 <b>위에서 아래까지</b> 덮습니다. 그래서 상단바의 버튼이
+ *   그 안에 들어가면 탭이 전부 이동 입력으로 먹힙니다 — 실측으로
+ *   소리·메뉴 버튼의 한가운데를 elementFromPoint 로 찍으면 #tMove 가
+ *   잡혔습니다. 엄지는 화면 아래쪽에 있으므로 위 53px 을 떼어 내도
+ *   조작에는 영향이 없습니다.
+ *   (노치가 있으면 상단바가 그만큼 내려오므로 safe-area 도 함께 뺍니다.) */
+#tMove{position:absolute;left:0;width:44%;pointer-events:auto;
+  top:calc(var(--topbar-h) + env(safe-area-inset-top));
+  height:calc(100% - var(--topbar-h) - env(safe-area-inset-top))}
 #tStick{position:absolute;width:132px;height:132px;margin:-66px 0 0 -66px;
   border-radius:50%;border:1.5px solid rgba(236,231,216,.26);
   background:rgba(5,6,10,.26);opacity:0;transition:opacity .12s;
