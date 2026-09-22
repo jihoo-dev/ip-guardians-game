@@ -435,8 +435,19 @@ body.dev #devLayers{display:flex}
  * 카드가 뷰포트보다 커지면 위아래가 동시에 잘리고 스크롤도 안 됩니다 —
  * 규격을 펼치거나 창이 낮은 노트북에서 제목과 입장 버튼이 같이 사라졌습니다.
  * flex-start + 카드에 margin:auto 가 정석입니다: 남으면 가운데, 넘치면 스크롤. */
+/* ⚠ position 은 <b>fixed</b> 여야 합니다(2026-09-22 수정).
+ *   absolute 면 덮는 높이가 <b>html 의 높이</b>(html,body{height:100%})에 묶입니다.
+ *   그런데 모바일에서는 그 값이 실제 뷰포트보다 작습니다 — 실측(844×390 폰):
+ *   레이아웃 뷰포트 <b>437</b> 인데 documentElement.clientHeight 는 <b>390</b>,
+ *   그래서 참가 화면이 0~390 까지만 깔리고 <b>아래 47px 이 비어</b> 3D 가
+ *   그대로 비쳤습니다("최초 화면 하단이 검게 안 채워진다"는 의견의 실체).
+ *   세로에서는 더 큽니다(846 vs 946 = 102px).
+ *   같은 화면의 #stage·#rotate 는 이미 fixed 라 437·946 을 다 덮고 있었습니다 —
+ *   .screen 만 혼자 absolute 였던 것입니다.
+ * ⚠ 스크롤은 그대로입니다. overflow-y 는 이 요소 자신의 것이라
+ *   position 과 무관합니다(카드가 길면 카드 안에서 스크롤됩니다). */
 .screen{
-  position:absolute;inset:0;display:none;align-items:flex-start;justify-content:center;
+  position:fixed;inset:0;display:none;align-items:flex-start;justify-content:center;
   overflow-y:auto;padding:24px 16px;
   background:radial-gradient(120% 90% at 50% 40%,rgba(5,6,10,.72),rgba(5,6,10,.97));
   pointer-events:auto;z-index:20
@@ -1205,7 +1216,11 @@ body.touch .rbtn{padding:10px;font-size:13px}
    대비비가 1.04 였습니다 — 1.0 이 '명도가 완전히 같다'이고 작은 글자
    최소 권장치가 4.5 입니다. 색만 올려서는 배경이 층마다 달라 또
    묻히므로, 어두운 판을 깔고 그 위에 글자를 놓습니다. */
-#hint{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);
+/* ⚠ position 은 <b>fixed</b> 입니다 — 이 요소는 이제 #topbar 의 자식이라
+ *   absolute 로 두면 상단바(높이 53px) 기준으로 잡혀 화면 아래로 못 갑니다.
+ *   fixed 는 뷰포트 기준이고, 상단바 계층에 fixed 를 가두는
+ *   transform/filter/contain 조상이 없는 것을 확인했습니다.            */
+#hint{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);
   font-family:var(--mono);font-size:11px;letter-spacing:.12em;line-height:1.7;
   color:rgba(236,231,216,.92);text-align:center;max-width:min(92vw,720px);
   padding:7px 14px;border-radius:4px;border:1px solid rgba(236,231,216,.10);
@@ -1281,8 +1296,42 @@ body.touch #btnAudio{margin-left:auto}
  *   가운데로 두어도 왼쪽 이동 영역과 실측 170px 겹쳤습니다(844px 기준).
  *   위쪽은 상단바 아래가 통째로 비어 있어 가릴 것이 없습니다.
  *   토스트는 그대로 아래 가운데입니다 — 안내(장소)는 위, 사건은 아래.  */
-body.touch #hint{top:calc(var(--topbar-h) + 5px + env(safe-area-inset-top));bottom:auto;
-  font-size:10px;max-width:min(60vw,480px);padding:5px 10px}
+/* ── 터치: 조작 안내를 상단바 <b>안</b>으로 ──────────────────────────
+ * 2026-09-22 — 종전에는 상단바 <b>바로 아래</b>에 떠 있었습니다
+ * (top: topbar-h + 5px). 가로 폰은 세로가 390~430px 뿐이라 그 한 줄이
+ * 아깝고, 암전 배너·층 안내와 계속 자리를 다퉜습니다(그 겹침을 고치느라
+ * 위 #darkAlert 규칙이 두 번 바뀌었습니다).
+ *
+ * 그런데 상단바는 터치에서 <b>가운데가 통째로 빕니다</b> — MAP·관전자·
+ * RTT·제목(.opt)이 숨겨지기 때문입니다. 실측(844px 폰): '남은 층' 오른끝
+ * 242 · '소리' 왼끝 826 → <b>빈 자리 584px</b>, 문구 한 줄은 473px.
+ * 그래서 그 자리를 flex 로 채웁니다.
+ *
+ * ⚠ flex:1 이 #tbTitle 이 하던 '밀어내기' 를 대신하지만
+ *   body.touch #btnAudio{margin-left:auto} 는 <b>그대로 둡니다</b> —
+ *   안내가 .hide 로 숨는 순간 오른쪽 버튼이 왼쪽으로 쏠립니다.
+ * ⚠ min-width:0 이 없으면 flex 항목이 글자 폭 아래로 안 줄어들어
+ *   좁은 폰(568px)에서 상단바를 밀고 나갑니다.
+ * ⚠ 줄바꿈을 허용합니다. 가장 좁은 가로 폰(568px)에서는 빈 자리가
+ *   약 216px 이라 두 줄이 되는데, 상단바 높이(53px)에 두 줄은 들어갑니다. */
+/* ⚠ 안내가 자리를 뺏어 <b>다른 칸이 찌그러지면 안 됩니다.</b> .tb 의 기본
+ *   flex 는 0 1 auto(줄어듦)라, 좁은 폰(568px)에서 'ROOM·생존·남은 층·소리'
+ *   가 전부 두 줄로 접혔습니다(실측). 고정 칸은 안 줄이고, 남는 자리는
+ *   안내가 <b>전부</b> 가져가게 합니다. */
+body.touch #topbar .tb{flex:0 0 auto}
+body.touch #hint{
+  position:static;flex:1 1 0;min-width:0;
+  top:auto;bottom:auto;left:auto;transform:none;
+  display:flex;align-items:center;justify-content:center;
+  margin:0;padding:0 10px;max-width:none;
+  border:none;border-radius:0;
+  /* ⚠ 배경을 없애면 <b>하늘 위에서 글자가 사라집니다.</b> 상단바 자신의
+   *   배경은 칸 사이 1px 선(--rule) 용이라 빈 자리에는 게임 화면이 그대로
+   *   비칩니다 — 실측으로 밝은 하늘 배경에 크림색 글자가 안 읽혔습니다.
+   *   다른 칸(.tb)과 <b>같은 판</b>을 깔아야 상단바가 한 줄로 이어집니다. */
+  background:rgba(5,6,10,.82);backdrop-filter:blur(8px);
+  font-size:9.5px;line-height:1.35;letter-spacing:.08em;text-align:center;
+  color:rgba(236,231,216,.82);pointer-events:none}
 body.touch #hint .rules{display:none}   /* 두 줄이면 층 안내와 겹칩니다 */
 /* ── 암전 배너가 조작 안내와 겹치던 것 (2026-09-20) ──────────────────
  * 터치에서는 #hint 가 <b>위로</b> 올라가 상단바 바로 밑을 차지하는데,
@@ -1457,6 +1506,17 @@ body.touch-run #touch{display:block}
     <!-- 구름바다까지 몇 층 남았는가. "떨어지면 죽는다"는 오해를 상시로
          반박하는 자리입니다 — 층이 곧 목숨이라는 걸 숫자로 보여 줍니다. -->
     <div class="tb panel"><span class="k">남은 층</span><span class="v" id="vFloors">—</span></div>
+    <!-- ★ 조작 안내. <b>상단바 안에</b> 둡니다(2026-09-22).
+         터치에서는 '남은 층' 과 '소리' 사이의 빈 자리를 flex 로 채워
+         화면 맨 위에 고정됩니다 — 실측(844px 폰) 빈 자리 584px 에
+         문구 한 줄 473px 이라 여유 있게 들어갑니다.
+         종전에는 상단바 <b>아래</b>에 떠 있어 가뜩이나 좁은 세로 공간을
+         한 줄 더 먹고, 암전 배너·층 안내와 자리를 다퉜습니다.
+         PC 에서는 position:fixed 로 <b>화면 아래 가운데</b>에 그대로
+         뜹니다 — 부모가 상단바여도 fixed 는 뷰포트 기준이고, 상단바
+         계층에 fixed 를 가두는 transform/filter 조상이 없음을 확인했습니다.
+         두 번째 줄(타일 규칙)은 buildRulesText 가 서버 상수로 채웁니다. -->
+    <div id="hint"><span id="hintKeys">WASD 이동 · SPACE 점프 · SHIFT 질주 · 마우스 드래그로 시점 회전</span><span class="rules" id="hintRules"></span></div>
     <div class="tb opt" id="tbTitle"><span class="k" style="text-align:center">IP GUARDIANS</span><span class="v">특허 <b>패스트트랙</b> 서바이벌</span></div>
     <div class="tb panel opt"><span class="k">관전자</span><span class="v" id="vSpec">0</span></div>
     <!-- ★ RTT·FPS 는 기본으로 보이지 않습니다(2026-09-20). 게임 규칙이
@@ -1511,8 +1571,6 @@ body.touch-run #touch{display:block}
   </div>
 
   <div id="diag" class="panel"><b>진단 F2</b><div id="diagBody">대기</div></div>
-  <!-- 두 번째 줄(타일 규칙)은 buildRulesText 가 서버 상수로 채웁니다 -->
-  <div id="hint"><span id="hintKeys">WASD 이동 · SPACE 점프 · SHIFT 질주 · 마우스 드래그로 시점 회전</span><span class="rules" id="hintRules"></span></div>
 </div>
 
 <!-- ── 터치 조작 (가로 전용) ─────────────────────────────────────────
@@ -7344,6 +7402,13 @@ function applyJumpImpulse(d) {
   const vy = +d.vel[1] || 0;
   if (vy <= 0) return;
 
+  /* ★ 점프 타일로 올라가는 중이라고 표시해 둡니다(2026-09-22).
+   *   터치에서는 이 상승으로 층이 바뀔 때 <b>가운데 층 배너를 띄우지
+   *   않습니다</b> — updateLayerStack 참고. 창은 상승 시간보다 넉넉히
+   *   잡습니다(두 층 상승이 약 0.89초). 착지하면 어차피 층이 더 안 바뀌므로
+   *   남아 있어도 다음 배너를 잡아먹지 않습니다.                      */
+  G.jumpTileUntil = performance.now() + 2000;
+
   local.vel.y = vy;
   local.grounded = false;
   /* jumped=true 로 둬야 낙하 애니메이션 판정이 '떨어지는 중'이 아니라
@@ -11316,6 +11381,20 @@ function updateLayerStack(layer) {
   if (G.lastLayerShown === layer) return;
   const prev = G.lastLayerShown;
   G.lastLayerShown = layer;
+
+  /* ⚠ 터치에서 <b>점프 타일로 올라갈 때는 배너를 띄우지 않습니다</b>(2026-09-22).
+   *   점프 타일은 아이디어 층(맨 아래)에만 있고 두 층 위로 쏘아 올립니다.
+   *   그런데 폰은 화면이 좁아 가운데 배너가 시야를 크게 덮고, 하필 <b>착지
+   *   지점을 봐야 하는 순간</b>에 뜹니다 — 올라가는 동안은 조작도 못 합니다.
+   *   PC 는 화면이 넓어 같은 문제가 없으므로 <b>터치에서만</b> 끕니다.
+   *   ★ G.lastLayerShown 은 <b>위에서 이미 갱신</b>했습니다. 여기서 그냥
+   *     return 해야 도착한 층이 '이미 보여 준 층' 으로 남아, 뒤에 그 층에서
+   *     다시 배너가 튀지 않습니다.
+   *   ⚠ 올라갈 때만입니다. 떨어져서 층이 바뀌는 것은 그대로 알립니다 —
+   *     그쪽은 '지금 어디로 떨어졌나' 가 실제로 궁금한 정보입니다.      */
+  const up = prev !== null && layer > prev;
+  if (IS_TOUCH && up && performance.now() < (G.jumpTileUntil || 0)) return;
+
   showLayerBanner(layer, prev === null ? 0 : (layer < prev ? -1 : 1));
 }
 

@@ -208,7 +208,14 @@ function makeBot(i, opt) {
   return b;
 }
 
-for (let i = 0; i < N; i++) bots.push(makeBot(i));
+/* --names 로 봇 이름을 직접 줍니다(쉼표 구분). 홍보영상처럼 <b>화면에
+   이름이 그대로 찍히는</b> 경우에 '봇1·봇2' 가 보이면 안 되기 때문입니다.
+   주면 앞에서부터 쓰고, 모자라면 나머지는 기본값(봇N)입니다. */
+const NAMES = (() => {
+  const i = process.argv.indexOf('--names');
+  return i >= 0 && process.argv[i + 1] ? process.argv[i + 1].split(',') : [];
+})();
+for (let i = 0; i < N; i++) bots.push(makeBot(i, NAMES[i] ? { name: NAMES[i] } : undefined));
 
 /* ── 관전자 봇 ────────────────────────────────────────────────────────
  * 개입(보정 기회)을 쓸 수 있는 것은 <b>이번 회차에 뛰지 않는 사람</b>뿐입니다
