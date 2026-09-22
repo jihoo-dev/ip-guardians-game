@@ -1370,11 +1370,46 @@ body.touch #hint .rules{display:none}   /* 두 줄이면 층 안내와 겹칩니
  *   에 갇혀 두 줄이 됐습니다 — 실측(669px 폰): 필요 361 · 허용 369 인데
  *   <b>쓸 수 있는 폭 335</b> 라 34px 짜리 둘째 줄이 생겼습니다.
  *   max-content 로 먼저 잡고 max-width 로 상한만 겁니다.            */
+/* ── 터치: 층 배너를 줄이고, 암전 배너와 겹치지 않게 ──────────────────
+ * 2026-09-22 — 폰에서 <b>층 배너가 너무 크고</b>, 5층에서는 암전 배너
+ * ('선행기술이 있는지 알 수 없다…')와 <b>겹친다</b>는 의견.
+ *
+ * 겹친 이유는 둘이 같은 띠를 두고 다퉜기 때문입니다 — 암전 배너는
+ * `topbar-h + 59px` = <b>112px</b>, 층 배너는 PC 와 같은 <b>122px</b>.
+ * 게다가 층 배너에는 터치 전용 규칙이 아예 없어서 이름이 <b>34px</b> 로
+ * PC 와 똑같이 나왔습니다(390px 짜리 세로 화면에서).
+ *
+ * ★ 59px 은 <b>낡은 값</b>이었습니다. #hint 가 상단바 아래에 떠 있던
+ *   시절 그 밑을 비켜 가려고 둔 것인데, #hint 를 상단바 <b>안</b>으로
+ *   옮기면서(위 주석) 그 자리가 비었습니다. 이제 상단바 바로 밑입니다.
+ *
+ * ★ 둘이 동시에 뜨는 것은 <b>5층뿐</b>이고 그때만 비켜서면 됩니다.
+ *   층 배너 높이는 층마다 다르므로(기믹 수·줄바꿈) 숫자를 박지 않고
+ *   <b>실측해서</b> --lb-h 에 넣습니다(showLayerBanner). 그동안만
+ *   body.lbOn 이 붙어 암전 배너가 그만큼 내려갑니다.                */
 body.touch #darkAlert .tag{
-  top:calc(var(--topbar-h) + 59px + env(safe-area-inset-top));
+  top:calc(var(--topbar-h) + 8px + env(safe-area-inset-top));
   width:max-content;
-  max-width:min(560px,max(160px,calc(100vw - 420px)))
+  max-width:min(560px,max(160px,calc(100vw - 420px)));
+  transition:opacity .18s ease,top .22s ease
 }
+body.touch.lbOn #darkAlert .tag{
+  top:calc(var(--topbar-h) + 8px + var(--lb-h,0px) + 10px + env(safe-area-inset-top))
+}
+
+/* 층 배너 — 폰에서는 한 단계 작게. 글자만 줄이면 여백이 그대로 남아
+   덩치가 안 줄어듭니다. 패딩·간격·최대폭을 같이 조입니다. */
+body.touch #layerBanner{
+  top:calc(var(--topbar-h) + 8px + env(safe-area-inset-top));
+  padding:12px 22px 11px;gap:3px;max-width:min(430px,84vw)
+}
+body.touch #layerBanner .lbNo{font-size:9px;letter-spacing:.24em}
+body.touch #layerBanner .lbName{font-size:20px;margin:1px 0 2px}
+body.touch #layerBanner .lbLead{font-size:11.5px;line-height:1.42;padding-top:4px}
+body.touch #layerBanner .lbMarks{gap:4px;margin:3px 0 1px}
+body.touch #layerBanner .lbMark{grid-template-columns:18px 1fr;font-size:11px}
+body.touch #layerBanner .lbMark i{font-size:13px}
+body.touch #layerBanner .lbMark.none{font-size:11px}
 body.touch #darkAlert .tag b{font-size:15px}
 body.touch #toasts{bottom:calc(20px + env(safe-area-inset-bottom))}
 /* ── 관전 중에는 토스트를 관전 패널 위로 ──────────────────────────
@@ -2025,9 +2060,64 @@ try { toastShowInfo = localStorage.getItem('ipg.toastInfo') === '1'; } catch (e)
 /* 회차가 바뀌면 "회차당 한 번" 짜리를 다시 쓸 수 있게 비웁니다. */
 function clearToastKeys() { toastSeen.clear(); }
 
+/* ── 층 배너가 떠 있는 동안 하단 알림을 미룹니다 (터치 전용) ──────────
+ * 2026-09-22 — 폰에서 <b>층 배너와 하단 알림이 겹친다</b>는 의견.
+ *
+ * 실측(가장 좁은 가로 폰 568×320 → 레이아웃 679×383): 기믹이 둘인 층
+ * (의견제출통지)에서 배너가 122~359px 을 차지하고 알림 두 줄이 291~363px
+ * 이라 <b>세로로 68px 겹칩니다.</b> 화면이 넓으면(844px 폰) 47px 남아
+ * 안 겹치므로, <b>낮고 좁은 폰에서만</b> 드러납니다 — 좁을수록 배너 글이
+ * 여러 줄로 접혀 세로로 길어지기 때문입니다(176 → 237px).
+ *
+ * ★ 새 구조를 만들지 않았습니다. 학습 문구(tipQueue)가 이미 '배너가 떠
+ *   있으면 기다린다' 로 돌고 있었는데, 그 규칙이 <b>학습 문구에만</b>
+ *   걸려 있어 발판·기믹 알림은 그대로 뚫고 나왔습니다. 같은 규칙을
+ *   toast() 한 곳으로 올려 <b>모든 알림</b>이 따르게 했습니다.
+ *
+ * ⚠ 터치에서만입니다. PC 는 배너(122~298)와 알림(하단 92px)이 넉넉히
+ *   떨어져 있어 미룰 이유가 없고, 미루면 멀쩡하던 알림만 늦어집니다.
+ * ⚠ 쌓인 것은 <b>뒤의 둘</b>만 냅니다 — 화면 동시 표시가 2개라 그보다
+ *   많이 내보내야 먼저 것이 밀려 사라지고, 지금 상황을 말하는 것은
+ *   최근 것입니다.
+ * ⚠ 중복 차단(key·gapMs)은 <b>넣을 때</b> 이미 기록됩니다. 미루는 동안
+ *   같은 key 가 또 와도 그 규칙이 그대로 걸러 줍니다.               */
+const toastHold = [];
+
+function bannerUp() {
+  const el = document.getElementById('layerBanner');
+  return !!(el && el.classList.contains('on'));
+}
+
+/** 배너가 내려갔을 때 부릅니다. 밀어 둔 알림을 순서대로 냅니다. */
+function flushToastHold() {
+  if (!toastHold.length) return;
+  const items = toastHold.splice(0, toastHold.length).slice(-2);
+  for (const it of items) toast(it.text, it.kind, it.opt);
+}
+
+/** 라운드 경계 — 지난 회차 알림이 새 회차로 새지 않게 버립니다. */
+function clearToastHold() { toastHold.length = 0; }
+
 function toast(text, kind, opt) {
   const o = opt || {};
   if (o.level === 'info' && !toastShowInfo) return;
+  /* 배너가 떠 있으면 미뤄 둡니다(위 주석). <b>o.now 를 주면 건너뜁니다</b> —
+   * 쓰임이 둘입니다.
+   *   ① flushToastHold 가 toast() 를 다시 부르므로, 이 표시가 없으면
+   *      배너가 아직 떠 있는 순간에 <b>무한히 되쌓입니다.</b>
+   *   ② <b>미루면 안 되는 알림</b>의 예외 통로. 지금은 탈락 통보 하나이고,
+   *      그건 소리·물보라 연출과 같은 순간에 나가야 뜻이 삽니다
+   *      (eliminated 핸들러 주석).                                   */
+  if (IS_TOUCH && !o.now && bannerUp()) {
+    if (o.key) {                       // 중복 차단은 넣을 때 기록합니다
+      const gap = o.gapMs === undefined ? TOAST_DEDUP_MS : o.gapMs;
+      const last = toastSeen.get(o.key);
+      if (last !== undefined && Date.now() - last < gap) return;
+      toastSeen.set(o.key, Date.now());
+    }
+    toastHold.push({ text, kind, opt: Object.assign({}, o, { now: true }) });
+    return;
+  }
   if (o.key) {
     const now = Date.now();
     const gap = o.gapMs === undefined ? TOAST_DEDUP_MS : o.gapMs;
@@ -2081,6 +2171,9 @@ const G = {
   seenTips: new Set(),
   /* 마지막으로 배너를 띄운 층. null 이면 아직 한 번도 안 띄웠습니다. */
   lastLayerShown: null,
+  /* 점프 타일로 솟는 중인가(터치 전용 배너 억제). applyJumpImpulse 에서
+   * 세우고 <b>착지하면</b> updateLayerStack 이 지웁니다 — 아래 주석 참고. */
+  jumpTileFlight: false,
   layerTiles: {},          // 층 번호 -> 타일 레코드 배열
   layerY: {},              // 층 번호 -> 바닥 y
   layerColor: {},          // 층 번호 -> 층 색(hex 숫자)
@@ -7402,12 +7495,15 @@ function applyJumpImpulse(d) {
   const vy = +d.vel[1] || 0;
   if (vy <= 0) return;
 
-  /* ★ 점프 타일로 올라가는 중이라고 표시해 둡니다(2026-09-22).
-   *   터치에서는 이 상승으로 층이 바뀔 때 <b>가운데 층 배너를 띄우지
-   *   않습니다</b> — updateLayerStack 참고. 창은 상승 시간보다 넉넉히
-   *   잡습니다(두 층 상승이 약 0.89초). 착지하면 어차피 층이 더 안 바뀌므로
-   *   남아 있어도 다음 배너를 잡아먹지 않습니다.                      */
-  G.jumpTileUntil = performance.now() + 2000;
+  /* ★ 점프 타일 비행 시작(2026-09-22). 터치에서는 이 비행 동안 층이
+   *   바뀌어도 <b>가운데 층 배너를 띄우지 않습니다</b> — updateLayerStack 참고.
+   *
+   *   ⚠ 처음에는 '2초 시간 창' 으로 만들었는데 그건 <b>약속을 못 지킵니다</b> —
+   *     도약은 1층·2층 두 가지이고(JUMP_TILE.levels), 착지 실패로 되떨어지는
+   *     경우까지 있어 비행 시간이 제각각입니다. 창이 먼저 닫히면 그때부터
+   *     배너가 다시 뜹니다.
+   *     지금은 <b>착지</b>라는 분명한 사건으로 끝냅니다 — 시간과 무관합니다.  */
+  G.jumpTileFlight = true;
 
   local.vel.y = vy;
   local.grounded = false;
@@ -8569,8 +8665,12 @@ function applyTileWear(rec) {
 function resetTileWear() {
   G.seenTips.clear();
   G.lastLayerShown = null;
+  /* 비행 중에 죽거나 회차가 끝나면 착지가 영영 안 옵니다 — 그대로 두면
+   * 다음 회차 내내 배너가 안 뜹니다. 라운드 경계에서 같이 내립니다. */
+  G.jumpTileFlight = false;
   clearTipQueue();       // 지난 회차 안내가 새 회차로 흘러나오지 않게
-  hideLayerBanner();
+  clearToastHold();      // 밀어 둔 하단 알림도 같이 — 순서가 중요합니다
+  hideLayerBanner();     //   (hideLayerBanner 가 flush 하므로 그 앞에서 비웁니다)
   for (const rec of G.tiles.values()) {
     rec.hits = 0;
     rec.wear = 0;
@@ -11345,18 +11445,40 @@ function showLayerBanner(layerIndex, dir) {
   el.classList.remove('on');
   void el.offsetWidth;
   el.classList.add('on');
+  /* 암전 배너가 이 배너를 비켜 갈 수 있게 <b>실제 높이</b>를 넘겨 줍니다.
+   * 층마다(기믹 수·줄바꿈) 높이가 달라 숫자를 박을 수 없습니다.
+   * ⚠ .on 을 붙인 <b>뒤</b>에 재야 합니다 — 그 전에는 display:none 이라
+   *   offsetHeight 가 0 입니다. */
+  document.documentElement.style.setProperty('--lb-h', el.offsetHeight + 'px');
+  document.body.classList.add('lbOn');
   layerBannerT1 = setTimeout(() => el.classList.add('out'), holdMs);
-  layerBannerT2 = setTimeout(() => { el.classList.remove('on'); el.classList.remove('out'); },
-    holdMs + 520);
+  layerBannerT2 = setTimeout(() => {
+    el.classList.remove('on'); el.classList.remove('out');
+    document.body.classList.remove('lbOn');   // 암전 배너가 제자리로
+    flushToastHold();          // 배너가 완전히 사라진 뒤에 밀어 둔 알림을 냅니다
+  }, holdMs + 520);
 }
 
 function hideLayerBanner() {
   const el = document.getElementById('layerBanner');
   clearTimeout(layerBannerT1); clearTimeout(layerBannerT2);
   if (el) { el.classList.remove('on'); el.classList.remove('out'); }
+  document.body.classList.remove('lbOn');
+  /* 타이머로 내려간 게 아니라 강제로 내린 경우 — 밀어 둔 알림이 갇히지
+   * 않게 여기서도 흘려보냅니다. 라운드 경계에서는 그 전에
+   * clearToastHold() 가 비우므로 지난 회차 것이 새지 않습니다. */
+  flushToastHold();
 }
 
 function updateLayerStack(layer) {
+  /* ★ 점프 타일 비행이 끝났으면(착지) 표시를 내립니다.
+   *   ⚠ 아래 '층이 바뀐 순간' 검사보다 <b>앞</b>에 있어야 합니다. 착지할
+   *     때는 비행 중에 이미 층이 바뀌어 있어서, 뒤에 두면 조기 반환에
+   *     걸려 영영 안 지워집니다.
+   *   ⚠ 여기서 지워도 <b>이번 착지 프레임에 배너가 새지 않습니다</b> —
+   *     착지는 층을 바꾸지 않으므로 아래 검사가 조기 반환합니다.        */
+  if (G.jumpTileFlight && local.grounded) G.jumpTileFlight = false;
+
   let changed = false;
   for (const d of dom.docs) {
     const on = parseInt(d.dataset.l, 10) === layer;
@@ -11382,18 +11504,24 @@ function updateLayerStack(layer) {
   const prev = G.lastLayerShown;
   G.lastLayerShown = layer;
 
-  /* ⚠ 터치에서 <b>점프 타일로 올라갈 때는 배너를 띄우지 않습니다</b>(2026-09-22).
-   *   점프 타일은 아이디어 층(맨 아래)에만 있고 두 층 위로 쏘아 올립니다.
-   *   그런데 폰은 화면이 좁아 가운데 배너가 시야를 크게 덮고, 하필 <b>착지
-   *   지점을 봐야 하는 순간</b>에 뜹니다 — 올라가는 동안은 조작도 못 합니다.
+  /* ⚠ 터치에서 <b>점프 타일을 밟은 뒤에는 배너를 아예 띄우지 않습니다</b>
+   *   (2026-09-22). 점프 타일은 아이디어 층(맨 아래)에만 있고 1층·2층 위로
+   *   쏘아 올립니다(`JUMP_TILE.levels`).
+   *
+   *   폰은 화면이 좁아 가운데 배너가 시야를 크게 덮는데, 하필 <b>착지 지점을
+   *   봐야 하는 순간</b>에 뜹니다 — 솟는 동안은 조작도 못 합니다. 2층 도약은
+   *   층을 둘 지나므로 배너가 <b>연달아 두 번</b> 뜨기까지 합니다.
    *   PC 는 화면이 넓어 같은 문제가 없으므로 <b>터치에서만</b> 끕니다.
+   *
+   *   ★ 끝나는 조건이 <b>시간이 아니라 착지</b>입니다(위 applyJumpImpulse
+   *     주석). 그래서 1층이든 2층이든, 착지에 실패해 되떨어지든 상관없이
+   *     "밟은 뒤부터 발이 닿을 때까지" 한 장도 안 뜹니다.
    *   ★ G.lastLayerShown 은 <b>위에서 이미 갱신</b>했습니다. 여기서 그냥
-   *     return 해야 도착한 층이 '이미 보여 준 층' 으로 남아, 뒤에 그 층에서
+   *     return 해야 지나온 층이 '이미 보여 준 층' 으로 남아, 뒤에 그 층에서
    *     다시 배너가 튀지 않습니다.
-   *   ⚠ 올라갈 때만입니다. 떨어져서 층이 바뀌는 것은 그대로 알립니다 —
-   *     그쪽은 '지금 어디로 떨어졌나' 가 실제로 궁금한 정보입니다.      */
-  const up = prev !== null && layer > prev;
-  if (IS_TOUCH && up && performance.now() < (G.jumpTileUntil || 0)) return;
+   *   ⚠ 점프와 무관한 낙하는 그대로 알립니다 — 그쪽은 '지금 어디로
+   *     떨어졌나' 가 실제로 궁금한 정보입니다(이 분기는 비행 중에만 탑니다). */
+  if (IS_TOUCH && G.jumpTileFlight) return;
 
   showLayerBanner(layer, prev === null ? 0 : (layer < prev ? -1 : 1));
 }
@@ -12427,7 +12555,12 @@ function connect(name, mode, opts) {
     if (d.id !== G.selfId) {
       // 밀어서 떨어뜨린 사람이 있으면 밝혀 줍니다 (내가 민 경우도 여기로 옵니다)
       const by = d.byName ? safeName(d.byName) + ' 님이 밀어냄 · ' : '';
-      toast(by + safeName(d.name) + ' 님 탈락 · ' + d.placement + '위', 'kill');
+      /* ★ now:true — 층 배너가 떠 있어도 <b>미루지 않습니다</b>(2026-09-22).
+       *   터치에서는 배너가 떠 있는 동안 하단 알림을 밀어 두는데(toast 주석),
+       *   탈락은 <b>그 순간에 맞춰 소리·물보라 연출이 같이 나갑니다.</b>
+       *   글만 최대 7초 뒤에 나오면 연출과 끊겨 '누가 죽었는지' 를 놓칩니다.
+       *   경쟁 상황이 바뀌는 사건이라 늦게 알면 뜻이 줄어드는 쪽입니다. */
+      toast(by + safeName(d.name) + ' 님 탈락 · ' + d.placement + '위', 'kill', { now: true });
       Sound.sfx('eliminate');
     } else if (local.alive) {
       /* 서버가 먼저 탈락시킨 경우 — 보고가 끊겨 서버가 대신 처리했습니다

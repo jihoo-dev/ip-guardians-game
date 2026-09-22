@@ -1870,6 +1870,32 @@ function aliveCount(room) {
   return n;
 }
 
+/**
+ * 비어 있는 좌석 중 가장 작은 번호.
+ *
+ * ★ 종전에는 좌석을 <b>room.players.size</b>(인원 수)로 줬습니다. 그건
+ *   '아무도 빠지지 않았을 때만' 맞는 값입니다 — 중간에 한 명이 나가면
+ *   <b>남은 사람이 쓰고 있는 번호를 그대로 다시 내줍니다.</b>
+ *
+ *   실측 재현: 1번(좌석 0)·2번(좌석 1)이 있다가 1번이 나가면 size 가 1 이
+ *   되고, 1번이 다시 들어오면 좌석 1 을 받아 <b>2번과 발판·옷 색이 겹칩니다</b>
+ *   (색 #ff5599 · 발판 (9.1, 10.5) 가 그대로 같았습니다).
+ *
+ *   좌석은 <b>발판 위치와 옷 색을 동시에</b> 정하므로(makePlayer),
+ *   충돌하면 두 사람이 같은 자리에 같은 모습으로 서게 됩니다.
+ *
+ * ⚠ 인원 수가 아니라 <b>실제로 쓰이는 번호</b>를 봐야 합니다.
+ * ⚠ 빈 자리가 없으면 -1 을 돌려줍니다 — 부르는 쪽이 정원을 먼저 확인하므로
+ *   정상 경로에서는 일어나지 않지만, 그때도 좌석이 겹치지 않도록
+ *   makePlayer 가 받은 값을 그대로 씁니다.
+ */
+function freeSeat(room) {
+  const taken = new Set();
+  for (const p of room.players.values()) taken.add(p.seat);
+  for (let i = 0; i < MAX_PLAYERS; i++) if (!taken.has(i)) return i;
+  return -1;
+}
+
 function makePlayer(id, name, seat, room) {
   const spawn = room.map.spawns[seat % room.map.spawns.length];
   return {
@@ -2502,7 +2528,7 @@ function resetRoom(room) {
     if (room.players.size >= MAX_PLAYERS) break;
     if (!spec.wantsPlay) continue;                 // 순수 관전자는 건드리지 않음
     if (!io.sockets.sockets.get(sid)) { room.spectators.delete(sid); continue; }
-    room.players.set(sid, makePlayer(sid, spec.name, room.players.size, room));
+    room.players.set(sid, makePlayer(sid, spec.name, freeSeat(room), room));
     room.spectators.delete(sid);
     io.to(room.id).emit('toast', { kind: 'cheer', text: spec.name + ' 님이 이번 회차 출원인으로 참가합니다' });
   }
@@ -3817,7 +3843,10 @@ io.on('connection', (socket) => {
     socket.join(room.id);
 
     if (role === 'player') {
-      const player = makePlayer(socket.id, name, room.players.size, room);
+      /* ⚠ 좌석은 <b>빈 번호</b>로 줍니다 — room.players.size 로 주면
+         누가 나간 뒤 재입장할 때 남은 사람의 번호를 그대로 재사용해
+         발판·옷 색이 겹칩니다(freeSeat 주석의 실측). */
+      const player = makePlayer(socket.id, name, freeSeat(room), room);
       room.players.set(socket.id, player);
       socket.to(room.id).emit('player_joined', publicPlayer(player));
     } else {
