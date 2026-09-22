@@ -4,6 +4,31 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>IP 가디언즈: 특허 패스트트랙 서바이벌</title>
+<!-- 탭 아이콘. 없으면 접속마다 /favicon.ico 404 가 한 번씩 납니다 —
+     게임 동작에는 지장이 없지만 행사장에서 콘솔을 여는 사람에게는 보입니다.
+     ⚠ ?v= 를 붙이지 않았습니다. 붙이면 immutable(1년) 캐시라 아이콘을
+       고칠 때마다 ASSET_VER 을 올려야 하는데, 잊기 쉬운 데 비해 얻는 것이
+       없습니다. 버전 없는 경로는 max-age=3600 이라 알아서 갱신됩니다.
+     파일은 tools/make_favicon.js 가 만듭니다(색·모양은 거기서 바꾸세요). -->
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<!-- 홈 화면에 추가했을 때 쓰이는 아이콘. 탭 아이콘과 파일이 다릅니다 —
+     iOS 가 둥근 마스크를 자기가 다시 씌우고 투명은 검정으로 깔아 버려서,
+     이쪽은 꽉 찬 사각·불투명으로 따로 뽑습니다(make_favicon.js 주석 참고). -->
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<!-- 홈 화면에 추가했을 때의 이름·아이콘·화면 방향. 안드로이드 크롬이 읽습니다.
+     ★ 이 게임에 실익이 있는 것은 "orientation":"landscape" 입니다 — 세로로 들면
+       #rotate 안내만 뜨는 가로 전용 게임이라, 아예 가로로 띄워 줍니다.
+       "display":"fullscreen" 도 같은 이유입니다(주소창 없이 바로 게임).
+     ⚠ 서비스 워커는 <b>일부러 두지 않았습니다.</b> 넣으면 설치 배너가 뜨는
+       대신 파일이 캐시에 붙박여, Render 로 배포한 새 판이 반영되지 않습니다 —
+       행사 도중 고칠 일이 생기면 그게 가장 위험합니다. 워커가 없으면
+       설치 배너도 안 뜨므로 평소 접속에는 아무 변화가 없습니다. -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#05060a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IP 가디언즈">
 <!-- 글꼴은 자체 서버에서 내려줍니다. 사내망에서 fonts.googleapis.com 이
      막히면 글꼴이 안 오는 정도가 아니라, 응답이 아예 안 오는 방식이면
      이 <link> 가 렌더 차단 자원이라 첫 화면이 수십 초 비어 있게 됩니다.
@@ -3599,30 +3624,6 @@ function clampToArena() {
   const lim = R * ARENA_SQ32;                    // 법선 투영 기준(내접반지름)
   const layer = local.grounded ? local.layer : currentLayerOf(local.pos.y);
 
-  /* ── 회전층 위를 <b>공중으로</b> 지날 때 ──────────────────────────────
-   * 2026-09-21 — 바닥은 서 있는 주자만 실어 나릅니다(carry 는 grounded 일
-   * 때만). 그래서 공중에 있는 동안 층 로컬 육각형을 그대로 적용하면,
-   * <b>도는 벽이 낙하 중인 주자를 옆으로 밀어냅니다</b> — 실측으로 5층
-   * 가장자리에서 떨어질 때 한 프레임에 4.7 유닛 이동했습니다. 그 순간이동은
-   * 서버 이동 검증(VALIDATE.MAX_STEP 6.0)에도 아슬아슬하게 닿습니다.
-   *
-   * 공중에서는 회전과 무관한 <b>외접원</b>으로만 막습니다 — 아레나를
-   * 완전히 벗어나는 것만 잡고, 어느 방향이든 타일이 있는 자리까지는
-   * 그대로 떨어지게 둡니다. 착지하면 아래 육각 판정이 이어받습니다.
-   * ⚠ 반지름은 내접(lim)이 아니라 <b>R</b> 입니다. 내접으로 막으면 육각형
-   *   꼭짓점 구역(여기서는 6.5 유닛 ≈ 타일 1.4장)이 통째로 닫힙니다.  */
-  if (isRotatingLayer(layer) && !local.grounded) {
-    const r = Math.hypot(local.pos.x, local.pos.z);
-    if (r <= R || r === 0) return;
-    const k = R / r;
-    local.pos.x *= k;
-    local.pos.z *= k;
-    const nx = local.pos.x / R, nz = local.pos.z / R;
-    const vn = local.vel.x * nx + local.vel.z * nz;
-    if (vn > 0) { local.vel.x -= nx * vn; local.vel.z -= nz * vn; }
-    return;
-  }
-
   const a = layerAngleOf(layer);
   const ca = Math.cos(-a), sa = Math.sin(-a);
   /* 층 로컬로 */
@@ -3631,23 +3632,121 @@ function clampToArena() {
   let vx = a ? local.vel.x * ca - local.vel.z * sa : local.vel.x;
   let vz = a ? local.vel.x * sa + local.vel.z * ca : local.vel.z;
 
-  let hit = false;
-  for (let pass = 0; pass < 2; pass++) {
+  /* ── 회전층 위를 <b>공중으로</b> 지날 때 ──────────────────────────────
+   * 2026-09-22 — 종전에는 공중이면 회전층을 통째로 <b>외접원(R)</b> 으로만
+   * 막았습니다. 그랬더니 <b>난간 바깥으로 점프가 됐습니다</b> — 변 한가운데
+   * 에서 경계가 내접(42.24)인데 외접(48.77)까지 열려, 눈에 보이는 난간보다
+   * <b>6.5 유닛(타일 약 1.4장)</b> 밖으로 나갑니다.
+   *
+   * ★ 그때 원을 쓴 이유였던 '낙하 중 한 프레임 4.7 유닛 튐' 은 <b>도는 벽이
+   *   밀어낸 것이 아니었습니다.</b> 회전은 0.12 rad/s 라, 벽이 공중의 주자를
+   *   쓸고 가는 속도는 계산상 <b>프레임당 0.056 유닛</b>뿐입니다
+   *   (lim × sin30°/cos²30° × 0.12 / 60). 진짜 원인은 <b>층이 바뀌는 순간의
+   *   불연속</b> 입니다 — 위층 육각형 안에서 떨어지던 주자가 아래 회전층의
+   *   관할로 들어서는 순간, 그 층 육각형이 다른 각도라 한 프레임에 통째로
+   *   끌려갔습니다(실측 4.76 = 47 − 42.24).
+   *
+   * 그래서 <b>벽을 넘은 것</b>과 <b>이미 바깥에서 들어온 것</b>을 가릅니다.
+   *   · 지난 프레임에 이 층 육각형 <b>안</b>에 있었다 → 육각형으로 막습니다
+   *     (점프로 넘어가려는 경우. 난간 그대로 작동)
+   *   · 바깥에서 들어왔다 → 끌어당기지 않고 <b>외접원</b>만 겁니다
+   *     (층 전환·회전 불연속. 끌려가지 않고 그대로 떨어집니다)
+   * 한 번 안으로 들어오면 다시 육각형이 이어받습니다.
+   *
+   * ⚠ 바깥으로 떨어져도 착지하지 않습니다 — 타일이 육각형 안에만 있어
+   *   findLanding 이 발판을 못 찾습니다. 즉 이 완화가 '난간 밖에 서기' 로
+   *   이어지지는 않습니다.
+   * ⚠ 접지 중에는 이 분기를 타지 않습니다. 바닥이 주자를 실어 나르므로
+   *   (carryAccum) 층 로컬 좌표가 그대로이고, 늘 육각형입니다.        */
+  /* ★ 2026-09-22 재수정 — 조건이 <b>`isRotatingLayer(layer)` 였던 것이
+   *   버그였습니다.</b> 그러면 회전층 <b>안으로</b> 들어오는 방향만 막고,
+   *   <b>회전층을 떠나 이웃 층으로 넘어가는 방향은 무방비</b>입니다.
+   *   제보가 정확히 그 경로였습니다 — "의견제출통지층(회전)에서 타일이
+   *   폭발해 보정층으로 내려갈 때 무한 낙하".
+   *
+   *   실측(회전각 0~60° 전수 훑기): 회전이 <b>30°</b> 어긋난 순간,
+   *   회전층 꼭짓점(r≈48.6)에 있던 주자가 이웃 층 관할로 들어서면 한
+   *   프레임에 <b>6.26~6.36 유닛</b> 끌려갑니다 — 서버
+   *   `VALIDATE.MAX_STEP`(6.0)을 <b>넘습니다.</b>
+   *   그리고 한 번 거절되면 `lastGood` 이 안 움직이므로 <b>그 뒤 보고가
+   *   전부 같은 거리만큼 벗어나 연달아 거절</b>됩니다 — 실측으로
+   *   수평 점프 한 번이 5.90 에서는 보정 0회인데 <b>6.26 에서 32회</b>를
+   *   부릅니다. 이것이 무한 낙하의 정체입니다.
+   *
+   *   그래서 가드를 <b>공중이면 층 종류를 가리지 않고</b> 겁니다.
+   *   비회전층끼리는 모두 각도가 0 이라 육각형이 똑같아 `inside` 가 항상
+   *   참이고, 동작이 종전과 완전히 같습니다(회귀 없음). 달라지는 것은
+   *   회전층이 낀 전환뿐입니다.                                       */
+  let hexWall = true;
+  if (!local.grounded) {
+    let inside = true;
     for (const n of ARENA_N) {
-      const d = px * n.x + pz * n.z;
-      const over = Math.abs(d) - lim;
-      if (over <= 0) continue;
-      const sgn = d > 0 ? 1 : -1;
-      px -= n.x * over * sgn;
-      pz -= n.z * over * sgn;
-      /* 바깥으로 향하는 속도 성분만 깎습니다. 전부 0 으로 만들면 난간을
-       * 따라 옆으로 달리는 것까지 멈춰 벽에 붙어 버립니다. */
-      const vn = vx * n.x + vz * n.z;
-      if (vn * sgn > 0) { vx -= n.x * vn; vz -= n.z * vn; }
+      if (Math.abs(px * n.x + pz * n.z) > lim) { inside = false; break; }
+    }
+    hexWall = inside || (local.arenaInLayer === layer && local.arenaIn);
+    local.arenaIn = inside;
+  } else {
+    local.arenaIn = true;
+  }
+  local.arenaInLayer = layer;
+
+  let hit = false;
+  if (!hexWall) {
+    /* 이미 바깥 — 아레나를 완전히 벗어나는 것만 막습니다(외접원). */
+    const r = Math.hypot(px, pz);
+    if (r > R && r > 0) {
+      const k = R / r;
+      px *= k; pz *= k;
+      const nx = px / R, nz = pz / R;
+      const vn = vx * nx + vz * nz;
+      if (vn > 0) { vx -= nx * vn; vz -= nz * vn; }
       hit = true;
     }
+  } else {
+    for (let pass = 0; pass < 2; pass++) {
+      for (const n of ARENA_N) {
+        const d = px * n.x + pz * n.z;
+        const over = Math.abs(d) - lim;
+        if (over <= 0) continue;
+        const sgn = d > 0 ? 1 : -1;
+        px -= n.x * over * sgn;
+        pz -= n.z * over * sgn;
+        /* 바깥으로 향하는 속도 성분만 깎습니다. 전부 0 으로 만들면 난간을
+         * 따라 옆으로 달리는 것까지 멈춰 벽에 붙어 버립니다. */
+        const vn = vx * n.x + vz * n.z;
+        if (vn * sgn > 0) { vx -= n.x * vn; vz -= n.z * vn; }
+        hit = true;
+      }
+    }
+    if (hit) local.arenaIn = true;   // 벽에 붙여 놓았으니 이제 안쪽입니다
   }
   if (!hit) return;
+
+  /* ── 안전망: 한 프레임에 끌어당기는 양을 제한합니다 ──────────────────
+   * 무한 낙하가 세 번 재발했고, 세 번 다 구조가 같았습니다 —
+   * <b>클램프가 한 프레임에 크게 끌면</b>(층 전환 각도 불일치 등) 그 보고가
+   * 서버 `VALIDATE.MAX_STEP`(6.0)을 넘어 거절되고, 거절되면 `lastGood` 이
+   * 안 움직이므로 <b>그 뒤 보고가 전부 같은 거리만큼 벗어나 연달아 거절</b>
+   * 되어 보정 → 되돌림 → 재낙하가 반복됩니다.
+   * 실측: 한 번의 수평 점프가 4.40·5.90 에서는 보정 0회인데
+   *       <b>6.26 에서 32회</b>, 6.50 에서 31회를 부릅니다.
+   *
+   * 그래서 원인(층 전환 불연속)을 고치는 것과 <b>별개로</b>, 클램프가
+   * 서버 한계를 건드릴 만큼 크게 움직이는 일 자체를 막습니다. 여러 프레임에
+   * 걸쳐 나눠 끌면 한 보고당 이동은 작고 결과 위치는 같습니다.
+   *
+   * ⚠ 정상 플레이에는 아무 영향이 없습니다 — 난간에 질주로 부딪쳐도 한
+   *   프레임 초과분은 21.5/60 = <b>0.36 유닛</b>뿐이라 이 상한에 닿지
+   *   않습니다. 걸리는 것은 '있어서는 안 되는 큰 끌림' 뿐입니다.       */
+  const CLAMP_STEP_MAX = 3.0;
+  const mdx = px - (a ? local.pos.x * ca - local.pos.z * sa : local.pos.x);
+  const mdz = pz - (a ? local.pos.x * sa + local.pos.z * ca : local.pos.z);
+  const md = Math.hypot(mdx, mdz);
+  if (md > CLAMP_STEP_MAX) {
+    const k = CLAMP_STEP_MAX / md;
+    px -= mdx * (1 - k);
+    pz -= mdz * (1 - k);
+  }
 
   /* 월드로 되돌리기 (+a 회전) */
   const cb = Math.cos(a), sb = Math.sin(a);
@@ -6538,6 +6637,10 @@ const local = {
   avatar: null,
   coyote: 0,
   jumpBuffer: 0,
+  /* 회전층 난간 판정용 (clampToArena). "지난 프레임에 이 층 육각형 안에
+   * 있었는가" — 벽을 넘으려는 것과 바깥에서 들어온 것을 가릅니다. */
+  arenaIn: true,
+  arenaInLayer: -1,
   alive: true,
   seat: null,        // 내 좌석 번호 (대기 발판 매칭용)
   dying: 0,          // >0 이면 구름바다로 잠기는 연출 진행 중
