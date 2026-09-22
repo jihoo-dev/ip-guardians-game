@@ -2171,9 +2171,10 @@ const G = {
   seenTips: new Set(),
   /* 마지막으로 배너를 띄운 층. null 이면 아직 한 번도 안 띄웠습니다. */
   lastLayerShown: null,
-  /* 점프 타일로 솟는 중인가(터치 전용 배너 억제). applyJumpImpulse 에서
-   * 세우고 <b>착지하면</b> updateLayerStack 이 지웁니다 — 아래 주석 참고. */
-  jumpTileFlight: false,
+  /* 이 회차에 점프 타일을 <b>한 번이라도 밟았는가</b>(터치 전용 배너 억제).
+   * applyJumpImpulse 에서 세우고 <b>회차가 끝날 때까지 안 내립니다</b> —
+   * updateLayerStack 주석 참고. */
+  jumpTileUsed: false,
   layerTiles: {},          // 층 번호 -> 타일 레코드 배열
   layerY: {},              // 층 번호 -> 바닥 y
   layerColor: {},          // 층 번호 -> 층 색(hex 숫자)
@@ -7495,15 +7496,17 @@ function applyJumpImpulse(d) {
   const vy = +d.vel[1] || 0;
   if (vy <= 0) return;
 
-  /* ★ 점프 타일 비행 시작(2026-09-22). 터치에서는 이 비행 동안 층이
-   *   바뀌어도 <b>가운데 층 배너를 띄우지 않습니다</b> — updateLayerStack 참고.
+  /* ★ 점프 타일을 밟았다는 표시(2026-09-22). 터치에서는 <b>이 순간부터
+   *   회차가 끝날 때까지</b> 가운데 층 배너를 띄우지 않습니다
+   *   — updateLayerStack 참고.
    *
-   *   ⚠ 처음에는 '2초 시간 창' 으로 만들었는데 그건 <b>약속을 못 지킵니다</b> —
-   *     도약은 1층·2층 두 가지이고(JUMP_TILE.levels), 착지 실패로 되떨어지는
-   *     경우까지 있어 비행 시간이 제각각입니다. 창이 먼저 닫히면 그때부터
-   *     배너가 다시 뜹니다.
-   *     지금은 <b>착지</b>라는 분명한 사건으로 끝냅니다 — 시간과 무관합니다.  */
-  G.jumpTileFlight = true;
+   *   ⚠ <b>한 번 세우면 안 내립니다.</b> 처음에는 '2초 시간 창' 으로,
+   *     그 다음에는 '착지하면 해제' 로 만들었는데 둘 다 부족했습니다 —
+   *     도약은 <b>맨 아래 아이디어 층</b>에서만 쓰는데, 거기까지 왔다는 것은
+   *     이미 모든 층 안내를 본 뒤입니다. 올라가서 또, 다시 떨어져서 또
+   *     뜨면 그때부터는 전부 <b>아는 내용</b>이라 시야만 가립니다.
+   *     회차 경계(resetTileWear)에서만 내립니다.                        */
+  G.jumpTileUsed = true;
 
   local.vel.y = vy;
   local.grounded = false;
@@ -8667,7 +8670,7 @@ function resetTileWear() {
   G.lastLayerShown = null;
   /* 비행 중에 죽거나 회차가 끝나면 착지가 영영 안 옵니다 — 그대로 두면
    * 다음 회차 내내 배너가 안 뜹니다. 라운드 경계에서 같이 내립니다. */
-  G.jumpTileFlight = false;
+  G.jumpTileUsed = false;
   clearTipQueue();       // 지난 회차 안내가 새 회차로 흘러나오지 않게
   clearToastHold();      // 밀어 둔 하단 알림도 같이 — 순서가 중요합니다
   hideLayerBanner();     //   (hideLayerBanner 가 flush 하므로 그 앞에서 비웁니다)
@@ -11471,14 +11474,6 @@ function hideLayerBanner() {
 }
 
 function updateLayerStack(layer) {
-  /* ★ 점프 타일 비행이 끝났으면(착지) 표시를 내립니다.
-   *   ⚠ 아래 '층이 바뀐 순간' 검사보다 <b>앞</b>에 있어야 합니다. 착지할
-   *     때는 비행 중에 이미 층이 바뀌어 있어서, 뒤에 두면 조기 반환에
-   *     걸려 영영 안 지워집니다.
-   *   ⚠ 여기서 지워도 <b>이번 착지 프레임에 배너가 새지 않습니다</b> —
-   *     착지는 층을 바꾸지 않으므로 아래 검사가 조기 반환합니다.        */
-  if (G.jumpTileFlight && local.grounded) G.jumpTileFlight = false;
-
   let changed = false;
   for (const d of dom.docs) {
     const on = parseInt(d.dataset.l, 10) === layer;
@@ -11513,15 +11508,17 @@ function updateLayerStack(layer) {
    *   층을 둘 지나므로 배너가 <b>연달아 두 번</b> 뜨기까지 합니다.
    *   PC 는 화면이 넓어 같은 문제가 없으므로 <b>터치에서만</b> 끕니다.
    *
-   *   ★ 끝나는 조건이 <b>시간이 아니라 착지</b>입니다(위 applyJumpImpulse
-   *     주석). 그래서 1층이든 2층이든, 착지에 실패해 되떨어지든 상관없이
-   *     "밟은 뒤부터 발이 닿을 때까지" 한 장도 안 뜹니다.
+   *   ★ <b>밟은 순간부터 회차 끝까지</b>입니다 — 비행 중만이 아닙니다.
+   *     도약 타일은 <b>맨 아래 아이디어 층</b>에만 있으니, 거기까지 왔다는
+   *     것은 이미 모든 층 안내를 본 뒤입니다. 올라가서 또, 되떨어져서 또
+   *     뜨면 그때부터는 전부 <b>아는 내용</b>이라 시야만 가립니다.
+   *     ⚠ 그래서 1층·2층 도약을 가리지 않고, 착지 성공·실패도 안 가립니다.
    *   ★ G.lastLayerShown 은 <b>위에서 이미 갱신</b>했습니다. 여기서 그냥
    *     return 해야 지나온 층이 '이미 보여 준 층' 으로 남아, 뒤에 그 층에서
    *     다시 배너가 튀지 않습니다.
-   *   ⚠ 점프와 무관한 낙하는 그대로 알립니다 — 그쪽은 '지금 어디로
-   *     떨어졌나' 가 실제로 궁금한 정보입니다(이 분기는 비행 중에만 탑니다). */
-  if (IS_TOUCH && G.jumpTileFlight) return;
+   *   ⚠ 되돌리려면 <b>착지에서 해제</b>하지 말고(그건 이미 해 봤고 모자랐습니다)
+   *     이 조건 자체를 빼세요. 회차 경계에서는 resetTileWear 가 내립니다. */
+  if (IS_TOUCH && G.jumpTileUsed) return;
 
   showLayerBanner(layer, prev === null ? 0 : (layer < prev ? -1 : 1));
 }
@@ -12587,6 +12584,19 @@ function connect(name, mode, opts) {
 
   socket.on('game_over', (d) => {
     updateRoster();
+    /* ★ 아직 <b>참가를 누르지도 않은</b> 사람에게는 아무것도 띄우지
+     *   않습니다(2026-09-22). 페이지를 열면 곧바로 미리보기 관전으로
+     *   붙는 구조라(connect 의 preview), 참가 화면을 보고 있는 동안에도
+     *   <b>남의 방</b> 경기의 game_over 가 그대로 날아옵니다.
+     *   그대로 두면 결과 화면(.screen · position:fixed)이 참가 화면을
+     *   통째로 덮어, 들어가지도 않은 경기의 처분서를 받습니다.
+     *
+     *   ⚠ toast·chat·sudden_death 는 이미 같은 가드가 있었는데
+     *     <b>game_over 만 빠져 있었습니다.</b> 미리보기로 들어오는 경로에
+     *     무엇을 더할 때는 이 네 곳을 같이 보세요.
+     *   ⚠ updateRoster() 는 가드 앞에 둡니다 — 명단은 참가 화면 뒤에서
+     *     계속 돌아야 할 화면이고, 덮는 물건이 아닙니다.            */
+    if (previewing) return;
     /* 승자가 있으면 3D 피날레를 먼저 돌리고 결과 패널은 그 뒤에 올립니다.
      * 패널이 먼저 뜨면 화면을 덮어 연출이 하나도 안 보입니다.
      * 승자가 없으면(전멸) 연출할 대상이 없으므로 종전처럼 바로 띄웁니다. */
