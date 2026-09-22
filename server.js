@@ -896,12 +896,51 @@ const VALIDATE = {
                              // 클라이언트는 dt 를 0.25초로 자르므로
                              // 한 프레임 최대 이동이 21.5×0.25 = 5.4m 입니다.
 
-  /* 수직은 버킷을 쓰지 않습니다. 중력이 이미 자연스러운 상한이고,
-   * 낙하는 정상적으로 아주 빠릅니다. 순간 판정 + 여유값으로 충분합니다. */
+  /* 위로 솟는 것만 순간 판정으로 봅니다 — 비행·등반이 진짜 치트 경로입니다.
+   * 아래로 내려가는 것은 수평과 같은 토큰 버킷입니다(바로 아래 주석). */
   MAX_UP_SPEED: 34,          // PHYS.JUMP_V(21.5) + 장애물 팝(9) + 여유
   MAX_DOWN_SPEED: 120,       // PHYS.MAX_FALL(90) + 여유
   V_MIN_DT: 0.02,
   V_SLACK: 1.0,              // 착지 스냅(findLanding)이 한 프레임에 내는 도약분
+
+  /* ★ 2026-09-21 — <b>하강도 토큰 버킷으로 바꿨습니다.</b>
+   *
+   *   종전에는 하강이 순간 판정 하나였습니다:
+   *       -dy > MAX_DOWN_SPEED × max(dt, V_MIN_DT) + V_SLACK  이면 거절.
+   *   이것이 위의 수평 BURST 와 <b>똑같은 이유로</b> 무너집니다 — 보고가
+   *   몰려 도착하면 dt 가 0 에 가까워 vdt 가 하한(0.02)으로 눌리고,
+   *   허용치가 120 × 0.02 + 1 = <b>3.40m</b> 로 쪼그라듭니다. 그런데
+   *   종단속도(클라이언트 PHYS.MAX_FALL = 90m/s)로 떨어지는 정직한 주자는
+   *   20Hz 보고 하나에 <b>4.50m</b> 를 내려갑니다. 즉 <b>빠르게 떨어지는
+   *   동안에는 몰림이 곧 거절</b>입니다. 2026-09-21 에 수평만 고치고
+   *   이쪽을 남겨 둬서, 증상이 '낙하할 때만' 남았습니다.
+   *
+   *   ⚠ 증상이 고약합니다 — 거절 4연속이면 보정이 나가는데, 클라이언트는
+   *     보정을 받으면 <b>그 자리로 되돌아가 속도를 0 으로</b> 만들고 다시
+   *     떨어집니다(index.html 의 state_correction 핸들러). 되돌려지는 폭이
+   *     한 층 간격(LAYER_GAP 18)과 맞먹어, 착지 직전에 한 층 위로
+   *     끌어올려지는 일이 반복됩니다. 화면에는 <b>끝나지 않는 낙하</b> 로
+   *     보입니다. 모바일에서 먼저 드러난 이유는 폴링 전송과 CPU 조절로
+   *     몰림이 더 크기 때문입니다.
+   *
+   *   경계: <b>41.6m(약 2.3개 층)</b> 넘게 떨어지면 속도가 71.3m/s 를 넘어
+   *   한 보고 하강량이 3.40m 를 넘어섭니다. 한 층 낙하(18m)는 안 걸리고
+   *   <b>장외 낙하나 여러 층 낙하만</b> 걸립니다 — 그래서 '가끔' 나는
+   *   버그로 보였습니다.
+   *
+   *   실측(최상층 y=90 → 구름바다 y=-16, 106m 낙하):
+   *     몰림 50·150·250ms → 보정 0회 · 3.7초에 도달
+   *     몰림 300ms → <b>보정 2회 · 6.4초</b> (y 86→100, 2→20 으로 끌어올려짐)
+   *     몰림 400ms → <b>보정 3회 · 7.7초</b>
+   *
+   *   ⚠ 하강을 느슨하게 봐도 되는 이유: 아래로 순간이동해 봐야 얻는 것이
+   *     없습니다(어차피 떨어질 자리이고, 한 층 내려가는 것은 정상
+   *     플레이입니다). 진짜 치트 경로는 위로 솟는 쪽이라 그쪽은 종전
+   *     그대로 빡빡하게 둡니다.                                       */
+  DOWN_BURST: 0,             // 아래에서 MAX_DOWN_SPEED × MAX_DT 로 채웁니다
+  MAX_V_STEP: 0,             // 아래에서 파생 — 한 보고의 최대 하강량
+  CLIENT_DT_CAP: 0.25,       // index.html stepFrameOnce 의 dt 상한과 짝
+  SEND_PERIOD: 0.05,         // 20Hz 보고 주기
 
   /* MAX_DT 가 없으면 오래 끊겼다 돌아온 클라이언트의 버킷이 가득 차
    * 순간이동 한 번이 통과합니다. BURST 와 함께 이중으로 막습니다.     */
@@ -923,6 +962,14 @@ const VALIDATE = {
 /* BURST 는 MAX_DT 와 짝입니다 — 서버가 인정하는 최대 공백 동안 정직한
  * 주자가 갈 수 있는 거리. 숫자를 따로 적으면 한쪽만 고치고 끝나게 됩니다. */
 VALIDATE.BURST = VALIDATE.MAX_H_SPEED * VALIDATE.MAX_DT;
+/* 하강 버킷도 같은 짝입니다. MAX_V_STEP 은 '한 보고 안에 들어올 수 있는
+ * 최대 물리 시간'(클라이언트 dt 상한 + 보고 주기)으로 파생시킵니다 —
+ * 클라이언트가 한 프레임에 0.25초까지 진행할 수 있고, 그 프레임이 보고
+ * 직전에 끼면 한 보고가 0.30초 치를 담습니다. 숫자를 따로 적으면
+ * index.html 의 dt 상한만 고치고 여기를 잊게 됩니다.                */
+VALIDATE.DOWN_BURST = VALIDATE.MAX_DOWN_SPEED * VALIDATE.MAX_DT;
+VALIDATE.MAX_V_STEP = VALIDATE.MAX_DOWN_SPEED *
+  (VALIDATE.CLIENT_DT_CAP + VALIDATE.SEND_PERIOD);
 
 /* ── 보고가 끊긴 플레이어 (STALE) ─────────────────────────────────────
  * 브라우저는 비활성 탭의 requestAnimationFrame 을 멈춥니다. 그러면 물리도
@@ -1871,10 +1918,13 @@ function makePlayer(id, name, seat, room) {
      *   lastGood   : 마지막으로 검증을 통과한 위치. 보정할 때 이 자리로 되돌립니다.
      *   lastGoodAt : 그 시각. 여기부터 흐른 시간만큼 예산이 찹니다.
      *   budget     : 남은 수평 이동 예산(m). 토큰 버킷.
+     *   downBudget : 남은 하강 예산(m). 같은 토큰 버킷 — 낙하 중에 보고가
+     *                몰려도 정직한 주자가 거절당하지 않게 합니다.
      *   strikes    : 연속 위반 횟수. 통과 보고가 하나라도 오면 0 으로 돌아갑니다. */
     lastGood: { x: spawn.x, y: spawn.y, z: spawn.z },
     lastGoodAt: Date.now(),
     budget: VALIDATE.BURST,
+    downBudget: VALIDATE.DOWN_BURST,
     strikes: 0,
     corrections: 0
   };
@@ -1899,6 +1949,7 @@ function resetValidation(p) {
   p.lastGood.x = p.pos.x; p.lastGood.y = p.pos.y; p.lastGood.z = p.pos.z;
   p.lastGoodAt = Date.now();
   p.budget = VALIDATE.BURST;
+  p.downBudget = VALIDATE.DOWN_BURST;
   p.strikes = 0;
 }
 
@@ -1945,13 +1996,27 @@ function moveIsPlausible(p, nx, ny, nz, now) {
   if (dh > VALIDATE.MAX_STEP) return false;
   if (dh > budget) return false;
 
-  // 수직 — 순간 판정. 위로 솟는 것만 빡빡하게 봅니다.
+  /* 수직 — 위로 솟는 것만 순간 판정으로 빡빡하게 봅니다. */
   const vdt = Math.max(dt, VALIDATE.V_MIN_DT);
   const dy = ny - p.lastGood.y;
   if (dy > VALIDATE.MAX_UP_SPEED * vdt + VALIDATE.V_SLACK) return false;
-  if (-dy > VALIDATE.MAX_DOWN_SPEED * vdt + VALIDATE.V_SLACK) return false;
 
-  p.budget = budget - dh;      // 통과했을 때만 씁니다
+  /* 하강은 수평과 같은 토큰 버킷입니다(위 DOWN_BURST 주석).
+   * 순간 판정으로 보면 보고가 몰릴 때 허용치가 3.4m 로 눌려, 종단속도로
+   * 떨어지는 정직한 주자(보고당 4.5m)가 거절당하고 보정이 나갑니다.
+   * 그 보정이 주자를 한 층 위로 끌어올려 '끝나지 않는 낙하'가 됩니다. */
+  const drop = -dy;
+  const dBudget = Math.min(VALIDATE.DOWN_BURST,
+    (p.downBudget === undefined ? VALIDATE.DOWN_BURST : p.downBudget) +
+    VALIDATE.MAX_DOWN_SPEED * dt);
+  /* 한 보고가 통째로 크게 떨어지는 것만 여기서 막습니다(수평 MAX_STEP 과 짝). */
+  if (drop > VALIDATE.MAX_V_STEP) return false;
+  if (drop > dBudget) return false;
+
+  /* 통과했을 때만 씁니다 — 거절된 보고가 버킷을 깎으면 렉이 이어지는 동안
+   * 스스로 회복하지 못합니다(수평과 같은 규칙).                       */
+  p.budget = budget - dh;
+  p.downBudget = drop > 0 ? dBudget - drop : dBudget;
   return true;
 }
 
@@ -2128,6 +2193,29 @@ function startCountdown(room) {
 
 function startRound(room) {
   if (room.phase !== 'countdown') return;
+
+  /* ★ 2026-09-21 — 연습 여부를 <b>여기서 한 번 더 좁힙니다.</b>
+   *
+   *   room.solo 는 카운트다운이 시작되는 순간에 확정되는데(startCountdown),
+   *   그 사이 <b>카운트다운 3초</b> 동안 들어온 사람은 관전자가 아니라
+   *   <b>주자</b>가 됩니다(관전자로 밀리는 것은 phase 가 'playing' 일
+   *   때뿐입니다). 그래서 '혼자 심사 개시 → 카운트다운 중 난입' 이면
+   *   여럿이 뛰는데 회차만 연습으로 남습니다.
+   *
+   *   결과가 실제로 틀립니다 — 시간이 다 됐을 때 서든데스로 가지 않고
+   *   <b>survived(생존자 공동 1위)</b> 로 끝납니다. 등록결정은 한 건이고
+   *   대기 화면 첫 문장도 "단 한 사람"이라고 말하므로, 시계가 승자를
+   *   여럿 만들면 안 됩니다(아래 roomTimeout 주석).
+   *   실측: 혼자 시작 → 1.2초 뒤 2명 난입 → 3명 전원 생존 →
+   *         <b>reason=survived · 공동 1위 3명</b>.
+   *
+   *   ⚠ <b>좁히기만 하고 되돌리지는 않습니다</b>(&& 인 이유). 반대로
+   *     '여럿으로 시작했다가 카운트다운 중에 빠져 혼자 남는' 경우를
+   *     연습으로 바꾸면, 같은 회차의 성격이 오락가락한다는 startCountdown
+   *     의 경고에 그대로 걸립니다. 그 경우는 어차피 남은 한 명이
+   *     checkRoundEnd 에서 lastStanding 으로 즉시 마무리됩니다.        */
+  if (room.solo && room.players.size > 1) room.solo = false;
+
   room.phase = 'playing';
   room.roundStartedAt = Date.now();
   /* 화면의 '남은 시간'도 같은 상한을 따라야 합니다 — 혼자일 때 6분으로
@@ -3866,6 +3954,7 @@ io.on('connection', (socket) => {
       p.lastGood.x = nx; p.lastGood.y = ny; p.lastGood.z = nz;
       p.lastGoodAt = now;
       p.budget = VALIDATE.BURST;
+      p.downBudget = VALIDATE.DOWN_BURST;
       p.strikes = 0;
     }
 
