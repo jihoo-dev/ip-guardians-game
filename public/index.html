@@ -2223,10 +2223,6 @@ const G = {
    * 어긋나면 false 가 되고 20Hz 스냅샷의 rt 값을 그대로 씁니다.         */
   rotTrust: true,
 
-  /* 이번 회차에 회전 반전을 이미 안내했는가.
-   * 반전은 15초마다 반복되는데 매번 배너를 띄우면 곧 배경이 됩니다.
-   * 회차당 한 번만 알리고, 그 뒤로는 층 목록의 방향 표시로만 읽습니다. */
-  rotFlipTold: false,
 
   /* ── 어둠 예고 (내 도착 기준) ─────────────────────────────────────
    * told   : 이번 회차에 예고를 이미 받았는가 (회차당 한 번)
@@ -11185,9 +11181,6 @@ function onTraitLayer(trait) {
  * 이벤트 발동 시점에 한 번만 정하면, 어둠이 켜진 뒤 내가 그 층으로
  * 내려가도 배너가 안 뜹니다(반대로 올라가도 안 꺼집니다).            */
 function refreshTraitBanners() {
-  /* 회전 층을 떠나면 글 설명을 다시 열어 둡니다 — 다시 내려오면
-   * 그때는 처음 보는 사람일 수 있습니다(applyLayerEvent 주석).     */
-  if (!onTraitLayer('rotate')) G.rotFlipTold = false;
   const a = G.traits.accel, dk = G.traits.dark;
   if (dom.accelAlert) {
     dom.accelAlert.classList.toggle('on', !!(a && a.active) && onTraitLayer('accel'));
@@ -11284,27 +11277,20 @@ function applyLayerEvent(d) {
     for (const el of (dom.docs || [])) {
       el.classList.toggle('rotate', st.active && st.layers.indexOf(+el.dataset.l) >= 0);
     }
-      /* fired 는 '이번 패킷이 방향 반전 순간'이라는 표시입니다.
-     * 라운드 시작·중도 참가 때도 같은 이벤트가 오는데, 그때까지 문구를
-     * 띄우면 접속하자마자 경고가 뜹니다.
-     *
-     * 반전은 15초마다 반복되므로 회차당 한 번만, 그것도 그 층에 실제로
-     * 서 있는 사람에게만 알립니다. 그 뒤로는 층 목록의 ↻/↺ 로만 읽습니다. */
     /* ── 방향이 뒤집힌 순간 ─────────────────────────────────────────
-     * 2026-09-18 — 종전에는 <b>회차당 한 번</b>만 알렸습니다(rotFlipTold).
-     * 그런데 첫 반전이 일어날 때 내가 다른 층에 있었으면 <b>그 회차 내내
-     * 아무것도 못 봅니다</b> — "회전 알림이 한 번밖에 안 보인다"는 의견의
-     * 실체가 이것이었습니다. 어둠 예고와 같은 실수였습니다: 알림을
-     * <b>방 전체의 사건 시점</b>에 묶어 두면 그때 그 자리에 없던 사람은
-     * 영영 못 받습니다.
+     * fired 는 '이번 패킷이 방향 반전 순간'이라는 표시입니다. 라운드
+     * 시작·중도 참가 때도 같은 이벤트가 오는데, 그때까지 알리면
+     * 접속하자마자 경고가 뜹니다.
      *
-     * 지금은 둘로 나눕니다.
-     *   배너·소리 : 내가 그 층에 있는 <b>동안 반전될 때마다</b>.
-     *               2.2초짜리이고, 실제로 몸이 반대로 실리는 순간이라
-     *               매번 알려 주는 것이 맞습니다.
-     *   글 설명   : 그 층에 <b>머무는 동안 한 번</b>. 7초마다 같은 문장이
-     *               쌓이면 읽지 않게 됩니다. 층을 떠나면 다시 열립니다
-     *               (refreshTraitBanners 에서 해제).
+     * 알리는 것은 <b>상단 배너와 소리뿐</b>입니다. 내가 그 층에 있는
+     * <b>동안 반전될 때마다</b> 내보냅니다 — 2.2초짜리이고, 실제로 몸이
+     * 반대로 실리는 순간이라 매번 알려 주는 것이 맞습니다.
+     *
+     * ⚠ 2026-09-23 — 같은 문장을 <b>하단 알림으로도</b> 한 번 더 내보내고
+     *   있었는데 뺐습니다. 위아래에 같은 말이 동시에 떠서 두 번 읽게 될
+     *   뿐이었습니다. 그 한 번을 세던 G.rotFlipTold 도 같이 지웠습니다
+     *   — 남겨 두면 아무도 안 읽는 죽은 상태가 됩니다.
+     *   규칙 설명은 층 배너·층 목록·대기 화면 심사 규격이 이미 합니다.
      * ------------------------------------------------------------- */
     if (d.fired) {
       netStats.rotFlips++;
@@ -11315,10 +11301,6 @@ function applyLayerEvent(d) {
           rotAlertTimer = setTimeout(() => dom.rotAlert.classList.remove('on'), 2200);
         }
         Sound.sfx('obstacle', { rate: 0.9, volume: 0.85 });
-        if (!G.rotFlipTold) {
-          G.rotFlipTold = true;
-          toast('⚠️ 심사관 검토 방향 변경 — 층이 반대로 돕니다', 'kill');
-        }
       }
     }
   }
@@ -12120,8 +12102,6 @@ function connect(name, mode, opts) {
     if (d.phaseEpoch) G.phaseEpoch = d.phaseEpoch;
     G.phaseTrust = true;
     G.phaseOn = true;
-    // 회전 반전 안내는 회차당 한 번이므로 새 회차에서 다시 열어 줍니다
-    G.rotFlipTold = false;
     // 어둠 예고도 회차당 한 번입니다 (updateDarkGrace 주석)
     G.darkGrace.told = false; G.darkGrace.until = 0; G.darkGrace.landed = false;
     G.specFree = false;          // 새 회차는 대상 시점에서 시작
